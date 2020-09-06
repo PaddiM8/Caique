@@ -1,0 +1,121 @@
+--- main.cq ---
+use util.string_utils;
+
+union Option<T> {
+    Some(T),
+    None,
+}
+
+// Naming conventions
+// PascalCase: unions, classes, structs, type functions
+// camelCase: independent functions
+// snake_case: modules
+
+fn Main() {
+    let people = [
+        new Person("a", 20),
+        new Person("b", 35),
+        new Person("c", 62),
+    ];
+
+    let inputPerson = io.readln("Find person by name: ");
+
+    // Alternative 1
+    let person = if let Some(person) = people.Find(inputPerson) {
+        person
+    } else {
+        io.println("Unable to find person: '{}'.", inputPerson);
+        ret;
+    };
+
+    // Alternative 2
+    let person = people.Find(inputPerson).Else(|| {
+        io.println("Unable to find person: '{}'.", inputPerson);
+        ret;
+    });
+
+    // println is a function in the `core.io` module.
+    // `core` is included automatically.
+    // When calling functions straight from a module (static functions), the module name needs to preceed it.
+    io.println("Hello {}", person.Name);
+    io.println('-'.Repeat(person.Name.Length));
+
+    io.print(match person.Name {
+        "bakk" => "nice",
+        "z" => "ok",
+        _ => "",
+    });
+
+    io.println(ReverseList([ 3, 5, 2, 6 ]).ToJson()); // [ 6, 2, 5, 3 ]
+
+    let list = [ "hello", "world" ];
+    list.Add("yes");
+    io.println(list[0]);
+}
+
+fn ReverseList<T>(arr: T[]): T[] {
+    let amount = arr.Length;
+    let reversed = T[amount];
+    for i in 0..amount: reversed[amount - i] = arr[i];
+
+    reversed
+}
+
+ext Person[] Find(name: string): Option<Person> {
+    for person in self {
+        if person.Name == name: ret Some(person);
+    }
+
+    None
+}
+
+--- person.cq ---
+class Person(Name, Age) {
+    pub Name: string;
+    pub Age: i8;
+    _id: string;
+
+    setter Name: self = self.FirstUppercase();
+
+    init {
+        _id = Name + Age.ToString();
+    }
+}
+
+--- util/string_utils.cq ---
+ext string FirstUppercase(): string {
+    self[0].ToUpper() + self[1..]
+}
+
+ext char Repeat(amount: i32): string {
+    let chars = [] as char[amount];
+    for i in 0..amount {
+        chars[i] = self;
+    }
+
+    chars as string
+}
+
+class Rectangle(Width, Height) {
+    pub Width: i32;
+    pub Height: i32;
+    pub_read Area: i32;
+
+    setter Width {
+        Width = value;
+        UpdateArea();
+    }
+
+    setter Height {
+        Height = value;
+        UpdateArea();
+    }
+
+    init {
+        UpdateArea();
+    }
+
+    fn UpdateArea() {
+        Area = Width * Height;
+    }
+}
