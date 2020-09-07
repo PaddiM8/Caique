@@ -6,7 +6,7 @@ useStmt = "use" , identifier , [{ "." , identifier }] , ";" ;
 declaration = classDecl
             | functionDecl
             | varDecl ;
-classDecl = "class" , identifier , parameters , [ ":" , type , { ", " type } ] , ( ";" | blockStmt ) ;
+classDecl = "class" , identifier , parameters , [ ":" , type , { ", " type } ] , blockStmt ;
 functionDecl = "fn" , identifier , parameters , [ ":" , type ] , blockStmt ;
 varDecl = "let" , identifier , "=" , expression , ";" ;
 
@@ -15,28 +15,37 @@ parameter = identifier , ":" , type ;
 
 statement = expressionStmt
           | blockStmt
-          | assignmentStmt ;
+          | assignmentStmt
+          | returnStmt
+          |ifStmt ;
 expressionStmt = expression , ";" ;
 blockStmt = [{ varDecl | statement }] ;
-assignmentStmt = identifier , ( "=" | "+=" | "-=" | "*=" ) , expressionStmt ;
+assignmentStmt = identifierExpr , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
+returnStmt = "ret" , expression ;
 ifStmt = "if" , expression , ( blockStmt | ":" , expressionStmt ) ;
 
 expression = precedenceExpr ;
 precedenceExpr = ? unary/binary expression with primaryExpr as values ? ;
+castExpr = expression , [ "as" type ] ;
+indexerExpr = primaryExpr , [ "[" , expression , "]" ] ;
 primaryExpr = identifierExpr
             | groupExpr
             | newExpr
-            | literal ;
+            | literal
+            | ifExpr
+            | listExpr ;
 
-identifierExpr = identifier , [{ "." , identifier }] , [ arguments ];
+identifierExpr = [ identifier , [{ "->" , identifier }] ] ,
+                 identifier , [ arguments ] , [{ "." , identifier , [ arguments ] }];
 groupExpr = "(" , expression , ")" ;
 newExpr = "new" , type , arguments ;
 literal = bool | number | string | char ;
+listExpr = "[" , expression , [ "," , expression ] , "]" ;
 
 arguments = "(" , [ expression , [{ "," , expression }] ] , ")" ;
 
 bool = "true" | "false" ;
-number = /[0-9]+/ ;
+number = /[0-9]+(\.[0-9]+)/ ;
 string = '"' , ? anything ? , '"' ;
 char = "'" , ? any utf-8 character ? , '"' ; (* utf-8? *)
 identifier = /[A-z_]+/ ;
