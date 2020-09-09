@@ -2,7 +2,7 @@ using System;
 
 namespace Caique.Parsing
 {
-    struct TextPosition
+    public struct TextPosition
     {
         public int Line { get; }
 
