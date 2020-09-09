@@ -8,15 +8,15 @@ namespace Caique.Diagnostics
 
         public string Message { get; }
 
-        public TextPosition TextPosition { get; }
+        public TextSpan Span { get; }
 
         public DiagnosticType Type { get; }
 
-        public Diagnostic(DiagnosticIdentifier identifier, string message, TextPosition textPosition, DiagnosticType type)
+        public Diagnostic(DiagnosticIdentifier identifier, string message, TextSpan span, DiagnosticType type)
         {
             Identifier = identifier;
             Message = message;
-            TextPosition = textPosition;
+            Span = span;
             Type = type;
         }
     }

@@ -9,9 +9,9 @@ namespace Caique.Parsing
 
         public string Value { get; }
 
-        public (TextPosition from, TextPosition to) Span { get; }
+        public TextSpan Span { get; }
 
-        public Token(TokenKind kind, string value, (TextPosition from, TextPosition to) span)
+        public Token(TokenKind kind, string value, TextSpan span)
         {
             Kind = kind;
             Value = value;

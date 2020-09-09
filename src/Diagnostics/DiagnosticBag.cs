@@ -18,22 +18,32 @@ namespace Caique.Diagnostics
             _diagnostics.AddRange(diagnostics);
         }
 
-        public void ReportUnterminatedStringLiteral(string tokenValue, TextPosition position)
+        public void ReportUnterminatedStringLiteral(TextPosition position)
         {
             Report(
                 DiagnosticIdentifier.UnterminatedStringLiteral,
-                $"Unexpected token '{tokenValue}'",
-                position,
+                "Unterminated string literal",
+                new TextSpan(position, position),
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportUnknownToken(string tokenValue, TextPosition position)
+        {
+            Report(
+                DiagnosticIdentifier.UnknownToken,
+                $"Unknown token '{tokenValue}'",
+                new TextSpan(position, position),
                 DiagnosticType.Error
             );
         }
 
         private void Report(DiagnosticIdentifier identifier,
                             string message,
-                            TextPosition position,
+                            TextSpan span,
                             DiagnosticType type)
         {
-            _diagnostics.Add(new Diagnostic(identifier, message, position, type));
+            _diagnostics.Add(new Diagnostic(identifier, message, span, type));
         }
     }
 }

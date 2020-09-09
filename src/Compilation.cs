@@ -11,6 +11,10 @@ namespace Caique
         public Compilation(string source)
         {
             var tokens = new Lexer(source, Diagnostics).Lex();
+            foreach (var token in tokens)
+            {
+                Console.WriteLine(token.Span.Start.Column + ", " + token.Span.End.Column);
+            }
         }
     }
 }
