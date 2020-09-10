@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Caique.AST;
 using Caique.Diagnostics;
 using Caique.Parsing;
 
@@ -16,7 +17,11 @@ namespace Caique
 
             if (Program.Options!.PrintTokens)
                 PrintTokens(tokens);
+
             var statements = new Parser(tokens, Diagnostics).Parse();
+
+            if (Program.Options!.PrintAst)
+                new AstPrinter().PrintStatements(statements);
         }
 
         private void PrintTokens(List<Token> tokens)
