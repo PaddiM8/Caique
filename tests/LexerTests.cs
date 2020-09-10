@@ -113,7 +113,10 @@ namespace Caique.Tests
 
         private List<Token> Lex(string source)
         {
-            return new Lexer(source, _diagnostics).Lex();
+            var tokens = new Lexer(source, _diagnostics).Lex();
+            tokens.RemoveAt(tokens.Count - 1); // Remove EndOfFile token.
+
+            return tokens;
         }
 
         public static IEnumerable<object[]> GetTokensData()

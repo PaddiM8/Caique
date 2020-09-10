@@ -3,7 +3,7 @@ using Caique.Parsing;
 
 namespace Caique.Parsing
 {
-    class Token
+    public class Token
     {
         public TokenKind Kind { get; }
 

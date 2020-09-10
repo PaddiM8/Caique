@@ -21,4 +21,19 @@ namespace Caique.Parsing
         // Other
         Unknown, EndOfFile,
     }
+
+    public static class TokenKindExtensions
+    {
+        public static int GetBinaryOperatorPrecedence(this TokenKind kind)
+        {
+            return kind switch
+            {
+                TokenKind.Plus => 1,
+                TokenKind.Minus => 1,
+                TokenKind.Star => 2,
+                TokenKind.Slash => 2,
+                _ => 0,
+            };
+        }
+    }
 }

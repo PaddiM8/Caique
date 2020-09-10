@@ -71,11 +71,13 @@ namespace Caique.Parsing
                 tokens.Add(NextToken());
             }
 
-            // An end of file token may be added for simplicity,
-            // but should not be in the end result.
-            if (tokens.Last().Kind == TokenKind.EndOfFile)
+            // Make sure there is an EndOfFile token.
+            if (tokens.Last().Kind != TokenKind.EndOfFile)
             {
-                tokens.RemoveAt(tokens.Count - 1);
+                tokens.Add(new Token(TokenKind.EndOfFile, "", new TextSpan(
+                    CurrentTextPosition,
+                    CurrentTextPosition)
+                ));
             }
 
             return tokens;

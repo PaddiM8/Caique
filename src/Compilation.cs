@@ -16,6 +16,7 @@ namespace Caique
 
             if (Program.Options!.PrintTokens)
                 PrintTokens(tokens);
+            var statements = new Parser(tokens, Diagnostics).Parse();
         }
 
         private void PrintTokens(List<Token> tokens)
