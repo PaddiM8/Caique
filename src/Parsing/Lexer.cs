@@ -71,6 +71,8 @@ namespace Caique.Parsing
                 tokens.Add(NextToken());
             }
 
+            // An end of file token may be added for simplicity,
+            // but should not be in the end result.
             if (tokens.Last().Kind == TokenKind.EndOfFile)
             {
                 tokens.RemoveAt(tokens.Count - 1);
@@ -81,6 +83,7 @@ namespace Caique.Parsing
 
         private Token NextToken()
         {
+            // Ignore any whitespace
             while (!IsAtEnd && char.IsWhiteSpace(Current))
             {
                 Advance();
@@ -93,6 +96,9 @@ namespace Caique.Parsing
             }
 
 
+            // If the last character is whitespace,
+            // something will still be needed to be returned.
+            // Return an end of file token.
             if (IsAtEnd)
             {
                 return new Token(TokenKind.EndOfFile, "", new TextSpan(
@@ -191,6 +197,9 @@ namespace Caique.Parsing
                 length++;
             }
 
+            // The position should be at the last character in the literal
+            // before returning. This is to make sure the eventual token
+            // will have a correct TextSpan.
             Retreat();
 
             return _source.Substring(start, length);
@@ -239,6 +248,9 @@ namespace Caique.Parsing
                 Advance();
             }
 
+            // If the loop didn't break because of
+            // a double quote, the string literal was never terminated,
+            // so throw an error.
             if (Previous != '"')
             {
                 _diagnostics.ReportUnterminatedStringLiteral(CurrentTextPosition);
@@ -258,7 +270,13 @@ namespace Caique.Parsing
                 length++;
             }
 
+            // The position should be at the last character in the literal
+            // before returning. This is to make sure the eventual token
+            // will have a correct TextSpan.
             Retreat();
+
+            // Figure out which (if any) keyword it is.
+            // If it is not any keyword, it's just an identifier.
             string value = _source.Substring(start, length);
             var kind = value switch
             {
@@ -269,7 +287,10 @@ namespace Caique.Parsing
                 _ => TokenKind.Identifier,
             };
 
-            return (value, kind);
+            return (
+                kind == TokenKind.Identifier ? value : "", // Only return the value if it's an identifier
+                kind
+            );
         }
 
         private void Advance()
