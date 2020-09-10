@@ -12,6 +12,6 @@ namespace Caique
         public bool PrintTokens { get; set; }
 
         [Value(0, MetaName = "input file", HelpText = "Path to the Caique input file")]
-        public string InputFile { get; set; }
+        public string? InputFile { get; set; }
     }
 }

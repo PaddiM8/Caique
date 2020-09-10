@@ -28,6 +28,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportUnknownEscapeSequence(string escaped, TextPosition position)
+        {
+            Report(
+                DiagnosticIdentifier.UnknownEscapeSequence,
+                $"Unknown escape sequence: '\\{escaped}'",
+                new TextSpan(position, position),
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportUnknownToken(string tokenValue, TextPosition position)
         {
             Report(

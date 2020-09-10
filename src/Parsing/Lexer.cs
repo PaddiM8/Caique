@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Caique.Diagnostics;
 using Caique.Parsing;
 
@@ -198,21 +199,52 @@ namespace Caique.Parsing
         private string NextStringLiteral()
         {
             Advance(); // Skip past the first "
-
-            int start = _position.index;
-            int length = 0;
+            var value = new StringBuilder();
 
             while (Current != '"' && Current != '\n')
             {
+                if (Current == '\\')
+                {
+                    if (IsAtEnd) break;
+                    Advance();
+
+                    char? escaped = Current switch
+                    {
+                        'n' => '\n',
+                        't' => '\t',
+                        'r' => '\r',
+                        '"' => '"',
+                        '\\' => '\\',
+                        _ => null,
+                    };
+
+                    if (escaped != null)
+                    {
+                        value.Append(escaped);
+                    }
+                    else
+                    {
+                        _diagnostics.ReportUnknownEscapeSequence(
+                            Current.ToString(),
+                            CurrentTextPosition
+                        );
+                    }
+
+                    Advance();
+
+                    continue;
+                }
+
+                value.Append(Current);
                 Advance();
-                length++;
             }
 
             if (Previous != '"')
             {
                 _diagnostics.ReportUnterminatedStringLiteral(CurrentTextPosition);
             }
-            return _source.Substring(start, length);
+
+            return value.ToString();
         }
 
         private (string, TokenKind) NextIdentifier()

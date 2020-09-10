@@ -7,7 +7,7 @@ namespace Caique
 {
     class Program
     {
-        public static CommandLineOptions Options { get; private set; }
+        public static CommandLineOptions? Options { get; private set; }
         static void Main(string[] args)
         {
             // Create the cli parser with HelpWriter disabled,

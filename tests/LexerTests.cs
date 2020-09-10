@@ -49,6 +49,20 @@ namespace Caique.Tests
         }
 
         [Theory]
+        [InlineData("\\n", "\n")]
+        [InlineData("\\t", "\t")]
+        [InlineData("\\r", "\r")]
+        [InlineData("\\\"", "\"")]
+        [InlineData("\\\\", "\\")]
+        public void Lexer_StringLiteralWithEscapeSequences_InsertTheSequences(string inputSequence, string expected)
+        {
+            var tokens = Lex($"\"{inputSequence}\"");
+            var token = Assert.Single(tokens);
+            Assert.Equal(TokenKind.StringLiteral, token.Kind);
+            Assert.Equal(expected, token.Value);
+        }
+
+        [Theory]
         [MemberData(nameof(GetTokenPairsData))]
         public void Lexer_TokenPairs_WithAccurateTextPosition((TokenKind kind, string text) token1, (TokenKind kind, string text) token2)
         {
