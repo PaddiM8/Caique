@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Caique.Diagnostics;
 using Caique.Parsing;
 
@@ -11,9 +13,41 @@ namespace Caique
         public Compilation(string source)
         {
             var tokens = new Lexer(source, Diagnostics).Lex();
+
+            if (Program.Options!.PrintTokens)
+                PrintTokens(tokens);
+        }
+
+        private void PrintTokens(List<Token> tokens)
+        {
             foreach (var token in tokens)
             {
-                Console.WriteLine(token.Span.Start.Column + ", " + token.Span.End.Column);
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.Write(token.Kind);
+                Console.ResetColor();
+
+                if (!string.IsNullOrEmpty(token.Value))
+                {
+                    Console.Write($": {token.Value}");
+                }
+
+                Console.Write(" | (");
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.Write(
+                    "{0}:{1}",
+                    token.Span.Start.Line,
+                    token.Span.Start.Column
+                );
+                Console.ResetColor();
+                Console.Write(") -> (");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write(
+                    "{0}:{1}",
+                    token.Span.End.Line,
+                    token.Span.End.Column
+                );
+                Console.ResetColor();
+                Console.WriteLine(")");
             }
         }
     }
