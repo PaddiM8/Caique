@@ -259,10 +259,17 @@ namespace Caique.Parsing
             }
 
             Retreat();
+            string value = _source.Substring(start, length);
+            var kind = value switch
+            {
+                "if" => TokenKind.If,
+                "fn" => TokenKind.Fn,
+                "let" => TokenKind.Let,
+                "class" => TokenKind.Class,
+                _ => TokenKind.Identifier,
+            };
 
-            // This will later return keywords as well,
-            // meaning it needs to return the TokenKind.
-            return (_source.Substring(start, length), TokenKind.Identifier);
+            return (value, kind);
         }
 
         private void Advance()

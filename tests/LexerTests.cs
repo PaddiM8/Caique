@@ -155,6 +155,11 @@ namespace Caique.Tests
                 (TokenKind.OpenAngleBracket, "<"),
                 (TokenKind.ClosedAngleBracket, ">"),
 
+                (TokenKind.If, "if"),
+                (TokenKind.Fn, "fn"),
+                (TokenKind.Let, "let"),
+                (TokenKind.Class, "class"),
+
                 (TokenKind.Identifier, "a"),
                 (TokenKind.Identifier, "_abc"),
                 (TokenKind.Identifier, "a_bc"),

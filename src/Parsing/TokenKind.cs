@@ -12,6 +12,9 @@ namespace Caique.Parsing
         OpenParenthesis, ClosedParenthesis, OpenSquareBracket, ClosedSquareBracket,
         OpenBrace, ClosedBrace, OpenAngleBracket, ClosedAngleBracket,
 
+        // Keywords
+        If, Fn, Let, Class, Ret,
+
         // Variable length
         Identifier, NumberLiteral, StringLiteral,
 
