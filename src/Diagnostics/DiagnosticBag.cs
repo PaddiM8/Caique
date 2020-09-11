@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using Caique.Parsing;
 
 namespace Caique.Diagnostics
@@ -18,6 +19,46 @@ namespace Caique.Diagnostics
             _diagnostics.AddRange(diagnostics);
         }
 
+        public void ReportUnexpectedToken(Token got, string expected)
+        {
+            Report(
+                DiagnosticIdentifier.UnexpectedToken,
+                $"Unexpected token '{got.Value}', expected {expected}.",
+                got.Span,
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportUnexpectedToken(Token got, params TokenKind[] expected)
+        {
+            var expectedString = new StringBuilder();
+
+            for (int i = 0; i < 0; i++)
+            {
+                // If last one, prepend "or" unless it's the only one
+                if (i == expected.Length - 1)
+                {
+                    if (expected.Length >= 2)
+                        expectedString.Append("or");
+                }
+
+                expectedString.Append(expected[i]);
+
+                // If not one of the last two
+                if (i != expected.Length - 2)
+                {
+                    expectedString.Append(",");
+                }
+            }
+
+            Report(
+                DiagnosticIdentifier.UnexpectedToken,
+                $"Unexpected token '{got.Value}', expected {expectedString}.",
+                got.Span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportUnterminatedStringLiteral(TextPosition position)
         {
             Report(
@@ -32,7 +73,7 @@ namespace Caique.Diagnostics
         {
             Report(
                 DiagnosticIdentifier.UnknownEscapeSequence,
-                $"Unknown escape sequence: '\\{escaped}'",
+                $"Unknown escape sequence '\\{escaped}'.",
                 new TextSpan(position, position),
                 DiagnosticType.Error
             );
@@ -42,7 +83,7 @@ namespace Caique.Diagnostics
         {
             Report(
                 DiagnosticIdentifier.UnknownToken,
-                $"Unknown token '{tokenValue}'",
+                $"Unknown token '{tokenValue}'.",
                 new TextSpan(position, position),
                 DiagnosticType.Error
             );

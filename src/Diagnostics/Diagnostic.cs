@@ -1,3 +1,4 @@
+using System;
 using Caique.Parsing;
 
 namespace Caique.Diagnostics
@@ -18,6 +19,21 @@ namespace Caique.Diagnostics
             Message = message;
             Span = span;
             Type = type;
+        }
+
+        public void Print()
+        {
+            Console.ForegroundColor = Type switch
+            {
+                DiagnosticType.Error => ConsoleColor.Red,
+                DiagnosticType.Warning => ConsoleColor.Yellow,
+                _ => throw new NotImplementedException(),
+            };
+
+            Console.Write(Type.ToString());
+            Console.ResetColor();
+            Console.Write(": ");
+            Console.WriteLine(Message);
         }
     }
 }

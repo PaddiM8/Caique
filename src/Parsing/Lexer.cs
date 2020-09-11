@@ -125,6 +125,10 @@ namespace Caique.Parsing
                 case ']': kind = TokenKind.ClosedSquareBracket; break;
                 case '{': kind = TokenKind.OpenBrace; break;
                 case '}': kind = TokenKind.ClosedBrace; break;
+                case '.': kind = TokenKind.Dot; break;
+                case ',': kind = TokenKind.Comma; break;
+                case ':': kind = TokenKind.Colon; break;
+                case ';': kind = TokenKind.Semicolon; break;
                 case '=':
                     if (Lookahead == '=')
                     {
@@ -283,16 +287,14 @@ namespace Caique.Parsing
             var kind = value switch
             {
                 "if" => TokenKind.If,
+                "else" => TokenKind.Else,
                 "fn" => TokenKind.Fn,
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
                 _ => TokenKind.Identifier,
             };
 
-            return (
-                kind == TokenKind.Identifier ? value : "", // Only return the value if it's an identifier
-                kind
-            );
+            return (value, kind);
         }
 
         private void Advance()

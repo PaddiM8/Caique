@@ -13,10 +13,13 @@ namespace Caique.Parsing
         OpenBrace, ClosedBrace, OpenAngleBracket, ClosedAngleBracket,
 
         // Keywords
-        If, Fn, Let, Class, Ret,
+        If, Else, Fn, Let, Class, Ret,
 
         // Variable length
         Identifier, NumberLiteral, StringLiteral,
+
+        // Punctuation
+        Dot, Comma, Colon, Semicolon,
 
         // Other
         Unknown, EndOfFile,

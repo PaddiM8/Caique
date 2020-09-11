@@ -22,6 +22,9 @@ namespace Caique
 
             if (Program.Options!.PrintAst)
                 new AstPrinter().PrintStatements(statements);
+
+            foreach (var diagnostic in Diagnostics)
+                diagnostic.Print();
         }
 
         private void PrintTokens(List<Token> tokens)

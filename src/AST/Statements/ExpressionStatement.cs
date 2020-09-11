@@ -7,9 +7,12 @@ namespace Caique.AST
     {
         public IExpression Expression { get; }
 
-        public ExpressionStatement(IExpression expr)
+        public bool TrailingSemicolon { get; }
+
+        public ExpressionStatement(IExpression expr, bool trailingSemicolon)
         {
             Expression = expr;
+            TrailingSemicolon = trailingSemicolon;
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)
