@@ -40,7 +40,14 @@ namespace Caique.Parsing
 
             while (!IsAtEnd)
             {
-                statements.Add(ParseStatement());
+                try
+                {
+                    statements.Add(ParseStatement());
+                }
+                catch (ParsingErrorException)
+                {
+                    Synchronise();
+                }
             }
 
             return statements;
@@ -93,7 +100,14 @@ namespace Caique.Parsing
 
             while (!Consume(TokenKind.ClosedBrace))
             {
-                statements.Add(ParseStatement());
+                try
+                {
+                    statements.Add(ParseStatement());
+                }
+                catch (ParsingErrorException)
+                {
+                    Synchronise();
+                }
             }
 
             return new BlockStatement(statements);
@@ -260,6 +274,20 @@ namespace Caique.Parsing
         private TypeExpression ParseType()
         {
             return new TypeExpression(Expect(TokenKind.Identifier, "type"));
+        }
+
+        private void Synchronise()
+        {
+            Advance();
+
+            while (!IsAtEnd)
+            {
+                if (Consume(TokenKind.Semicolon)) return;
+                if (Current.Kind.IsKeyword() ||
+                    Match(TokenKind.ClosedBrace)) return;
+
+                Advance();
+            }
         }
 
         private bool Match(params TokenKind[] kinds)

@@ -38,5 +38,20 @@ namespace Caique.Parsing
                 _ => 0,
             };
         }
+        public static bool IsKeyword(this TokenKind kind)
+        {
+            switch (kind)
+            {
+                case TokenKind.If:
+                case TokenKind.Else:
+                case TokenKind.Fn:
+                case TokenKind.Let:
+                case TokenKind.Class:
+                case TokenKind.Ret:
+                    return true;
+                default:
+                    return false;
+            };
+        }
     }
 }
