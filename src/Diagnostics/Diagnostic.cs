@@ -23,6 +23,11 @@ namespace Caique.Diagnostics
 
         public void Print()
         {
+            // Print position
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.Write($"[{Span.Start.Line}:{Span.Start.Column}] ");
+
+            // Print "Error"/"Warning"
             Console.ForegroundColor = Type switch
             {
                 DiagnosticType.Error => ConsoleColor.Red,
@@ -33,6 +38,8 @@ namespace Caique.Diagnostics
             Console.Write(Type.ToString());
             Console.ResetColor();
             Console.Write(": ");
+
+            // Print error message
             Console.WriteLine(Message);
         }
     }

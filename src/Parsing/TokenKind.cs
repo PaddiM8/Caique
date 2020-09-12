@@ -38,6 +38,7 @@ namespace Caique.Parsing
                 _ => 0,
             };
         }
+
         public static bool IsKeyword(this TokenKind kind)
         {
             switch (kind)
@@ -51,6 +52,36 @@ namespace Caique.Parsing
                     return true;
                 default:
                     return false;
+            };
+        }
+
+        public static string ToStringRepresentation(this TokenKind kind)
+        {
+            return kind switch
+            {
+                TokenKind.Plus => "+",
+                TokenKind.Minus => "-",
+                TokenKind.Star => "*",
+                TokenKind.Slash => "/",
+                TokenKind.Equals => "=",
+                TokenKind.Bang => "!",
+                TokenKind.BangEquals => "!=",
+                TokenKind.EqualsEquals => "==",
+                TokenKind.MoreOrEquals => ">=",
+                TokenKind.LessOrEquals => "<=",
+                TokenKind.OpenParenthesis => "(",
+                TokenKind.ClosedParenthesis => ")",
+                TokenKind.OpenSquareBracket => "[",
+                TokenKind.ClosedSquareBracket => "]",
+                TokenKind.OpenBrace => "{",
+                TokenKind.ClosedBrace => "}",
+                TokenKind.OpenAngleBracket => "<",
+                TokenKind.ClosedAngleBracket => ">",
+                TokenKind.Dot => ".",
+                TokenKind.Comma => ",",
+                TokenKind.Colon => ":",
+                TokenKind.Semicolon => ";",
+                _ => kind.ToString().ToLower(),
             };
         }
     }

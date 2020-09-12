@@ -23,7 +23,7 @@ namespace Caique.Diagnostics
         {
             Report(
                 DiagnosticIdentifier.UnexpectedToken,
-                $"Unexpected token '{got.Value}', expected {expected}.",
+                $"Unexpected token '{got.Kind.ToStringRepresentation()}', expected {expected}.",
                 got.Span,
                 DiagnosticType.Error
             );
@@ -33,19 +33,19 @@ namespace Caique.Diagnostics
         {
             var expectedString = new StringBuilder();
 
-            for (int i = 0; i < 0; i++)
+            for (int i = 0; i < expected.Length; i++)
             {
                 // If last one, prepend "or" unless it's the only one
                 if (i == expected.Length - 1)
                 {
                     if (expected.Length >= 2)
-                        expectedString.Append("or");
+                        expectedString.Append(" or ");
                 }
 
-                expectedString.Append(expected[i]);
+                expectedString.Append($"'{expected[i].ToStringRepresentation()}'");
 
                 // If not one of the last two
-                if (i != expected.Length - 2)
+                if (i < expected.Length - 2)
                 {
                     expectedString.Append(",");
                 }
@@ -53,7 +53,7 @@ namespace Caique.Diagnostics
 
             Report(
                 DiagnosticIdentifier.UnexpectedToken,
-                $"Unexpected token '{got.Value}', expected {expectedString}.",
+                $"Unexpected token '{got.Kind.ToStringRepresentation()}', expected {expectedString}.",
                 got.Span,
                 DiagnosticType.Error
             );
