@@ -88,13 +88,13 @@ namespace Caique.Parsing
             // Ignore any whitespace
             while (!IsAtEnd && char.IsWhiteSpace(Current))
             {
-                Advance();
-
                 if (Current == '\n')
                 {
                     _position.line++;
                     _position.column = 0;
                 }
+
+                Advance();
             }
 
 
