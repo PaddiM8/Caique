@@ -8,6 +8,9 @@ namespace Caique.Parsing
         // Comparison
         Equals, Bang, BangEquals, EqualsEquals, MoreOrEquals, LessOrEquals,
 
+        // Assignment
+        PlusEquals, MinusEquals, StarEquals, SlashEquals,
+
         // Parenthesis and brackets
         OpenParenthesis, ClosedParenthesis, OpenSquareBracket, ClosedSquareBracket,
         OpenBrace, ClosedBrace, OpenAngleBracket, ClosedAngleBracket,
@@ -43,6 +46,21 @@ namespace Caique.Parsing
             };
         }
 
+        public static bool IsAssignmentOperator(this TokenKind kind)
+        {
+            switch (kind)
+            {
+                case TokenKind.Equals:
+                case TokenKind.PlusEquals:
+                case TokenKind.MinusEquals:
+                case TokenKind.StarEquals:
+                case TokenKind.SlashEquals:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         public static bool IsKeyword(this TokenKind kind)
         {
             switch (kind)
@@ -73,6 +91,10 @@ namespace Caique.Parsing
                 TokenKind.EqualsEquals => "==",
                 TokenKind.MoreOrEquals => ">=",
                 TokenKind.LessOrEquals => "<=",
+                TokenKind.PlusEquals => "+=",
+                TokenKind.MinusEquals => "-=",
+                TokenKind.StarEquals => "*=",
+                TokenKind.SlashEquals => "/=",
                 TokenKind.OpenParenthesis => "(",
                 TokenKind.ClosedParenthesis => ")",
                 TokenKind.OpenSquareBracket => "[",

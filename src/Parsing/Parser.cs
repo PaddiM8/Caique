@@ -143,8 +143,27 @@ namespace Caique.Parsing
             );
         }
 
-        private ExpressionStatement ParseExpressionStatement()
+        private IStatement ParseExpressionStatement()
         {
+            var expression = ParseExpression();
+
+            if (Current.Kind.IsAssignmentOperator())
+            {
+                if (expression is VariableExpression variableExpression)
+                {
+                    var op = Advance();
+                    var value = ParseExpression();
+                    Expect(TokenKind.Semicolon);
+
+                    return new AssignmentStatement(variableExpression, op, value);
+                }
+                else
+                {
+                    _diagnostics.ReportMisplacedAssignmentOperator(Current);
+                    throw new ParsingErrorException();
+                }
+            }
+
             return new ExpressionStatement(
                 ParseExpression(),
                 Consume(TokenKind.Semicolon)

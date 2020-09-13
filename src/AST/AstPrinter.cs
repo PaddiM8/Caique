@@ -85,9 +85,19 @@ namespace Caique.AST
             return null!;
         }
 
+        public object Visit(AssignmentStatement assignmentStatement)
+        {
+            PrintStart(assignmentStatement.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
+            assignmentStatement.Variable.Accept(this);
+            assignmentStatement.Value.Accept(this);
+            _indentationLevel--;
+
+            return null!;
+        }
+
         public object Visit(BinaryExpression binaryExpression)
         {
-            PrintStart(binaryExpression.Operator.Kind.ToString(), ConsoleColor.Green);
+            PrintStart(binaryExpression.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
             binaryExpression.Left.Accept(this);
             binaryExpression.Right.Accept(this);
             _indentationLevel--;

@@ -19,22 +19,24 @@ statement = expressionStmt
           | returnStmt ;
 expressionStmt = expression , ";" ;
 blockStmt = [{ varDecl | statement }] ;
-assignmentStmt = identifierExpr , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
+assignmentStmt = variableExpr , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
 returnStmt = "ret" , expression ;
 
 expression = precedenceExpr ;
 precedenceExpr = ? unary/binary expression with primaryExpr as values ? ;
 castExpr = expression , [ "as" type ] ;
 indexerExpr = primaryExpr , [ "[" , expression , "]" ] ;
-primaryExpr = identifierExpr
+primaryExpr = variableExpr
+            | callExpr
             | groupExpr
             | newExpr
             | literal
             | ifExpr
             | listExpr ;
 
-identifierExpr = [ identifier , [{ "->" , identifier }] ] ,
-                 identifier , [ arguments ] , [{ "." , identifier , [ arguments ] }];
+variableExpr = [ identifier , [{ "->" , identifier }] ] ,
+                 identifier , [{ "." , identifier }];
+callExpr
 groupExpr = "(" , expression , ")" ;
 newExpr = "new" , type , arguments ;
 literal = bool | number | string | char ;

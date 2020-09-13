@@ -7,6 +7,7 @@ namespace Caique.AST
         T Visit(ExpressionStatement expressionStatement);
         T Visit(BlockStatement blockStatement);
         T Visit(VariableDeclStatement variableDeclStatement);
+        T Visit(AssignmentStatement assignmentStatement);
         T Visit(FunctionDeclStatement functionDeclStatement);
         T Visit(ClassDeclStatement classDeclStatement);
     }

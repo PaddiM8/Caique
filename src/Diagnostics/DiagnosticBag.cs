@@ -19,6 +19,16 @@ namespace Caique.Diagnostics
             _diagnostics.AddRange(diagnostics);
         }
 
+        public void ReportMisplacedAssignmentOperator(Token comparisonOperator)
+        {
+            Report(
+                DiagnosticIdentifier.MisplacedAssignmentOperator,
+                $"Misplaced comparison operator. Expected the left-hand expression to be a variable.",
+                comparisonOperator.Span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportUnexpectedToken(Token got, string expected)
         {
             Report(
