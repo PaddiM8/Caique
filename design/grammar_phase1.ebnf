@@ -16,13 +16,11 @@ parameter = identifier , ":" , type ;
 statement = expressionStmt
           | blockStmt
           | assignmentStmt
-          | returnStmt
-          |ifStmt ;
+          | returnStmt ;
 expressionStmt = expression , ";" ;
 blockStmt = [{ varDecl | statement }] ;
 assignmentStmt = identifierExpr , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
 returnStmt = "ret" , expression ;
-ifStmt = "if" , expression , ( blockStmt | ":" , expressionStmt ) ;
 
 expression = precedenceExpr ;
 precedenceExpr = ? unary/binary expression with primaryExpr as values ? ;
