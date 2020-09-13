@@ -107,10 +107,38 @@ namespace Caique.Parsing
 
             switch (Current)
             {
-                case '+': kind = TokenKind.Plus; break;
-                case '-': kind = TokenKind.Minus; break;
-                case '*': kind = TokenKind.Star; break;
-                case '/': kind = TokenKind.Slash; break;
+                case '+':
+                    if (Lookahead == '=')
+                    {
+                        kind = TokenKind.PlusEquals;
+                        Advance();
+                    }
+                    else kind = TokenKind.Plus;
+                    break;
+                case '-':
+                    if (Lookahead == '=')
+                    {
+                        kind = TokenKind.MinusEquals;
+                        Advance();
+                    }
+                    else kind = TokenKind.Minus;
+                    break;
+                case '*':
+                    if (Lookahead == '=')
+                    {
+                        kind = TokenKind.StarEquals;
+                        Advance();
+                    }
+                    else kind = TokenKind.Star;
+                    break;
+                case '/':
+                    if (Lookahead == '=')
+                    {
+                        kind = TokenKind.SlashEquals;
+                        Advance();
+                    }
+                    else kind = TokenKind.Slash;
+                    break;
                 case '(': kind = TokenKind.OpenParenthesis; break;
                 case ')': kind = TokenKind.ClosedParenthesis; break;
                 case '[': kind = TokenKind.OpenSquareBracket; break;
@@ -281,6 +309,7 @@ namespace Caique.Parsing
                 "if" => TokenKind.If,
                 "else" => TokenKind.Else,
                 "fn" => TokenKind.Fn,
+                "ret" => TokenKind.Ret,
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
                 _ => TokenKind.Identifier,

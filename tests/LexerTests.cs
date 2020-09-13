@@ -138,38 +138,34 @@ namespace Caique.Tests
 
         private static IEnumerable<(TokenKind kind, string text)> GetTokens()
         {
-            return new[]
+            foreach (TokenKind kind in Enum.GetValues(typeof(TokenKind)))
             {
-                (TokenKind.Plus, "+"),
-                (TokenKind.Minus, "-"),
-                (TokenKind.Slash, "/"),
-                (TokenKind.Equals, "="),
-                (TokenKind.Bang, "!"),
-                (TokenKind.BangEquals, "!="),
-                (TokenKind.EqualsEquals, "=="),
-                (TokenKind.MoreOrEquals, ">="),
-                (TokenKind.LessOrEquals, "<="),
-                (TokenKind.OpenParenthesis, "("),
-                (TokenKind.ClosedParenthesis, ")"),
-                (TokenKind.OpenSquareBracket, "["),
-                (TokenKind.ClosedSquareBracket, "]"),
-                (TokenKind.OpenBrace, "{"),
-                (TokenKind.ClosedBrace, "}"),
-                (TokenKind.OpenAngleBracket, "<"),
-                (TokenKind.ClosedAngleBracket, ">"),
+                switch (kind)
+                {
+                    case TokenKind.StringLiteral:
+                    case TokenKind.EndOfFile:
+                    case TokenKind.Unknown:
+                        continue;
+                }
 
-                (TokenKind.If, "if"),
-                (TokenKind.Fn, "fn"),
-                (TokenKind.Let, "let"),
-                (TokenKind.Class, "class"),
+                if (kind == TokenKind.Identifier)
+                {
+                    yield return (TokenKind.Identifier, "a");
+                    yield return (TokenKind.Identifier, "_abc");
+                    yield return (TokenKind.Identifier, "a_bc");
+                    continue;
+                }
 
-                (TokenKind.Identifier, "a"),
-                (TokenKind.Identifier, "_abc"),
-                (TokenKind.Identifier, "a_bc"),
-                (TokenKind.NumberLiteral, "1"),
-                (TokenKind.NumberLiteral, "123"),
-                (TokenKind.NumberLiteral, "1.23"),
-            };
+                if (kind == TokenKind.NumberLiteral)
+                {
+                    yield return (TokenKind.NumberLiteral, "1");
+                    yield return (TokenKind.NumberLiteral, "123");
+                    yield return (TokenKind.NumberLiteral, "1.23");
+                    continue;
+                }
+
+                yield return (kind, kind.ToStringRepresentation());
+            }
         }
     }
 }
