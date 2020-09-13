@@ -1,15 +1,16 @@
 using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 
 namespace Caique.AST
 {
     public class VariableExpression : IExpression
     {
-        public Token Identifier { get; }
+        public List<Token> Identifiers { get; }
 
-        public VariableExpression(Token identifier)
+        public VariableExpression(List<Token> identifiers)
         {
-            Identifier = identifier;
+            Identifiers = identifiers;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

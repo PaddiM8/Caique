@@ -147,6 +147,7 @@ namespace Caique.Parsing
         {
             var expression = ParseExpression();
 
+            // Assignment statement parsing
             if (Current.Kind.IsAssignmentOperator())
             {
                 if (expression is VariableExpression variableExpression)
@@ -235,14 +236,22 @@ namespace Caique.Parsing
 
         private IExpression ParseIdentifier()
         {
-            var identifier = Expect(TokenKind.Identifier);
+            var identifiers = new List<Token>()
+            {
+                Expect(TokenKind.Identifier),
+            };
 
             if (Match(TokenKind.OpenParenthesis))
             {
-                return new CallExpression(identifier, ParseArguments());
+                return new CallExpression(identifiers[0], ParseArguments());
             }
 
-            return new VariableExpression(identifier);
+            while (Consume(TokenKind.Dot))
+            {
+                identifiers.Add(Expect(TokenKind.Identifier));
+            }
+
+            return new VariableExpression(identifiers);
         }
 
         private List<IExpression> ParseArguments()

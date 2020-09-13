@@ -123,7 +123,10 @@ namespace Caique.AST
 
         public object Visit(VariableExpression variableExpression)
         {
-            PrintMiddle(variableExpression.Identifier.Value, ConsoleColor.DarkCyan);
+            PrintMiddle(
+                string.Join(".", variableExpression.Identifiers.Select(x => x.Value)),
+                ConsoleColor.DarkCyan
+            );
 
             return null!;
         }
