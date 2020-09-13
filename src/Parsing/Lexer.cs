@@ -27,14 +27,6 @@ namespace Caique.Parsing
             }
         }
 
-        private char Previous
-        {
-            get
-            {
-                return _source[_position.index - 1];
-            }
-        }
-
         private char Lookahead
         {
             get
@@ -257,7 +249,7 @@ namespace Caique.Parsing
             // If the loop didn't break because of
             // a double quote, the string literal was never terminated,
             // so throw an error.
-            if (Previous != '"')
+            if (Current != '"')
             {
                 _diagnostics.ReportUnterminatedStringLiteral(CurrentTextPosition);
             }
