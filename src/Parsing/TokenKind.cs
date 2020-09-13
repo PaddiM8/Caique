@@ -31,10 +31,14 @@ namespace Caique.Parsing
         {
             return kind switch
             {
-                TokenKind.Plus => 1,
-                TokenKind.Minus => 1,
-                TokenKind.Star => 2,
-                TokenKind.Slash => 2,
+                TokenKind.EqualsEquals => 1,
+                TokenKind.BangEquals => 1,
+                TokenKind.MoreOrEquals => 1,
+                TokenKind.LessOrEquals => 1,
+                TokenKind.Plus => 2,
+                TokenKind.Minus => 2,
+                TokenKind.Star => 3,
+                TokenKind.Slash => 3,
                 _ => 0,
             };
         }
