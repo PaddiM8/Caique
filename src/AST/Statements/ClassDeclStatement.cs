@@ -7,11 +7,11 @@ namespace Caique.AST
     {
         public Token Identifier { get; }
 
-        public BlockStatement Body { get; }
+        public BlockExpression Body { get; }
 
         public TypeExpression? Ancestor { get; }
 
-        public ClassDeclStatement(Token identifier, BlockStatement body, TypeExpression? ancestor = null)
+        public ClassDeclStatement(Token identifier, BlockExpression body, TypeExpression? ancestor = null)
         {
             Identifier = identifier;
             Body = body;

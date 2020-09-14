@@ -18,7 +18,12 @@ namespace Caique
             if (Program.Options!.PrintTokens)
                 PrintTokens(tokens);
 
-            var statements = new Parser(tokens, Diagnostics).Parse();
+            var statements = new Parser(
+                tokens,
+                Diagnostics,
+                Environment
+            ).Parse();
+
 
             if (Program.Options!.PrintAst)
                 new AstPrinter().PrintStatements(statements);

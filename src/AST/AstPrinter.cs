@@ -24,25 +24,13 @@ namespace Caique.AST
             return null!;
         }
 
-        public object Visit(BlockStatement blockStatement)
-        {
-            PrintStart("Block", ConsoleColor.Magenta);
-
-            foreach (var statement in blockStatement.Statements)
-                statement.Accept(this);
-
-            _indentationLevel--;
-
-            return null!;
-        }
-
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
             PrintStart("Variable: " + variableDeclStatement.Identifier.Value, ConsoleColor.DarkGreen);
 
-            if (variableDeclStatement.Type != null)
+            if (variableDeclStatement.SpecifiedType != null)
             {
-                variableDeclStatement.Type.Accept(this);
+                variableDeclStatement.SpecifiedType.Accept(this);
             }
 
             variableDeclStatement.Value.Accept(this);
@@ -125,6 +113,18 @@ namespace Caique.AST
         {
             PrintStart("Group", ConsoleColor.Magenta);
             groupExpression.Expression.Accept(this);
+            _indentationLevel--;
+
+            return null!;
+        }
+
+        public object Visit(BlockExpression blockStatement)
+        {
+            PrintStart("Block", ConsoleColor.Magenta);
+
+            foreach (var statement in blockStatement.Statements)
+                statement.Accept(this);
+
             _indentationLevel--;
 
             return null!;

@@ -9,13 +9,15 @@ namespace Caique.AST
 
         public IExpression Value { get; }
 
-        public TypeExpression? Type { get; }
+        public TypeExpression? SpecifiedType { get; }
+
+        public ValueType? ValueType { get; set; }
 
         public VariableDeclStatement(Token identifier, IExpression value, TypeExpression? type = null)
         {
             Identifier = identifier;
             Value = value;
-            Type = type;
+            SpecifiedType = type;
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)

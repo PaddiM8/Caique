@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Caique.AST;
 using Caique.Diagnostics;
+using Caique.Semantics;
 
 namespace Caique.Parsing
 {
@@ -26,12 +27,15 @@ namespace Caique.Parsing
 
         private readonly List<Token> _tokens;
         private readonly DiagnosticBag _diagnostics;
+        private SymbolEnvironment _environment;
         private int _index;
 
-        public Parser(List<Token> tokens, DiagnosticBag diagnostics)
+        public Parser(List<Token> tokens, DiagnosticBag diagnostics,
+                      SymbolEnvironment environment)
         {
             _tokens = tokens;
             _diagnostics = diagnostics;
+            _environment = environment;
         }
 
         public List<IStatement> Parse()
@@ -58,10 +62,6 @@ namespace Caique.Parsing
             if (Match(TokenKind.Let))
             {
                 return ParseVariableDecl();
-            }
-            else if (Match(TokenKind.OpenBrace))
-            {
-                return ParseBlock();
             }
             else if (Match(TokenKind.Fn))
             {
@@ -93,26 +93,6 @@ namespace Caique.Parsing
             return new VariableDeclStatement(identifier, value, type);
         }
 
-        private BlockStatement ParseBlock()
-        {
-            Expect(TokenKind.OpenBrace, "block");
-            var statements = new List<IStatement>();
-
-            while (!Consume(TokenKind.ClosedBrace))
-            {
-                try
-                {
-                    statements.Add(ParseStatement());
-                }
-                catch (ParsingErrorException)
-                {
-                    Synchronise();
-                }
-            }
-
-            return new BlockStatement(statements);
-        }
-
         private ClassDeclStatement ParseClassDecl()
         {
             Expect(TokenKind.Class, "class declaration");
@@ -122,7 +102,15 @@ namespace Caique.Parsing
             if (Consume(TokenKind.Colon))
                 ancestor = ParseType();
 
-            return new ClassDeclStatement(identifier, ParseBlock(), ancestor);
+            var statement = new ClassDeclStatement(
+                identifier,
+                ParseBlock(),
+                ancestor
+            );
+
+            _environment.Add(statement);
+
+            return statement;
         }
 
         private FunctionDeclStatement ParseFunctionDecl()
@@ -135,12 +123,16 @@ namespace Caique.Parsing
                 : null;
             var body = ParseBlock();
 
-            return new FunctionDeclStatement(
+            var statement = new FunctionDeclStatement(
                 identifier,
                 parameters,
                 body,
                 returnType
             );
+
+            _environment.Add(statement);
+
+            return statement;
         }
 
         private IStatement ParseExpressionStatement()
@@ -223,6 +215,10 @@ namespace Caique.Parsing
             {
                 return new LiteralExpression(Advance());
             }
+            else if (Match(TokenKind.OpenBrace))
+            {
+                return ParseBlock();
+            }
             else if (Match(TokenKind.Identifier))
             {
                 return ParseIdentifier();
@@ -244,6 +240,30 @@ namespace Caique.Parsing
                 elseBranch = ParseStatement();
 
             return new IfExpression(condition, branch, elseBranch);
+        }
+
+        private BlockExpression ParseBlock()
+        {
+            Expect(TokenKind.OpenBrace, "block");
+            var statements = new List<IStatement>();
+            _environment = _environment.CreateChildEnvironment(); // Create the scope
+
+            while (!Consume(TokenKind.ClosedBrace))
+            {
+                try
+                {
+                    statements.Add(ParseStatement());
+                }
+                catch (ParsingErrorException)
+                {
+                    Synchronise();
+                }
+            }
+
+            var statement = new BlockExpression(statements, _environment);
+            _environment = _environment.Parent!; // Return to the parent scope
+
+            return statement;
         }
 
         private IExpression ParseIdentifier()

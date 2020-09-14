@@ -10,12 +10,12 @@ namespace Caique.AST
 
         public List<Parameter> Parameters { get; }
 
-        public BlockStatement Body { get; }
+        public BlockExpression Body { get; }
 
         public TypeExpression? ReturnType { get; }
 
         public FunctionDeclStatement(Token identifier, List<Parameter> parameters,
-                                     BlockStatement body, TypeExpression? returnType)
+                                     BlockExpression body, TypeExpression? returnType)
         {
             Identifier = identifier;
             Parameters = parameters;

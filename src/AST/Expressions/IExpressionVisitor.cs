@@ -8,6 +8,7 @@ namespace Caique.AST
         T Visit(BinaryExpression binaryExpression);
         T Visit(LiteralExpression literalExpression);
         T Visit(GroupExpression groupExpression);
+        T Visit(BlockExpression blockExpression);
         T Visit(VariableExpression variableExpression);
         T Visit(CallExpression callExpression);
         T Visit(TypeExpression typeExpression);
