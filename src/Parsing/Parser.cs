@@ -166,7 +166,7 @@ namespace Caique.Parsing
             }
 
             return new ExpressionStatement(
-                ParseExpression(),
+                expression,
                 Consume(TokenKind.Semicolon)
             );
         }
@@ -178,7 +178,20 @@ namespace Caique.Parsing
 
         private IExpression ParseBinary(int parentPrecendece = 0)
         {
-            IExpression left = ParsePrimary();
+            IExpression left;
+
+            int unaryOperatorPrecedence = Current.Kind.GetUnaryOperatorPrecedence();
+            if (unaryOperatorPrecedence != 0 && unaryOperatorPrecedence >= parentPrecendece)
+            {
+                left = new UnaryExpression(
+                    Advance(),
+                    ParseBinary(unaryOperatorPrecedence)
+                );
+            }
+            else
+            {
+                left = ParsePrimary();
+            }
 
             while (true)
             {
@@ -187,8 +200,7 @@ namespace Caique.Parsing
                     break;
 
                 var op = Advance();
-                var right = ParseBinary(precedence);
-                left = new BinaryExpression(left, op, right);
+                left = new BinaryExpression(left, op, ParseBinary(precedence));
             }
 
             return left;

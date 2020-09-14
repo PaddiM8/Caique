@@ -95,6 +95,15 @@ namespace Caique.AST
             return null!;
         }
 
+        public object Visit(UnaryExpression unaryExpression)
+        {
+            PrintStart(unaryExpression.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
+            unaryExpression.Value.Accept(this);
+            _indentationLevel--;
+
+            return null!;
+        }
+
         public object Visit(BinaryExpression binaryExpression)
         {
             PrintStart(binaryExpression.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);

@@ -30,6 +30,15 @@ namespace Caique.Parsing
 
     public static class TokenKindExtensions
     {
+        public static int GetUnaryOperatorPrecedence(this TokenKind kind)
+        {
+            return kind switch
+            {
+                TokenKind.Bang => 4,
+                TokenKind.Minus => 4,
+                _ => 0,
+            };
+        }
         public static int GetBinaryOperatorPrecedence(this TokenKind kind)
         {
             return kind switch
