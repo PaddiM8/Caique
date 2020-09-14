@@ -4,12 +4,14 @@ using System.Linq;
 using Caique.AST;
 using Caique.Diagnostics;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique
 {
     public class Compilation
     {
         public DiagnosticBag Diagnostics = new DiagnosticBag();
+        public SymbolEnvironment Environment = new SymbolEnvironment();
 
         public Compilation(string source)
         {
@@ -24,6 +26,7 @@ namespace Caique
                 Environment
             ).Parse();
 
+            new Typechecker(statements, Diagnostics, Environment).Analyse();
 
             if (Program.Options!.PrintAst)
                 new AstPrinter().PrintStatements(statements);

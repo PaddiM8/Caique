@@ -312,6 +312,13 @@ namespace Caique.Parsing
                 "ret" => TokenKind.Ret,
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
+                "void" => TokenKind.Void,
+                "i8" => TokenKind.i8,
+                "i32" => TokenKind.i32,
+                "i64" => TokenKind.i64,
+                "f8" => TokenKind.f8,
+                "f32" => TokenKind.f32,
+                "f64" => TokenKind.f64,
                 _ => TokenKind.Identifier,
             };
 

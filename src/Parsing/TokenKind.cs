@@ -24,6 +24,11 @@ namespace Caique.Parsing
         // Punctuation
         Dot, Comma, Colon, Semicolon,
 
+        // Types
+        i8, i32, i64,
+        f8, f32, f64,
+        Void,
+
         // Other
         Unknown, EndOfFile,
     }

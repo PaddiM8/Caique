@@ -29,6 +29,25 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportSymbolAlreadyExists(Token identifier)
+        {
+            Report(
+                DiagnosticIdentifier.SymbolAlreadyExists,
+                $"A symbol with the name {identifier.Value} already exists in the current scope.",
+                identifier.Span,
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportUnableToInferType(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.UnableToInferType,
+                $"Unable to infer type.",
+                span,
+                DiagnosticType.Error
+            );
+        }
         public void ReportUnexpectedToken(Token got, string expected)
         {
             Report(
@@ -65,6 +84,16 @@ namespace Caique.Diagnostics
                 DiagnosticIdentifier.UnexpectedToken,
                 $"Unexpected token '{got.Kind.ToStringRepresentation()}', expected {expectedString}.",
                 got.Span,
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportUnexpectedType(ValueType got, ValueType expected)
+        {
+            Report(
+                DiagnosticIdentifier.UnexpectedType,
+                $"Unexpected token '{got}', expected {expected}.",
+                new TextSpan(new TextPosition(0, 0), new TextPosition(0, 0)), // TODO:
                 DiagnosticType.Error
             );
         }
