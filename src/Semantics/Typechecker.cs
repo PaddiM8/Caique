@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Caique.AST;
 using Caique.Diagnostics;
+using Caique.Parsing;
 using Caique.Util;
 
 namespace Caique.Semantics
 {
-    class Typechecker : IStatementVisitor<object>, IExpressionVisitor<ValueType>
+    class Typechecker : IStatementVisitor<object>, IExpressionVisitor<DataType>
     {
         private readonly List<IStatement> _statements;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
-        private static ValueType _voidType = new ValueType(TypeKeyword.Void);
+        private static DataType _voidType = new DataType(TypeKeyword.Void);
 
         public Typechecker(List<IStatement> statements, DiagnosticBag diagnostics,
                            SymbolEnvironment environment)
@@ -37,20 +39,25 @@ namespace Caique.Semantics
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
             var valueType = variableDeclStatement.Value.Accept(this);
-            variableDeclStatement.ValueType = valueType;
 
             // If a type was specified
             if (variableDeclStatement.SpecifiedType != null)
             {
                 var specifiedType = variableDeclStatement.SpecifiedType.Accept(this);
-                if (specifiedType.Type == TypeKeyword.Void)
+                variableDeclStatement.DataType = specifiedType;
+
+                if (valueType.Type == TypeKeyword.Unknown)
                 {
                     _diagnostics.ReportUnableToInferType(variableDeclStatement.Identifier.Span);
                 }
                 else if (specifiedType.Type != valueType.Type)
                 {
-                    _diagnostics.ReportUnexpectedType(specifiedType, valueType);
+                    _diagnostics.ReportUnexpectedType(valueType, specifiedType);
                 }
+            }
+            else
+            {
+                variableDeclStatement.DataType = valueType;
             }
 
             try
@@ -67,56 +74,87 @@ namespace Caique.Semantics
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            throw new NotImplementedException();
+            var variableType = assignmentStatement.Variable.Accept(this);
+            var valueType = assignmentStatement.Value.Accept(this);
+
+            CheckTypes(variableType, valueType);
+
+            return null!;
         }
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
-            throw new NotImplementedException();
+            functionDeclStatement.Body.Accept(this);
+
+            return null!;
         }
 
         public object Visit(ClassDeclStatement classDeclStatement)
         {
-            throw new NotImplementedException();
+            classDeclStatement.Body.Accept(this);
+
+            return null!;
         }
 
-        public ValueType Visit(UnaryExpression unaryExpression)
+        public DataType Visit(UnaryExpression unaryExpression)
         {
-            throw new NotImplementedException();
+            var valueType = unaryExpression.Value.Accept(this);
+            if (!valueType.IsNumber())
+            {
+                _diagnostics.ReportUnexpectedType(valueType, "number");
+            }
+
+            return valueType;
         }
 
-        public ValueType Visit(BinaryExpression binaryExpression)
+        public DataType Visit(BinaryExpression binaryExpression)
         {
-            throw new NotImplementedException();
+            var leftType = binaryExpression.Left.Accept(this);
+            var rightType = binaryExpression.Left.Accept(this);
+
+            if (!leftType.IsCompatible(rightType))
+            {
+                _diagnostics.ReportUnexpectedType(leftType, rightType);
+            }
+
+            return leftType;
         }
 
-        public ValueType Visit(LiteralExpression literalExpression)
+        public DataType Visit(LiteralExpression literalExpression)
         {
+            if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
+            {
+                return new DataType(TypeKeyword.i32);
+            }
+
             throw new NotImplementedException();
         }
 
-        public ValueType Visit(GroupExpression groupExpression)
+        public DataType Visit(GroupExpression groupExpression)
         {
-            throw new NotImplementedException();
+            return groupExpression.Expression.Accept(this);
         }
 
-        public ValueType Visit(BlockExpression blockStatement)
+        public DataType Visit(BlockExpression blockStatement)
         {
             _environment = blockStatement.Environment;
-            ValueType returnType = _voidType;
+            DataType returnType = _voidType;
 
             foreach (var (statement, i) in blockStatement.Statements.WithIndex())
             {
-                // If at last statement
-                if (i == blockStatement.Statements.Count - 1)
+                bool isLast = i == blockStatement.Statements.Count - 1;
+
+                // If it's an expression statement and
+                // it doesn't have a trailing semicolon, it should be returned.
+                if (isLast &&
+                    statement is ExpressionStatement expressionStatement &&
+                    expressionStatement.TrailingSemicolon)
                 {
-                    // If it's an expression statement and
-                    // it doesn't have a trailing semicolon, it should be returned.
-                    if (statement is ExpressionStatement expressionStatement &&
-                        !expressionStatement.TrailingSemicolon)
-                    {
-                        returnType = expressionStatement.Expression.Accept(this);
-                    }
+                    returnType = expressionStatement.Expression.Accept(this);
+                }
+                else
+                {
+                    statement.Accept(this);
                 }
             }
 
@@ -125,24 +163,85 @@ namespace Caique.Semantics
             return returnType;
         }
 
-        public ValueType Visit(VariableExpression variableExpression)
+        public DataType Visit(VariableExpression variableExpression)
         {
-            throw new NotImplementedException();
+            var variableName = variableExpression.Identifiers[0];
+            var variableDecl = _environment.GetVariable(variableName.Value);
+
+            if (variableDecl == null)
+            {
+                _diagnostics.ReportSymbolDoesNotExist(variableName);
+
+                return new DataType(TypeKeyword.Unknown);
+            }
+
+            return variableDecl.DataType!.Value;
         }
 
-        public ValueType Visit(CallExpression callExpression)
+        public DataType Visit(CallExpression callExpression)
         {
-            throw new NotImplementedException();
+            var functionDecl = _environment.GetFunction(callExpression.Identifier.Value);
+
+            if (functionDecl == null)
+            {
+                _diagnostics.ReportSymbolDoesNotExist(callExpression.Identifier);
+
+                return new DataType(TypeKeyword.Unknown);
+            }
+
+            foreach (var (argument, parameter) in
+                     callExpression.Arguments.Zip(functionDecl.Parameters))
+            {
+                var argumentType = argument.Accept(this);
+                var parameterType = parameter.Type.Accept(this);
+                if (!argumentType.IsCompatible(parameterType))
+                {
+                    _diagnostics.ReportUnexpectedType(argumentType, parameterType);
+                }
+            }
+
+            return functionDecl.ReturnType == null
+                ? _voidType
+                : functionDecl.ReturnType.Accept(this);
         }
 
-        public ValueType Visit(TypeExpression typeExpression)
+        public DataType Visit(TypeExpression typeExpression)
         {
-            throw new NotImplementedException();
+            var keyword = typeExpression.Identifier.Kind switch
+            {
+                TokenKind.i8 => TypeKeyword.i8,
+                TokenKind.i32 => TypeKeyword.i32,
+                TokenKind.i64 => TypeKeyword.i64,
+                TokenKind.f8 => TypeKeyword.f8,
+                TokenKind.f32 => TypeKeyword.f32,
+                TokenKind.f64 => TypeKeyword.f64,
+                _ => TypeKeyword.Unknown,
+            };
+
+            return new DataType(keyword);
         }
 
-        public ValueType Visit(IfExpression ifExpression)
+        public DataType Visit(IfExpression ifExpression)
         {
-            throw new NotImplementedException();
+            var conditionType = ifExpression.Condition.Accept(this);
+            var boolType = new DataType(TypeKeyword.Bool);
+            if (!conditionType.IsCompatible(boolType))
+            {
+                _diagnostics.ReportUnexpectedType(boolType, conditionType);
+            }
+
+            if (ifExpression.Branch is ExpressionStatement branchExpressionStatement &&
+                branchExpressionStatement.Expression is BlockExpression branchBlock)
+            {
+                return branchBlock.Accept(this);
+            }
+
+            return _voidType;
+        }
+
+        private bool CheckTypes(DataType type1, DataType type2)
+        {
+            return type1.Type == type2.Type;
         }
     }
 }

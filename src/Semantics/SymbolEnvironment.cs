@@ -81,7 +81,7 @@ namespace Caique.Semantics
             }
         }
 
-        public VariableDeclStatement? GetVariableType(string identifier)
+        public VariableDeclStatement? GetVariable(string identifier)
         {
             _variables.TryGetValue(identifier, out VariableDeclStatement? variable);
 
@@ -91,7 +91,7 @@ namespace Caique.Semantics
             }
             else if (Parent != null)
             {
-                return Parent.GetVariableType(identifier);
+                return Parent.GetVariable(identifier);
             }
             else
             {

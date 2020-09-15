@@ -39,6 +39,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportSymbolDoesNotExist(Token identifier)
+        {
+            Report(
+                DiagnosticIdentifier.SymbolDoesNotExist,
+                $"A symbol with the name {identifier.Value}  does not exist.",
+                identifier.Span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportUnableToInferType(TextSpan span)
         {
             Report(
@@ -89,6 +99,16 @@ namespace Caique.Diagnostics
         }
 
         public void ReportUnexpectedType(ValueType got, ValueType expected)
+        {
+            Report(
+                DiagnosticIdentifier.UnexpectedType,
+                $"Unexpected token '{got}', expected {expected}.",
+                new TextSpan(new TextPosition(0, 0), new TextPosition(0, 0)), // TODO:
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportUnexpectedType(ValueType got, string expected)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,

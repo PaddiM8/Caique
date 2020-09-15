@@ -1,5 +1,6 @@
 ﻿using System;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.AST
 {
@@ -11,7 +12,7 @@ namespace Caique.AST
 
         public TypeExpression? SpecifiedType { get; }
 
-        public ValueType? ValueType { get; set; }
+        public DataType? DataType { get; set; }
 
         public VariableDeclStatement(Token identifier, IExpression value, TypeExpression? type = null)
         {

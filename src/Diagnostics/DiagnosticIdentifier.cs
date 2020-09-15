@@ -4,6 +4,7 @@ namespace Caique.Diagnostics
     {
         MisplacedAssignmentOperator,
         SymbolAlreadyExists,
+        SymbolDoesNotExist,
         UnableToInferType,
         UnexpectedToken,
         UnexpectedType,

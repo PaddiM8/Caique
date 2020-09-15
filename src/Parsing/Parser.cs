@@ -333,7 +333,7 @@ namespace Caique.Parsing
 
         private TypeExpression ParseType()
         {
-            return new TypeExpression(Expect(TokenKind.Identifier, "type"));
+            return new TypeExpression(Advance());
         }
 
         private void Synchronise()
