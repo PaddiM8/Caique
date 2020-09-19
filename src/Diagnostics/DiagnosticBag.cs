@@ -43,7 +43,7 @@ namespace Caique.Diagnostics
         {
             Report(
                 DiagnosticIdentifier.SymbolDoesNotExist,
-                $"A symbol with the name {identifier.Value}  does not exist.",
+                $"A symbol with the name '{identifier.Value}' does not exist.",
                 identifier.Span,
                 DiagnosticType.Error
             );
