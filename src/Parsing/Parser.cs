@@ -125,6 +125,14 @@ namespace Caique.Parsing
                 : null;
             var body = ParseBlock();
 
+            // Add the parameters to the symbol table
+            foreach (var parameter in parameters)
+            {
+                body.Environment.Add(
+                    new VariableDeclStatement(parameter.Identifier, null, parameter.Type)
+                );
+            }
+
             var statement = new FunctionDeclStatement(
                 identifier,
                 parameters,
