@@ -12,5 +12,6 @@ namespace Caique.Diagnostics
         UnterminatedStringLiteral,
         UnknownEscapeSequence,
         UnknownToken,
+        WrongNumberOfArguments,
     }
 }

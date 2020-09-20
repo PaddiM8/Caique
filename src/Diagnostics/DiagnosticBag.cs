@@ -161,6 +161,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportWrongNumberOfArguments(Token identifier, int got, int expected)
+        {
+            Report(
+                DiagnosticIdentifier.WrongNumberOfArguments,
+                $"Wrong number of arguments for function '{identifier.Value}'. Got {got}, but expected {expected}.",
+                identifier.Span,
+                DiagnosticType.Error
+            );
+        }
+
         private void Report(DiagnosticIdentifier identifier,
                             string message,
                             TextSpan span,

@@ -326,7 +326,7 @@ namespace Caique.Semantics
             }
             else
             {
-                type = variableDecl.Value.Accept(this);
+                type = variableDecl.Value!.Accept(this);
             }
 
             variableDecl.DataType = type;
@@ -344,6 +344,23 @@ namespace Caique.Semantics
                 return new DataType(TypeKeyword.Unknown);
             }
 
+
+            var returnType = functionDecl.ReturnType == null
+                ? _voidType
+                : functionDecl.ReturnType.Accept(this);
+
+            // If wrong number of arguments
+            if (arguments.Count != functionDecl.Parameters.Count)
+            {
+                _diagnostics.ReportWrongNumberOfArguments(
+                    identifier,
+                    arguments.Count,
+                    functionDecl.Parameters.Count
+                );
+
+                return returnType;
+            }
+
             foreach (var (argument, parameter) in
                      arguments.Zip(functionDecl.Parameters))
             {
@@ -355,9 +372,7 @@ namespace Caique.Semantics
                 }
             }
 
-            return functionDecl.ReturnType == null
-                ? _voidType
-                : functionDecl.ReturnType.Accept(this);
+            return returnType;
         }
     }
 }
