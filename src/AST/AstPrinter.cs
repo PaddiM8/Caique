@@ -39,7 +39,7 @@ namespace Caique.AST
                 variableDeclStatement.SpecifiedType.Accept(this);
             }
 
-            variableDeclStatement.Value.Accept(this);
+            variableDeclStatement.Value!.Accept(this);
             _indentationLevel--;
 
             return null!;

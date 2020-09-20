@@ -40,25 +40,26 @@ namespace Caique.Semantics
 
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
-            var valueType = variableDeclStatement.Value.Accept(this);
-
             // If a type was specified
             if (variableDeclStatement.SpecifiedType != null)
             {
                 var specifiedType = variableDeclStatement.SpecifiedType.Accept(this);
                 variableDeclStatement.DataType = specifiedType;
 
-                if (valueType.Type == TypeKeyword.Unknown)
+                // Make sure the value type match up with the specified type
+                // if there is a value
+                if (variableDeclStatement.Value != null)
                 {
-                    _diagnostics.ReportUnableToInferType(variableDeclStatement.Identifier.Span);
-                }
-                else if (specifiedType.Type != valueType.Type)
-                {
-                    _diagnostics.ReportUnexpectedType(valueType, specifiedType);
+                    var valueType = variableDeclStatement.Value!.Accept(this);
+                    if (specifiedType.Type != valueType.Type)
+                    {
+                        _diagnostics.ReportUnexpectedType(valueType, specifiedType);
+                    }
                 }
             }
             else
             {
+                var valueType = variableDeclStatement.Value!.Accept(this);
                 variableDeclStatement.DataType = valueType;
             }
 
