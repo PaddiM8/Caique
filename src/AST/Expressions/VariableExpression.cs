@@ -6,11 +6,11 @@ namespace Caique.AST
 {
     public class VariableExpression : IExpression
     {
-        public List<Token> Identifiers { get; }
+        public Token Identifier { get; }
 
-        public VariableExpression(List<Token> identifiers)
+        public VariableExpression(Token identifier)
         {
-            Identifiers = identifiers;
+            Identifier = identifier;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

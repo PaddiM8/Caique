@@ -20,8 +20,8 @@ namespace Caique
             {
                 Options = options;
 
-                // Do something with the options...
-                new Compilation(File.ReadAllText(options.InputFile));
+                var projectManager = new ProjectManager(Options.ProjectFilePath!);
+                projectManager.Build();
             });
 
             // Show the help text if there was an error

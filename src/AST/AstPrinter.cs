@@ -5,13 +5,19 @@ using Caique.Parsing;
 
 namespace Caique.AST
 {
-    public class AstPrinter : IStatementVisitor<object>, IExpressionVisitor<object>
+    class AstPrinter : IStatementVisitor<object>, IExpressionVisitor<object>
     {
         private int _indentationLevel = 1;
+        private Ast _ast;
 
-        public void PrintStatements(List<IStatement> statements)
+        public AstPrinter(Ast ast)
         {
-            foreach (var statement in statements)
+            _ast = ast;
+        }
+
+        public void Print()
+        {
+            foreach (var statement in _ast.Statements)
             {
                 statement.Accept(this);
             }
@@ -102,6 +108,16 @@ namespace Caique.AST
             return null!;
         }
 
+        public object Visit(DotExpression dotExpression)
+        {
+            PrintStart(".", ConsoleColor.Magenta);
+            dotExpression.Left.Accept(this);
+            dotExpression.Right.Accept(this);
+            _indentationLevel--;
+
+            return null!;
+        }
+
         public object Visit(LiteralExpression literalExpression)
         {
             PrintMiddle(literalExpression.Value.Value, ConsoleColor.Magenta);
@@ -132,19 +148,31 @@ namespace Caique.AST
 
         public object Visit(VariableExpression variableExpression)
         {
-            PrintMiddle(
-                string.Join(".", variableExpression.Identifiers.Select(x => x.Value)),
-                ConsoleColor.DarkCyan
-            );
+            PrintMiddle(variableExpression.Identifier.Value, ConsoleColor.DarkCyan);
 
             return null!;
         }
 
         public object Visit(CallExpression callExpression)
         {
-            PrintStart(callExpression.Identifier.Value, ConsoleColor.DarkCyan);
+            PrintStart(
+                StringifyModulePath(callExpression.ModulePath),
+                ConsoleColor.DarkCyan
+            );
 
             foreach (var arg in callExpression.Arguments)
+                arg.Accept(this);
+
+            _indentationLevel--;
+
+            return null!;
+        }
+
+        public object Visit(NewExpression newExpression)
+        {
+            string path = StringifyModulePath(newExpression.ModulePath);
+            PrintStart("new " + path, ConsoleColor.Yellow);
+            foreach (var arg in newExpression.Arguments)
                 arg.Accept(this);
 
             _indentationLevel--;
@@ -197,5 +225,8 @@ namespace Caique.AST
             Console.WriteLine(value);
             Console.ResetColor();
         }
+
+        private string StringifyModulePath(List<Token> modulePath)
+            => string.Join("->", modulePath.Select(x => x.Value));
     }
 }

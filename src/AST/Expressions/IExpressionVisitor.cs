@@ -13,5 +13,7 @@ namespace Caique.AST
         T Visit(CallExpression callExpression);
         T Visit(TypeExpression typeExpression);
         T Visit(IfExpression ifExpression);
+        T Visit(NewExpression newExpression);
+        T Visit(DotExpression dotExpression);
     }
 }

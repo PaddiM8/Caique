@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Caique.AST;
@@ -8,24 +8,26 @@ using Caique.Util;
 
 namespace Caique.Semantics
 {
-    class Typechecker : IStatementVisitor<object>, IExpressionVisitor<DataType>
+    class TypeChecker : IStatementVisitor<object>, IExpressionVisitor<DataType>
     {
-        private readonly List<IStatement> _statements;
+        private readonly Ast _ast;
         private readonly DiagnosticBag _diagnostics;
+        private ModuleEnvironment _rootModuleEnvironment;
         private SymbolEnvironment _environment;
         private static DataType _voidType = new DataType(TypeKeyword.Void);
 
-        public Typechecker(List<IStatement> statements, DiagnosticBag diagnostics,
-                           SymbolEnvironment environment)
+        public TypeChecker(Ast ast, DiagnosticBag diagnostics,
+                           ModuleEnvironment rootEnvironment)
         {
-            _statements = statements;
+            _ast = ast;
             _diagnostics = diagnostics;
-            _environment = environment;
+            _rootModuleEnvironment = rootEnvironment;
+            _environment = ast.ModuleEnvironment.SymbolEnvironment;
         }
 
         public void Analyse()
         {
-            foreach (var statement in _statements)
+            foreach (var statement in _ast.Statements)
                 statement.Accept(this);
         }
 
@@ -120,6 +122,44 @@ namespace Caique.Semantics
             return leftType;
         }
 
+        public DataType Visit(DotExpression dotExpression)
+        {
+            var leftType = dotExpression.Left.Accept(this);
+
+            // If it's a user-made class
+            if (leftType.Type == TypeKeyword.Identifier)
+            {
+                var symbolEnvironment = leftType.Module!
+                    .GetClass(leftType.Identifier!.Value)!.Body.Environment;
+
+                // Check if the variable/function exists in the class
+                if (dotExpression.Right is CallExpression callExpression)
+                {
+                    var identifier = callExpression.ModulePath[^1];
+                    var function = symbolEnvironment.GetFunction(identifier.Value);
+
+                    return CheckCall(identifier, function, callExpression.Arguments);
+                }
+                else if (dotExpression.Right is VariableExpression variableExpression)
+                {
+                    var identifier = variableExpression.Identifier;
+                    var variable = symbolEnvironment.GetVariable(identifier.Value);
+
+                    return CheckVariableDecl(identifier, variable);
+                }
+                else
+                {
+                    throw new Exception("Expected call expression or variable expression. This should be a compiler error, but there is currently no way of getting the token for plain IExpressions. This will be implemented later.");
+                }
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedType(leftType, "object");
+            }
+
+            return new DataType(TypeKeyword.Unknown);
+        }
+
         public DataType Visit(LiteralExpression literalExpression)
         {
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
@@ -165,44 +205,50 @@ namespace Caique.Semantics
 
         public DataType Visit(VariableExpression variableExpression)
         {
-            var variableName = variableExpression.Identifiers[0];
+            var variableName = variableExpression.Identifier;
             var variableDecl = _environment.GetVariable(variableName.Value);
 
-            if (variableDecl == null)
-            {
-                _diagnostics.ReportSymbolDoesNotExist(variableName);
-
-                return new DataType(TypeKeyword.Unknown);
-            }
-
-            return variableDecl.DataType!.Value;
+            return CheckVariableDecl(variableName, variableDecl);
         }
 
         public DataType Visit(CallExpression callExpression)
         {
-            var functionDecl = _environment.GetFunction(callExpression.Identifier.Value);
-
-            if (functionDecl == null)
+            FunctionDeclStatement? functionDecl;
+            var lastIdentifier = callExpression.ModulePath[^1];
+            if (callExpression.ModulePath.Count > 1)
             {
-                _diagnostics.ReportSymbolDoesNotExist(callExpression.Identifier);
+                var module = GetModule(callExpression.ModulePath);
+                if (module == null) return new DataType(TypeKeyword.Unknown);
 
-                return new DataType(TypeKeyword.Unknown);
+                functionDecl = module.SymbolEnvironment.GetFunction(lastIdentifier.Value);
+            }
+            else
+            {
+                functionDecl = _environment.GetFunction(lastIdentifier.Value);
             }
 
-            foreach (var (argument, parameter) in
-                     callExpression.Arguments.Zip(functionDecl.Parameters))
+            return CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
+        }
+
+        public DataType Visit(NewExpression newExpression)
+        {
+            var module = _ast.ModuleEnvironment.Parent; // Classes are stored in the parent module
+            var lastIdentifier = newExpression.ModulePath[^1];
+            if (newExpression.ModulePath.Count > 1)
             {
-                var argumentType = argument.Accept(this);
-                var parameterType = parameter.Type.Accept(this);
-                if (!argumentType.IsCompatible(parameterType))
+                module = GetModule(newExpression.ModulePath);
+            }
+
+            if (module != null)
+            {
+                var classDecl = module.GetClass(lastIdentifier.Value);
+                if (classDecl == null)
                 {
-                    _diagnostics.ReportUnexpectedType(argumentType, parameterType);
+                    _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
                 }
             }
 
-            return functionDecl.ReturnType == null
-                ? _voidType
-                : functionDecl.ReturnType.Accept(this);
+            return new DataType(TypeKeyword.Identifier, lastIdentifier, module);
         }
 
         public DataType Visit(TypeExpression typeExpression)
@@ -242,6 +288,76 @@ namespace Caique.Semantics
         private bool CheckTypes(DataType type1, DataType type2)
         {
             return type1.Type == type2.Type;
+        }
+
+        private ModuleEnvironment? GetModule(List<Token> modulePath)
+        {
+            var module = _rootModuleEnvironment.FindByPath(
+                // Turn List<Token> into List<string>
+                modulePath.Select(x => x.Value)
+            );
+
+            if (module == null)
+            {
+                _diagnostics.ReportInvalidModulePath(modulePath);
+            }
+
+            return module;
+        }
+
+        private DataType CheckVariableDecl(Token identifier, VariableDeclStatement? variableDecl)
+        {
+            if (variableDecl == null)
+            {
+                _diagnostics.ReportSymbolDoesNotExist(identifier);
+
+                return new DataType(TypeKeyword.Unknown);
+            }
+
+            // If it has already been checked once before,
+            // the DataType will be cached (stored in the object).
+            if (variableDecl.DataType != null)
+                return variableDecl.DataType.Value;
+
+            DataType type;
+            if (variableDecl.SpecifiedType != null)
+            {
+                type = variableDecl.SpecifiedType.Accept(this);
+            }
+            else
+            {
+                type = variableDecl.Value.Accept(this);
+            }
+
+            variableDecl.DataType = type;
+
+            return type;
+        }
+
+        private DataType CheckCall(Token identifier, FunctionDeclStatement? functionDecl,
+                                   List<IExpression> arguments)
+        {
+            if (functionDecl == null)
+            {
+                _diagnostics.ReportSymbolDoesNotExist(identifier);
+
+                return new DataType(TypeKeyword.Unknown);
+            }
+
+            foreach (var (argument, parameter) in
+                     arguments.Zip(functionDecl.Parameters))
+            {
+                var argumentType = argument.Accept(this);
+                var parameterType = parameter.Type.Accept(this);
+                if (!argumentType.IsCompatible(parameterType))
+                {
+                    _diagnostics.ReportUnexpectedType(argumentType, parameterType);
+                }
+            }
+
+            return functionDecl.ReturnType == null
+                ? _voidType
+                : functionDecl.ReturnType.Accept(this);
         }
     }
 }

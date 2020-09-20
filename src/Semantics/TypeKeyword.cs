@@ -6,6 +6,7 @@
         f8, f32, f64,
         Bool,
         Void,
+        Identifier,
         Unknown,
     }
 }

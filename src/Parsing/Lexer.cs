@@ -121,6 +121,11 @@ namespace Caique.Parsing
                         kind = TokenKind.MinusEquals;
                         Advance();
                     }
+                    else if (Lookahead == '>')
+                    {
+                        kind = TokenKind.Arrow;
+                        Advance();
+                    }
                     else kind = TokenKind.Minus;
                     break;
                 case '*':
@@ -312,6 +317,7 @@ namespace Caique.Parsing
                 "ret" => TokenKind.Ret,
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
+                "new" => TokenKind.New,
                 "void" => TokenKind.Void,
                 "i8" => TokenKind.i8,
                 "i32" => TokenKind.i32,

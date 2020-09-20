@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Diagnostics
 {
@@ -17,6 +19,17 @@ namespace Caique.Diagnostics
         public void AddRange(IEnumerable<Diagnostic> diagnostics)
         {
             _diagnostics.AddRange(diagnostics);
+        }
+
+        public void ReportInvalidModulePath(List<Token> identifiers)
+        {
+            var path = string.Join("->", identifiers.Select(x => x.Value));
+            Report(
+                DiagnosticIdentifier.InvalidModulePath,
+                $"The module or symbol '{path}' does not exist.",
+                identifiers[0].Span.Add(identifiers[^1].Span),
+                DiagnosticType.Error
+            );
         }
 
         public void ReportMisplacedAssignmentOperator(Token comparisonOperator)
@@ -98,7 +111,7 @@ namespace Caique.Diagnostics
             );
         }
 
-        public void ReportUnexpectedType(ValueType got, ValueType expected)
+        public void ReportUnexpectedType(DataType got, DataType expected)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
@@ -108,7 +121,7 @@ namespace Caique.Diagnostics
             );
         }
 
-        public void ReportUnexpectedType(ValueType got, string expected)
+        public void ReportUnexpectedType(DataType got, string expected)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,

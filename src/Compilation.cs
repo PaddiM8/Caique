@@ -1,38 +1,82 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Caique.AST;
 using Caique.Diagnostics;
 using Caique.Parsing;
 using Caique.Semantics;
+using Caique.Util;
 
 namespace Caique
 {
     public class Compilation
     {
         public DiagnosticBag Diagnostics = new DiagnosticBag();
-        public SymbolEnvironment Environment = new SymbolEnvironment();
+        public ModuleEnvironment Environment;
 
-        public Compilation(string source)
+        public Compilation(ModuleEnvironment environment)
         {
-            var tokens = new Lexer(source, Diagnostics).Lex();
+            Environment = environment;
 
-            if (Program.Options!.PrintTokens)
-                PrintTokens(tokens);
+            // Parse everything first, so that classes and functions
+            // are added to the symbol table before type checking.
+            // The ParseModuleEnvironment traverses the ModuleEnvironment
+            // tree and reads the file specified in the specific ModuleEnvironment.
+            var asts = ParseModuleEnvironment(Environment);
+            foreach (var ast in asts)
+            {
+                new TypeChecker(
+                    ast,
+                    Diagnostics,
+                    Environment
+                ).Analyse();
 
-            var statements = new Parser(
-                tokens,
-                Diagnostics,
-                Environment
-            ).Parse();
+                if (Program.Options!.PrintAst)
+                    ast.Print();
+            }
 
-            new Typechecker(statements, Diagnostics, Environment).Analyse();
-
-            if (Program.Options!.PrintAst)
-                new AstPrinter().PrintStatements(statements);
+            if (Program.Options!.PrintEnvironment)
+                Environment.Print();
 
             foreach (var diagnostic in Diagnostics)
                 diagnostic.Print();
+        }
+
+        private List<Ast> ParseModuleEnvironment(ModuleEnvironment environment)
+        {
+            return ParseModuleEnvironment(environment, new List<Ast>());
+        }
+
+        private List<Ast> ParseModuleEnvironment(ModuleEnvironment environment,
+                                                 List<Ast> asts)
+        {
+            foreach (var (_, module) in environment.Modules)
+            {
+                // If the module is just a directory
+                if (module.FilePath == null) continue;
+
+                // Lex
+                var tokens = new Lexer(
+                    File.ReadAllText(module.FilePath),
+                    Diagnostics)
+                .Lex();
+
+                if (Program.Options!.PrintTokens)
+                    PrintTokens(tokens);
+
+                // Parse
+                var ast = new Parser(
+                    tokens,
+                    Diagnostics,
+                    module
+                ).Parse();
+                asts.Add(new Ast(ast, module));
+
+                ParseModuleEnvironment(module, asts);
+            }
+
+            return asts;
         }
 
         private void PrintTokens(List<Token> tokens)

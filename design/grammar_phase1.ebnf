@@ -26,6 +26,7 @@ expression = precedenceExpr ;
 precedenceExpr = ? unary/binary expression with primaryExpr as values ? ;
 castExpr = expression , [ "as" type ] ;
 indexerExpr = primaryExpr , [ "[" , expression , "]" ] ;
+dotExpr = primaryExpr ,  [ "." , dotExpr ] ;
 primaryExpr = variableExpr
             | callExpr
             | groupExpr
@@ -34,15 +35,15 @@ primaryExpr = variableExpr
             | ifExpr
             | listExpr ;
 
-variableExpr = [ identifier , [{ "->" , identifier }] ] ,
-                 identifier , [{ "." , identifier }];
-callExpr
+variableExpr = identifier ;
+callExpr = modulePath , arguments ;
 groupExpr = "(" , expression , ")" ;
-newExpr = "new" , type , arguments ;
+newExpr = "new" , identifier , arguments ;
 literal = bool | number | string | char ;
 listExpr = "[" , expression , [ "," , expression ] , "]" ;
 
 arguments = "(" , [ expression , [{ "," , expression }] ] , ")" ;
+modulePath = identifier , [{ "->" , identifier }] ;
 
 bool = "true" | "false" ;
 number = /[0-9]+(\.[0-9]+)/ ;

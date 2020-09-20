@@ -27,15 +27,17 @@ namespace Caique.Parsing
 
         private readonly List<Token> _tokens;
         private readonly DiagnosticBag _diagnostics;
-        private SymbolEnvironment _environment;
+        private ModuleEnvironment _moduleEnvironment;
+        private SymbolEnvironment _symbolEnvironment;
         private int _index;
 
         public Parser(List<Token> tokens, DiagnosticBag diagnostics,
-                      SymbolEnvironment environment)
+                      ModuleEnvironment moduleEnvironment)
         {
             _tokens = tokens;
             _diagnostics = diagnostics;
-            _environment = environment;
+            _moduleEnvironment = moduleEnvironment;
+            _symbolEnvironment = moduleEnvironment.SymbolEnvironment;
         }
 
         public List<IStatement> Parse()
@@ -108,7 +110,7 @@ namespace Caique.Parsing
                 ancestor
             );
 
-            _environment.Add(statement);
+            _moduleEnvironment.Parent!.Add(statement);
 
             return statement;
         }
@@ -130,7 +132,7 @@ namespace Caique.Parsing
                 returnType
             );
 
-            _environment.Add(statement);
+            _symbolEnvironment.Add(statement);
 
             return statement;
         }
@@ -182,7 +184,7 @@ namespace Caique.Parsing
             }
             else
             {
-                left = ParsePrimary();
+                left = ParseDot();
             }
 
             while (true)
@@ -193,6 +195,18 @@ namespace Caique.Parsing
 
                 var op = Advance();
                 left = new BinaryExpression(left, op, ParseBinary(precedence));
+            }
+
+            return left;
+        }
+
+        private IExpression ParseDot()
+        {
+            var left = ParsePrimary();
+
+            if (Consume(TokenKind.Dot))
+            {
+                return new DotExpression(left, ParseDot());
             }
 
             return left;
@@ -218,6 +232,10 @@ namespace Caique.Parsing
             else if (Match(TokenKind.OpenBrace))
             {
                 return ParseBlock();
+            }
+            else if (Match(TokenKind.New))
+            {
+                return ParseNew();
             }
             else if (Match(TokenKind.Identifier))
             {
@@ -246,7 +264,7 @@ namespace Caique.Parsing
         {
             Expect(TokenKind.OpenBrace, "block");
             var statements = new List<IStatement>();
-            _environment = _environment.CreateChildEnvironment(); // Create the scope
+            _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment(); // Create the scope
 
             while (!Consume(TokenKind.ClosedBrace))
             {
@@ -260,30 +278,44 @@ namespace Caique.Parsing
                 }
             }
 
-            var statement = new BlockExpression(statements, _environment);
-            _environment = _environment.Parent!; // Return to the parent scope
+            var statement = new BlockExpression(statements, _symbolEnvironment);
+            _symbolEnvironment = _symbolEnvironment.Parent!; // Return to the parent scope
 
             return statement;
         }
 
+        private NewExpression ParseNew()
+        {
+            Expect(TokenKind.New);
+
+            return new NewExpression(ParseModulePath(), ParseArguments());
+        }
+
         private IExpression ParseIdentifier()
+        {
+            var lookahead = Peek(1)!.Kind;
+            if (lookahead == TokenKind.Arrow ||
+                lookahead == TokenKind.OpenParenthesis)
+            {
+                return new CallExpression(ParseModulePath(), ParseArguments());
+            }
+
+            return new VariableExpression(Expect(TokenKind.Identifier));
+        }
+
+        private List<Token> ParseModulePath()
         {
             var identifiers = new List<Token>()
             {
                 Expect(TokenKind.Identifier),
             };
 
-            if (Match(TokenKind.OpenParenthesis))
-            {
-                return new CallExpression(identifiers[0], ParseArguments());
-            }
-
-            while (Consume(TokenKind.Dot))
+            while (Consume(TokenKind.Arrow))
             {
                 identifiers.Add(Expect(TokenKind.Identifier));
             }
 
-            return new VariableExpression(identifiers);
+            return identifiers;
         }
 
         private List<IExpression> ParseArguments()
@@ -358,6 +390,13 @@ namespace Caique.Parsing
             }
 
             return false;
+        }
+
+        private Token? Peek(int amount)
+        {
+            if (_index + amount >= _tokens.Count) return null;
+
+            return _tokens[_index + amount];
         }
 
         private Token Expect(TokenKind kind, string description)

@@ -1,4 +1,5 @@
 ﻿using System;
+using Caique.Parsing;
 
 namespace Caique.Semantics
 {
@@ -6,9 +7,16 @@ namespace Caique.Semantics
     {
         public TypeKeyword Type { get; }
 
-        public DataType(TypeKeyword type)
+        public Token? Identifier { get; }
+
+        public ModuleEnvironment? Module { get; }
+
+        public DataType(TypeKeyword type, Token? identifier = null,
+                        ModuleEnvironment? module = null)
         {
             Type = type;
+            Identifier = identifier;
+            Module = module;
         }
 
         public bool IsCompatible(DataType type2)
