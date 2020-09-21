@@ -89,6 +89,15 @@ namespace Caique.AST
             return null!;
         }
 
+        public object Visit(UseStatement useStatement)
+        {
+            PrintStart("use", ConsoleColor.Magenta);
+            PrintMiddle(StringifyModulePath(useStatement.ModulePath), ConsoleColor.Green);
+            _indentationLevel--;
+
+            return null!;
+        }
+
         public object Visit(UnaryExpression unaryExpression)
         {
             PrintStart(unaryExpression.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);

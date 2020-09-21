@@ -12,16 +12,13 @@ namespace Caique.Semantics
     {
         private readonly Ast _ast;
         private readonly DiagnosticBag _diagnostics;
-        private ModuleEnvironment _rootModuleEnvironment;
         private SymbolEnvironment _environment;
         private static DataType _voidType = new DataType(TypeKeyword.Void);
 
-        public TypeChecker(Ast ast, DiagnosticBag diagnostics,
-                           ModuleEnvironment rootEnvironment)
+        public TypeChecker(Ast ast, DiagnosticBag diagnostics)
         {
             _ast = ast;
             _diagnostics = diagnostics;
-            _rootModuleEnvironment = rootEnvironment;
             _environment = ast.ModuleEnvironment.SymbolEnvironment;
         }
 
@@ -95,6 +92,24 @@ namespace Caique.Semantics
         public object Visit(ClassDeclStatement classDeclStatement)
         {
             classDeclStatement.Body.Accept(this);
+
+            return null!;
+        }
+
+        public object Visit(UseStatement useStatement)
+        {
+            var module = _ast.ModuleEnvironment.Root.FindByPath(
+                useStatement.ModulePath.Select(x => x.Value)
+            );
+
+            if (module != null)
+            {
+                _ast.ModuleEnvironment.ImportModule(module);
+            }
+            else
+            {
+                _diagnostics.ReportInvalidModulePath(useStatement.ModulePath);
+            }
 
             return null!;
         }
@@ -233,7 +248,7 @@ namespace Caique.Semantics
 
         public DataType Visit(NewExpression newExpression)
         {
-            var module = _ast.ModuleEnvironment.Parent; // Classes are stored in the parent module
+            var module = _ast.ModuleEnvironment;
             var lastIdentifier = newExpression.ModulePath[^1];
             if (newExpression.ModulePath.Count > 1)
             {
@@ -293,7 +308,7 @@ namespace Caique.Semantics
 
         private ModuleEnvironment? GetModule(List<Token> modulePath)
         {
-            var module = _rootModuleEnvironment.FindByPath(
+            var module = _ast.ModuleEnvironment.FindByPath(
                 // Turn List<Token> into List<string>
                 modulePath.Select(x => x.Value)
             );

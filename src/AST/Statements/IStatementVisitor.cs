@@ -9,5 +9,6 @@ namespace Caique.AST
         T Visit(AssignmentStatement assignmentStatement);
         T Visit(FunctionDeclStatement functionDeclStatement);
         T Visit(ClassDeclStatement classDeclStatement);
+        T Visit(UseStatement useStatement);
     }
 }

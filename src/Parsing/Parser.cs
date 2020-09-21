@@ -44,6 +44,19 @@ namespace Caique.Parsing
         {
             var statements = new List<IStatement>();
 
+            // Parse "use" statements at the top first
+            while (!IsAtEnd && Match(TokenKind.Use))
+            {
+                try
+                {
+                    statements.Add(ParseUse());
+                }
+                catch (ParsingErrorException)
+                {
+                    continue;
+                }
+            }
+
             while (!IsAtEnd)
             {
                 try
@@ -57,6 +70,15 @@ namespace Caique.Parsing
             }
 
             return statements;
+        }
+
+        private UseStatement ParseUse()
+        {
+            Expect(TokenKind.Use);
+            var statement = new UseStatement(ParseModulePath());
+            Expect(TokenKind.Semicolon);
+
+            return statement;
         }
 
         private IStatement ParseStatement()

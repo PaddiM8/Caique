@@ -318,6 +318,7 @@ namespace Caique.Parsing
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
                 "new" => TokenKind.New,
+                "use" => TokenKind.Use,
                 "void" => TokenKind.Void,
                 "i8" => TokenKind.i8,
                 "i32" => TokenKind.i32,

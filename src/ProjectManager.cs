@@ -24,7 +24,7 @@ namespace Caique
 
         private ModuleEnvironment CreateModuleEnvironment(string path)
         {
-            var rootEnvironment = new ModuleEnvironment("root"); // TODO: Replace root with project name
+            var rootEnvironment = new ModuleEnvironment("root");
             CreateModuleEnvironment(path, rootEnvironment);
 
             return rootEnvironment;
@@ -32,14 +32,18 @@ namespace Caique
 
         private ModuleEnvironment CreateModuleEnvironment(string path, ModuleEnvironment environment)
         {
-            foreach (var directoryPath in Directory.GetDirectories(path))
+            var directories = Directory.GetDirectories(path);
+            foreach (var directoryPath in directories)
             {
-                string identifier = Path.GetDirectoryName(directoryPath)!;
+                string identifier = Path.GetFileName(directoryPath)!;
                 environment = CreateModuleEnvironment(
                     directoryPath,
                     environment.CreateChildModule(identifier)
                 );
             }
+
+            if (directories.Length > 0)
+                environment = environment.Parent!;
 
             foreach (var filePath in Directory.GetFiles(path))
             {

@@ -28,8 +28,7 @@ namespace Caique
             {
                 new TypeChecker(
                     ast,
-                    Diagnostics,
-                    Environment
+                    Diagnostics
                 ).Analyse();
 
                 if (Program.Options!.PrintAst)
@@ -53,8 +52,12 @@ namespace Caique
         {
             foreach (var (_, module) in environment.Modules)
             {
-                // If the module is just a directory
-                if (module.FilePath == null) continue;
+                // If the module is a directory, just parse its children and continue
+                if (module.FilePath == null)
+                {
+                    ParseModuleEnvironment(module, asts);
+                    continue;
+                }
 
                 // Lex
                 var tokens = new Lexer(
