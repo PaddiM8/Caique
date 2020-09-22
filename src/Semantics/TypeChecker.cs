@@ -147,8 +147,17 @@ namespace Caique.Semantics
             // If it's a user-made class
             if (leftType.Type == TypeKeyword.Identifier)
             {
-                var symbolEnvironment = leftType.Module!
-                    .GetClass(leftType.Identifier!.Value)!.Body.Environment;
+                var classDecl = leftType.Module!.GetClass(leftType.Identifier!.Value);
+
+                // Can't continue if the class couldn't be found.
+                // This will probably mostly happen due to other user-errors,
+                // which will reported where relevant instead.
+                if (classDecl == null)
+                {
+                    return new DataType(TypeKeyword.Unknown);
+                }
+
+                var symbolEnvironment = classDecl.Body.Environment;
 
                 // Check if the variable/function exists in the class
                 if (dotExpression.Right is CallExpression callExpression)
