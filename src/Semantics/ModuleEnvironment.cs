@@ -32,6 +32,7 @@ namespace Caique.Semantics
             FilePath = filePath;
             Parent = parent;
             Root = Parent == null ? this : Parent.Root;
+            ImportModule(Root); // Import root by default
         }
 
         public ModuleEnvironment CreateChildModule(string identifier, string? filePath = null)
@@ -52,25 +53,26 @@ namespace Caique.Semantics
             _importedModules.Add(module);
         }
 
-        public ClassDeclStatement? GetClass(string identifier)
+        public ClassDeclStatement? GetClass(string identifier, bool lookInImports = true)
         {
             if (_classes.TryGetValue(identifier, out ClassDeclStatement? classDecl))
             {
                 return classDecl;
             }
-            else
+            else if (lookInImports)
             {
                 // Try to find it in the imports
                 foreach (var import in _importedModules)
                 {
-                    return import.GetClass(identifier);
+                    var foundClass = import.GetClass(identifier, false);
+                    if (foundClass != null) return foundClass;
                 }
-
-                return null;
             }
+
+            return null;
         }
 
-        public FunctionDeclStatement? GetFunction(string identifier)
+        public FunctionDeclStatement? GetFunction(string identifier, bool lookInImports = true)
         {
             var functionDecl = SymbolEnvironment.GetFunction(identifier);
             if (functionDecl != null)
@@ -82,11 +84,12 @@ namespace Caique.Semantics
                 // Try to find it in the imports
                 foreach (var import in _importedModules)
                 {
-                    return import.GetFunction(identifier);
+                    var foundFunction = import.GetFunction(identifier, false);
+                    if (foundFunction != null) return foundFunction;
                 }
-
-                return null;
             }
+
+            return null;
         }
 
         public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers)
@@ -102,29 +105,35 @@ namespace Caique.Semantics
 
             // Start with the first identifier, and make sure the next recursion deals with the next identifier
             var identifier = identifierQueue.Dequeue();
+            var moduleList = Modules;
 
-            if (Modules.TryGetValue(identifier, out ModuleEnvironment? childEnvironment))
+            if (identifier == "root")
+            {
+                return Root.FindByPath(identifierQueue);
+            }
+
+            if (moduleList.TryGetValue(identifier, out ModuleEnvironment? childEnvironment))
             {
                 // Proceed to search for the next identifier in the path in the child environment
                 return childEnvironment.FindByPath(identifiers, identifierQueue);
             }
-            else if (_classes.ContainsKey(identifier) ||
+
+            if (_classes.ContainsKey(identifier) ||
                      SymbolEnvironment.ContainsFunction(identifier))
             {
                 // If the end-symbol has been reached, stop the recursion and return the module environment.
                 return this;
             }
-            else // Couldn't be found
-            {
-                // Try to find it in the imported modules instead
-                foreach (var import in _importedModules)
-                {
-                    var module = import.FindByPath(identifiers);
-                    if (module != null) return module;
-                }
 
-                return null;
+            // Couldn't be found
+            // Try to find it in the imported modules instead
+            foreach (var import in _importedModules)
+            {
+                var module = import.FindByPath(identifiers);
+                if (module != null) return module;
             }
+
+            return null;
         }
 
         public void Print(int layer = 0)
