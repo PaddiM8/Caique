@@ -32,7 +32,6 @@ namespace Caique.Semantics
             FilePath = filePath;
             Parent = parent;
             Root = Parent == null ? this : Parent.Root;
-            ImportModule(Root); // Import root by default
         }
 
         public ModuleEnvironment CreateChildModule(string identifier, string? filePath = null)
@@ -79,7 +78,7 @@ namespace Caique.Semantics
             {
                 return functionDecl;
             }
-            else
+            else if (lookInImports)
             {
                 // Try to find it in the imports
                 foreach (var import in _importedModules)
@@ -92,13 +91,13 @@ namespace Caique.Semantics
             return null;
         }
 
-        public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers)
+        public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers, bool lookInImported = true)
         {
-            return FindByPath(identifiers, new Queue<string>(identifiers));
+            return FindByPath(identifiers, new Queue<string>(identifiers), lookInImported);
         }
 
         public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers,
-            Queue<string> identifierQueue)
+            Queue<string> identifierQueue, bool lookInImported = true)
         {
             // If there are no more sub-modules to find, return the current module
             if (identifierQueue.Count == 0) return this;
@@ -119,7 +118,7 @@ namespace Caique.Semantics
             }
 
             if (_classes.ContainsKey(identifier) ||
-                     SymbolEnvironment.ContainsFunction(identifier))
+                SymbolEnvironment.ContainsFunction(identifier))
             {
                 // If the end-symbol has been reached, stop the recursion and return the module environment.
                 return this;
@@ -127,10 +126,13 @@ namespace Caique.Semantics
 
             // Couldn't be found
             // Try to find it in the imported modules instead
-            foreach (var import in _importedModules)
+            if (lookInImported)
             {
-                var module = import.FindByPath(identifiers);
-                if (module != null) return module;
+                foreach (var import in _importedModules)
+                {
+                    var module = import.FindByPath(identifiers, false);
+                    if (module != null) return module;
+                }
             }
 
             return null;

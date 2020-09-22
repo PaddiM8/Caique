@@ -98,8 +98,10 @@ namespace Caique.Semantics
 
         public object Visit(UseStatement useStatement)
         {
-            var module = _ast.ModuleEnvironment.Root.FindByPath(
-                useStatement.ModulePath.Select(x => x.Value)
+            var module = _ast.ModuleEnvironment.FindByPath(
+                useStatement.ModulePath
+                    .Select(x => x.Value) // Convert Token into string
+                    .Prepend("root") // Start looking from the root
             );
 
             if (module != null)
