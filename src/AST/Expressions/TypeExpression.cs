@@ -1,18 +1,19 @@
 using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 
 namespace Caique.AST
 {
     public class TypeExpression : IExpression
     {
-        public Token Identifier { get; }
+        public List<Token> ModulePath { get; }
 
         public TextSpan Span { get; }
 
-        public TypeExpression(Token identifier)
+        public TypeExpression(List<Token> modulePath)
         {
-            Identifier = identifier;
-            Span = Identifier.Span;
+            ModulePath = modulePath;
+            Span = modulePath[0].Span.Add(modulePath[^1].Span);
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

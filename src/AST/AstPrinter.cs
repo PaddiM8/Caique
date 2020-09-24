@@ -188,8 +188,8 @@ namespace Caique.AST
 
         public object Visit(NewExpression newExpression)
         {
-            string path = StringifyModulePath(newExpression.ModulePath);
-            PrintStart("new " + path, ConsoleColor.Yellow);
+            PrintStart("new ", ConsoleColor.Yellow);
+            newExpression.Type.Accept(this);
             foreach (var arg in newExpression.Arguments)
                 arg.Accept(this);
 
@@ -200,7 +200,10 @@ namespace Caique.AST
 
         public object Visit(TypeExpression typeExpression)
         {
-            PrintMiddle(typeExpression.Identifier.Value, ConsoleColor.DarkCyan);
+            PrintMiddle(
+                StringifyModulePath(typeExpression.ModulePath),
+                ConsoleColor.DarkCyan
+            );
 
             return null!;
         }

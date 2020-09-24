@@ -6,16 +6,16 @@ namespace Caique.AST
 {
     public class NewExpression : IExpression
     {
-        public List<Token> ModulePath { get; }
+        public TypeExpression Type { get; }
 
         public List<IExpression> Arguments { get; }
 
         public TextSpan Span { get; }
 
-        public NewExpression(List<Token> modulePath, List<IExpression> arguments,
+        public NewExpression(TypeExpression type, List<IExpression> arguments,
                              TextSpan span)
         {
-            ModulePath = modulePath;
+            Type = type;
             Arguments = arguments;
             Span = span;
         }

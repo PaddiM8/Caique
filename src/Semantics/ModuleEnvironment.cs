@@ -32,6 +32,7 @@ namespace Caique.Semantics
             FilePath = filePath;
             Parent = parent;
             Root = Parent == null ? this : Parent.Root;
+            if (Parent != null) ImportModule(Parent);
         }
 
         public ModuleEnvironment CreateChildModule(string identifier, string? filePath = null)

@@ -281,39 +281,51 @@ namespace Caique.Semantics
 
         public DataType Visit(NewExpression newExpression)
         {
-            var module = _ast.ModuleEnvironment;
-            var lastIdentifier = newExpression.ModulePath[^1];
-            if (newExpression.ModulePath.Count > 1)
+            return newExpression.Type.Accept(this);
+        }
+
+        public DataType Visit(TypeExpression typeExpression)
+        {
+            if (typeExpression.ModulePath.Count == 1)
             {
-                module = GetModule(newExpression.ModulePath);
+                var keyword = typeExpression.ModulePath[0].Kind switch
+                {
+                    TokenKind.i8 => TypeKeyword.i8,
+                    TokenKind.i32 => TypeKeyword.i32,
+                    TokenKind.i64 => TypeKeyword.i64,
+                    TokenKind.f8 => TypeKeyword.f8,
+                    TokenKind.f32 => TypeKeyword.f32,
+                    TokenKind.f64 => TypeKeyword.f64,
+                    _ => TypeKeyword.Identifier,
+                };
+
+                if (keyword != TypeKeyword.Identifier)
+                    return new DataType(keyword);
+            }
+
+            var module = _ast.ModuleEnvironment;
+            var lastIdentifier = typeExpression.ModulePath[^1];
+            bool inOtherModule = typeExpression.ModulePath.Count > 1;
+            if (inOtherModule)
+            {
+                module = GetModule(typeExpression.ModulePath);
             }
 
             if (module != null)
             {
-                var classDecl = module.GetClass(lastIdentifier.Value);
+                var classDecl = module.GetClass(
+                    lastIdentifier.Value,
+                    !inOtherModule // Only look in the imports if it is in the current module
+                );
+
                 if (classDecl == null)
                 {
                     _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
                 }
             }
 
+
             return new DataType(TypeKeyword.Identifier, lastIdentifier, module);
-        }
-
-        public DataType Visit(TypeExpression typeExpression)
-        {
-            var keyword = typeExpression.Identifier.Kind switch
-            {
-                TokenKind.i8 => TypeKeyword.i8,
-                TokenKind.i32 => TypeKeyword.i32,
-                TokenKind.i64 => TypeKeyword.i64,
-                TokenKind.f8 => TypeKeyword.f8,
-                TokenKind.f32 => TypeKeyword.f32,
-                TokenKind.f64 => TypeKeyword.f64,
-                _ => TypeKeyword.Unknown,
-            };
-
-            return new DataType(keyword);
         }
 
         public DataType Visit(IfExpression ifExpression)

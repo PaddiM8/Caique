@@ -28,7 +28,7 @@ namespace Caique.Semantics
                 return true;
 
             return Type == TypeKeyword.Identifier
-                ? Identifier == type2.Identifier
+                ? Identifier!.Value == type2.Identifier!.Value
                 : Type == type2.Type;
         }
 

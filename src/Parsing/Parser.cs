@@ -366,11 +366,11 @@ namespace Caique.Parsing
         private NewExpression ParseNew()
         {
             var start = Expect(TokenKind.New).Span;
-            var modulePath = ParseModulePath();
+            var type = ParseType();
             var (arguments, argumentsSpan) = ParseArguments();
 
             return new NewExpression(
-                modulePath,
+                type,
                 arguments,
                 start.Add(argumentsSpan)
             );
@@ -457,7 +457,17 @@ namespace Caique.Parsing
 
         private TypeExpression ParseType()
         {
-            return new TypeExpression(Advance());
+            if (Match(TokenKind.Identifier))
+            {
+                return new TypeExpression(ParseModulePath());
+            }
+            else
+            {
+                return new TypeExpression(new List<Token>()
+                {
+                    Advance()
+                });
+            }
         }
 
         private void Synchronise()
