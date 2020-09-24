@@ -13,12 +13,16 @@ namespace Caique.Diagnostics
 
         public DiagnosticType Type { get; }
 
-        public Diagnostic(DiagnosticIdentifier identifier, string message, TextSpan span, DiagnosticType type)
+        public string File { get; }
+
+        public Diagnostic(DiagnosticIdentifier identifier, string message,
+                          TextSpan span, DiagnosticType type, string file)
         {
             Identifier = identifier;
             Message = message;
             Span = span;
             Type = type;
+            File = file;
         }
 
         public void Print()
@@ -26,6 +30,7 @@ namespace Caique.Diagnostics
             // Print position
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.Write($"[{Span.Start.Line}:{Span.Start.Column}] ");
+            Console.Write(File + ": ");
 
             // Print "Error"/"Warning"
             Console.ForegroundColor = Type switch

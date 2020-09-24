@@ -14,10 +14,12 @@ namespace Caique
     {
         public DiagnosticBag Diagnostics = new DiagnosticBag();
         public ModuleEnvironment Environment;
+        private readonly string _rootPath = "";
 
-        public Compilation(ModuleEnvironment environment)
+        public Compilation(ModuleEnvironment environment, string rootPath)
         {
             Environment = environment;
+            _rootPath = rootPath;
 
             // Parse everything first, so that classes and functions
             // are added to the symbol table before type checking.
@@ -30,6 +32,11 @@ namespace Caique
             {
                 foreach (var ast in asts)
                 {
+                    // Set up diagnostic bag
+                    Diagnostics.CurrentFile = RelativePath(
+                        ast.ModuleEnvironment.FilePath!
+                    );
+
                     new TypeChecker(
                         ast,
                         Diagnostics
@@ -64,6 +71,9 @@ namespace Caique
                     continue;
                 }
 
+                // Set up diagnostic bag
+                Diagnostics.CurrentFile = RelativePath(module.FilePath);
+
                 // Lex
                 var tokens = new Lexer(
                     File.ReadAllText(module.FilePath),
@@ -85,6 +95,11 @@ namespace Caique
             }
 
             return asts;
+        }
+
+        private string RelativePath(string path)
+        {
+            return Path.GetRelativePath(_rootPath, path);
         }
 
         private void PrintTokens(List<Token> tokens)

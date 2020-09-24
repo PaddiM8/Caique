@@ -19,7 +19,7 @@ namespace Caique
             string sourcePath = $"{projectPath}/src";
 
             var environment = CreateModuleEnvironment(sourcePath);
-            new Compilation(environment);
+            new Compilation(environment, sourcePath);
         }
 
         private ModuleEnvironment CreateModuleEnvironment(string path)

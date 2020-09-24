@@ -14,6 +14,8 @@ namespace Caique.Diagnostics
 
         public IEnumerator<Diagnostic> GetEnumerator() => _diagnostics.GetEnumerator();
 
+        public string CurrentFile { get; set; } = "";
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public void AddRange(IEnumerable<Diagnostic> diagnostics)
@@ -176,7 +178,13 @@ namespace Caique.Diagnostics
                             TextSpan span,
                             DiagnosticType type)
         {
-            _diagnostics.Add(new Diagnostic(identifier, message, span, type));
+            _diagnostics.Add(new Diagnostic(
+                identifier,
+                message,
+                span,
+                type,
+                CurrentFile
+            ));
         }
     }
 }
