@@ -42,7 +42,9 @@ namespace Caique.Semantics
 
         public override string ToString()
         {
-            return Type.ToString();
+            return Type == TypeKeyword.Identifier
+                ? Identifier!.Value
+                : Type.ToString().ToLower();
         }
     }
 }
