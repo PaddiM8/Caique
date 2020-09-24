@@ -87,6 +87,10 @@ namespace Caique.Parsing
             {
                 return ParseVariableDecl();
             }
+            if (Match(TokenKind.Ret))
+            {
+                return ParseReturn();
+            }
             else if (Match(TokenKind.Fn))
             {
                 return ParseFunctionDecl();
@@ -115,6 +119,15 @@ namespace Caique.Parsing
             Expect(TokenKind.Semicolon);
 
             return new VariableDeclStatement(identifier, value, type);
+        }
+
+        private ReturnStatement ParseReturn()
+        {
+            var start = Expect(TokenKind.Ret).Span;
+            var expression = ParseExpression();
+            var end = Expect(TokenKind.Semicolon).Span;
+
+            return new ReturnStatement(expression, start.Add(end));
         }
 
         private ClassDeclStatement ParseClassDecl()

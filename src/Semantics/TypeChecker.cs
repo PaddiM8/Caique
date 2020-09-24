@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Caique.AST;
@@ -13,6 +13,7 @@ namespace Caique.Semantics
         private readonly Ast _ast;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
+        private DataType? _currentFunctionType = null;
         private static DataType _voidType = new DataType(TypeKeyword.Void);
 
         public TypeChecker(Ast ast, DiagnosticBag diagnostics)
@@ -68,6 +69,14 @@ namespace Caique.Semantics
             {
                 _diagnostics.ReportSymbolAlreadyExists(variableDeclStatement.Identifier);
             }
+
+            return null!;
+        }
+
+        public object Visit(ReturnStatement returnStatement)
+        {
+            var type = returnStatement.Expression.Accept(this);
+            CheckTypes(type, _currentFunctionType!.Value, returnStatement.Span);
 
             return null!;
         }

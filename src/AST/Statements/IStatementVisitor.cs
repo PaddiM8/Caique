@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Caique.AST
 {
@@ -6,6 +6,7 @@ namespace Caique.AST
     {
         T Visit(ExpressionStatement expressionStatement);
         T Visit(VariableDeclStatement variableDeclStatement);
+        T Visit(ReturnStatement returnStatement);
         T Visit(AssignmentStatement assignmentStatement);
         T Visit(FunctionDeclStatement functionDeclStatement);
         T Visit(ClassDeclStatement classDeclStatement);

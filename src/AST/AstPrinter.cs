@@ -45,6 +45,15 @@ namespace Caique.AST
             return null!;
         }
 
+        public object Visit(ReturnStatement returnStatement)
+        {
+            PrintStart("ret", ConsoleColor.Magenta);
+            returnStatement.Expression.Accept(this);
+            _indentationLevel--;
+
+            return null!;
+        }
+
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
             PrintStart("Function: " + functionDeclStatement.Identifier.Value, ConsoleColor.Magenta);
