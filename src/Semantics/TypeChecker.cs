@@ -15,6 +15,7 @@ namespace Caique.Semantics
         private SymbolEnvironment _environment;
         private DataType? _currentFunctionType = null;
         private static DataType _voidType = new DataType(TypeKeyword.Void);
+        private static DataType _boolType = new DataType(TypeKeyword.Bool);
 
         public TypeChecker(Ast ast, DiagnosticBag diagnostics)
         {
@@ -153,10 +154,12 @@ namespace Caique.Semantics
         public DataType Visit(BinaryExpression binaryExpression)
         {
             var leftType = binaryExpression.Left.Accept(this);
-            var rightType = binaryExpression.Left.Accept(this);
+            var rightType = binaryExpression.Right.Accept(this);
             CheckTypes(leftType, rightType, binaryExpression.Span);
 
-            return leftType;
+            return binaryExpression.Operator.Kind.IsComparisonOperator()
+                ? _boolType
+                : leftType;
         }
 
         public DataType Visit(DotExpression dotExpression)
@@ -316,13 +319,18 @@ namespace Caique.Semantics
         public DataType Visit(IfExpression ifExpression)
         {
             var conditionType = ifExpression.Condition.Accept(this);
-            var boolType = new DataType(TypeKeyword.Bool);
-            CheckTypes(conditionType, boolType, ifExpression.Condition.Span);
+            CheckTypes(conditionType, _boolType, ifExpression.Condition.Span);
 
-            if (ifExpression.Branch is ExpressionStatement branchExpressionStatement &&
-                branchExpressionStatement.Expression is BlockExpression branchBlock)
+            if (ifExpression.Branch is ExpressionStatement branchExprStmt &&
+                branchExprStmt.Expression is BlockExpression branchBlock &&
+                ifExpression.ElseBranch is ExpressionStatement elseBranchExprStmt &&
+                elseBranchExprStmt.Expression is BlockExpression elseBranchBlock)
             {
-                return branchBlock.Accept(this);
+                var branchType = branchBlock.Accept(this);
+                var elseBranchType = elseBranchBlock.Accept(this);
+                CheckTypes(branchType, elseBranchType, ifExpression.Span);
+
+                return branchType;
             }
 
             return _voidType;

@@ -52,12 +52,30 @@ namespace Caique.Parsing
                 TokenKind.BangEquals => 1,
                 TokenKind.MoreOrEquals => 1,
                 TokenKind.LessOrEquals => 1,
+                TokenKind.OpenAngleBracket => 1,
+                TokenKind.ClosedAngleBracket => 1,
                 TokenKind.Plus => 2,
                 TokenKind.Minus => 2,
                 TokenKind.Star => 3,
                 TokenKind.Slash => 3,
                 _ => 0,
             };
+        }
+
+        public static bool IsComparisonOperator(this TokenKind kind)
+        {
+            switch (kind)
+            {
+                case TokenKind.EqualsEquals:
+                case TokenKind.BangEquals:
+                case TokenKind.MoreOrEquals:
+                case TokenKind.LessOrEquals:
+                case TokenKind.OpenAngleBracket:
+                case TokenKind.ClosedAngleBracket:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         public static bool IsAssignmentOperator(this TokenKind kind)
