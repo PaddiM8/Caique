@@ -10,6 +10,12 @@ using Caique.Util;
 
 namespace Caique
 {
+    /// <summary>
+    /// Takes care of the entire compilation process,
+    /// such as lexing, parsing, type checking, etc.
+    /// All it needs is a module tree (with file paths) and the
+    /// path to the source files.
+    /// </summary>
     public class Compilation
     {
         public DiagnosticBag Diagnostics = new DiagnosticBag();
@@ -54,11 +60,23 @@ namespace Caique
                 diagnostic.Print();
         }
 
+        /// <summary>
+        /// Traverses a module tree and reads the files associated
+        /// with the different modules, and then parses the contents.
+        /// </summary>
+        /// <param name="environment">Module tree.</param>
+        /// <returns>List of abstract syntax trees.</returns>
         private List<Ast> ParseModuleEnvironment(ModuleEnvironment environment)
         {
             return ParseModuleEnvironment(environment, new List<Ast>());
         }
 
+        /// <summary>
+        /// Traverses a module tree and reads the files associated
+        /// with the different modules, and then parses the contents.
+        /// </summary>
+        /// <param name="environment">Module tree.</param>
+        /// <returns>List of abstract syntax trees.</returns>
         private List<Ast> ParseModuleEnvironment(ModuleEnvironment environment,
                                                  List<Ast> asts)
         {
@@ -97,6 +115,12 @@ namespace Caique
             return asts;
         }
 
+        /// <summary>
+        /// Turn an absolute path of a file inside 
+        /// a Caique project, into a relative path.
+        /// </summary>
+        /// <param name="path">Absolute path</param>
+        /// <returns>Relative path starting at the root of the source folder.</returns>
         private string RelativePath(string path)
         {
             return Path.GetRelativePath(_rootPath, path);

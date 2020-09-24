@@ -3,6 +3,9 @@ using Caique.Parsing;
 
 namespace Caique.Diagnostics
 {
+    /// <summary>
+    /// An error/warning/etc. found by the compiler.
+    /// </summary>
     public class Diagnostic
     {
         public DiagnosticIdentifier Identifier { get; }

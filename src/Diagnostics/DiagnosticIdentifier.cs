@@ -1,5 +1,8 @@
 namespace Caique.Diagnostics
 {
+    /// <summary>
+    /// A way to easily keep track of the type of problem.
+    /// </summary>
     public enum DiagnosticIdentifier
     {
         InvalidModulePath,

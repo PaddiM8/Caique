@@ -5,6 +5,9 @@ using Caique.AST;
 
 namespace Caique.Semantics
 {
+    /// <summary>
+    /// Symbol table of functions and variables within classes.
+    /// </summary>
     public class SymbolEnvironment
     {
         public SymbolEnvironment? Parent { get; }
@@ -19,6 +22,10 @@ namespace Caique.Semantics
             Parent = parent;
         }
 
+        /// <summary>
+        /// Create a new symbol environment inside this one.
+        /// </summary>
+        /// <returns>The new symbol environment.</returns>
         public SymbolEnvironment CreateChildEnvironment()
         {
             return new SymbolEnvironment(this);
@@ -39,6 +46,11 @@ namespace Caique.Semantics
             _variables.Add(variable.Identifier.Value, variable);
         }
 
+        /// <summary>
+        /// Get a function in the current scope.
+        /// </summary>
+        /// <param name="identifier">The name of the function.</param>
+        /// <returns>Null if none was found.</returns>
         public FunctionDeclStatement? GetFunction(string identifier)
         {
             _functions.TryGetValue(identifier, out FunctionDeclStatement? function);
@@ -57,6 +69,11 @@ namespace Caique.Semantics
             }
         }
 
+        /// <summary>
+        /// Get a variable in the current scope.
+        /// </summary>
+        /// <param name="identifier">The name of the variable.</param>
+        /// <returns>Null if none was found.</returns>
         public VariableDeclStatement? GetVariable(string identifier)
         {
             _variables.TryGetValue(identifier, out VariableDeclStatement? variable);

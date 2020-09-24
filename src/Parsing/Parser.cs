@@ -48,6 +48,10 @@ namespace Caique.Parsing
             _symbolEnvironment = moduleEnvironment.SymbolEnvironment;
         }
 
+        /// <summary>
+        /// Start the parsing process.
+        /// </summary>
+        /// <returns>List of abstract syntax trees.</returns>
         public List<IStatement> Parse()
         {
             var statements = new List<IStatement>();
@@ -470,6 +474,10 @@ namespace Caique.Parsing
             }
         }
 
+        /// <summary>
+        /// Recover from errors by proceeding to the next
+        /// statement or expression.
+        /// </summary>
         private void Synchronise()
         {
             Advance();
@@ -484,6 +492,10 @@ namespace Caique.Parsing
             }
         }
 
+        /// <summary>
+        /// Whether or not the current token is of a certain type.
+        /// </summary>
+        /// <param name="kinds">Checks if one if the current token is of the same type as *one* of these.</param>
         private bool Match(params TokenKind[] kinds)
         {
             foreach (var kind in kinds)
@@ -494,6 +506,10 @@ namespace Caique.Parsing
             return false;
         }
 
+        /// <summary>
+        /// Get a token that is somewhere after the current one.
+        /// </summary>
+        /// <param name="amount">How many items away.</param>
         private Token? Peek(int amount)
         {
             if (_index + amount >= _tokens.Count) return null;
@@ -501,6 +517,13 @@ namespace Caique.Parsing
             return _tokens[_index + amount];
         }
 
+        /// <summary>
+        /// Consume the current token if it is the right kind.
+        /// If it is the wrong kind, create an error.
+        /// </summary>
+        /// <param name="kind">Token kind to expect.</param>
+        /// <param name="description">Description of the expected token.</param>
+        /// <returns>The consumed token.</returns>
         private Token Expect(TokenKind kind, string description)
         {
             if (Current.Kind == kind) return Advance();
@@ -509,6 +532,12 @@ namespace Caique.Parsing
             throw new ParsingErrorException();
         }
 
+        /// <summary>
+        /// Consume the current token if it is the right kind.
+        /// If it is the wrong kind, create an error.
+        /// </summary>
+        /// <param name="kind">Token kind to expect.</param>
+        /// <returns>The consumed token.</returns>
         private Token Expect(params TokenKind[] kinds)
         {
             foreach (var kind in kinds)
@@ -520,6 +549,12 @@ namespace Caique.Parsing
             throw new ParsingErrorException();
         }
 
+        /// <summary>
+        /// If the current token is of the following type,
+        /// advance and return true. Otherwise just return false.
+        /// </summary>
+        /// <param name="kind">Token kind to expect.</param>
+        /// <returns>Whether or not the token kind was found.</returns>
         private bool Consume(TokenKind kind)
         {
             if (Current.Kind == kind)
@@ -532,6 +567,10 @@ namespace Caique.Parsing
             return false;
         }
 
+        /// <summary>
+        /// Move on to the next token.
+        /// </summary>
+        /// <returns>The previous token.</returns>
         private Token Advance()
         {
             var token = Current;

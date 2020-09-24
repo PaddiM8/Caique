@@ -5,10 +5,21 @@ using Caique.AST;
 
 namespace Caique.Semantics
 {
+    /// <summary>
+    /// Tree structure of modules.
+    /// Classes will be stored inside "directory" modules,
+    /// while functions are stored inside "file" modules.
+    /// If you define a class inside a file, it will be stored
+    /// in that file's parent module (which is a directory).
+    /// </summary>
     public class ModuleEnvironment
     {
         public string Identifier { get; }
 
+        /// <summary>
+        /// The path to the file associated with the module.
+        /// If it's a directory, the value is null.
+        /// </summary>
         public string? FilePath { get; }
 
         public ModuleEnvironment? Parent;
@@ -35,6 +46,12 @@ namespace Caique.Semantics
             if (Parent != null) ImportModule(Parent);
         }
 
+        /// <summary>
+        /// Create a new module inside this one.
+        /// </summary>
+        /// <param name="identifier">The name of the module.</param>
+        /// <param name="filePath">The path to the file associated with the module (null if it's a directory).</param>
+        /// <returns></returns>
         public ModuleEnvironment CreateChildModule(string identifier, string? filePath = null)
         {
             var module = new ModuleEnvironment(identifier, filePath, this);
@@ -48,11 +65,23 @@ namespace Caique.Semantics
             _classes.Add(classDecl.Identifier.Value, classDecl);
         }
 
+        /// <summary>
+        /// Import a module, so that it will be looked in when trying to find
+        /// symbols.
+        /// </summary>
+        /// <param name="module"></param>
         public void ImportModule(ModuleEnvironment module)
         {
             _importedModules.Add(module);
         }
 
+        /// <summary>
+        /// Get a class from the current module or directly from
+        /// one of its imported modules.
+        /// </summary>
+        /// <param name="identifier">Name of the class.</param>
+        /// <param name="lookInImports">Whether or not to try to find it in imported modules.</param>
+        /// <returns>Null if none was found.</returns>
         public ClassDeclStatement? GetClass(string identifier, bool lookInImports = true)
         {
             if (_classes.TryGetValue(identifier, out ClassDeclStatement? classDecl))
@@ -72,6 +101,13 @@ namespace Caique.Semantics
             return null;
         }
 
+        /// <summary>
+        /// Get a function from the current module or directly from
+        /// one of its imported modules.
+        /// </summary>
+        /// <param name="identifier">Name of the function.</param>
+        /// <param name="lookInImports">Whether or not to try to find it in imported modules.</param>
+        /// <returns>Null if none was found.</returns>
         public FunctionDeclStatement? GetFunction(string identifier, bool lookInImports = true)
         {
             var functionDecl = SymbolEnvironment.GetFunction(identifier);
@@ -92,12 +128,20 @@ namespace Caique.Semantics
             return null;
         }
 
+        /// <summary>
+        /// Find another module using a module path (list of tokens).
+        /// If the last token in the module path is a class/function/etc.
+        /// it will try to reach that, and will return the module it is in.
+        /// </summary>
+        /// <param name="identifiers">Module path.</param>
+        /// <param name="lookInImports">Whether or not to look in imported modules.</param>
+        /// <returns>Null if none was found.</returns>
         public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers, bool lookInImported = true)
         {
             return FindByPath(identifiers, new Queue<string>(identifiers), lookInImported);
         }
 
-        public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers,
+        private ModuleEnvironment? FindByPath(IEnumerable<string> identifiers,
             Queue<string> identifierQueue, bool lookInImported = true)
         {
             // If there are no more sub-modules to find, return the current module

@@ -9,6 +9,9 @@ namespace Caique.Parsing
 {
     class Lexer
     {
+        /// <summary>
+        /// Whether or not the index is outside the bounds of the source.
+        /// </summary>
         private bool IsAtEnd
         {
             get
@@ -27,6 +30,10 @@ namespace Caique.Parsing
             }
         }
 
+        /// <summary>
+        /// The character in front of the current one.
+        /// </summary>
+        /// <value></value>
         private char Lookahead
         {
             get
@@ -55,6 +62,9 @@ namespace Caique.Parsing
             _diagnostics = diagnostics;
         }
 
+        /// <summary>
+        /// Start the lexing process.
+        /// </summary>
         public List<Token> Lex()
         {
             var tokens = new List<Token>();
@@ -332,6 +342,9 @@ namespace Caique.Parsing
             return (value, kind);
         }
 
+        /// <summary>
+        /// Move on to the next character.
+        /// </summary>
         private void Advance()
         {
             if (IsAtEnd) return;
@@ -340,6 +353,9 @@ namespace Caique.Parsing
             _position.column++;
         }
 
+        /// <summary>
+        /// Go back to the previous character.
+        /// </summary>
         private void Retreat()
         {
             _position.index--;

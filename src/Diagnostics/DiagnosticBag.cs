@@ -8,6 +8,10 @@ using Caique.Semantics;
 
 namespace Caique.Diagnostics
 {
+    /// <summary>
+    /// List of `Diagnostic` objects.
+    /// Use the functions here to log new errors.
+    /// </summary>
     public class DiagnosticBag : IEnumerable<Diagnostic>
     {
         private readonly List<Diagnostic> _diagnostics = new List<Diagnostic>();

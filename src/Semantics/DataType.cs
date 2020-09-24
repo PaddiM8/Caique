@@ -3,6 +3,9 @@ using Caique.Parsing;
 
 namespace Caique.Semantics
 {
+    /// <summary>
+    /// Represents a Caique type.
+    /// </summary>
     public struct DataType
     {
         public TypeKeyword Type { get; }
@@ -19,6 +22,9 @@ namespace Caique.Semantics
             Module = module;
         }
 
+        /// <summary>
+        /// Checks if two types are compatible with each other.
+        /// </summary>
         public bool IsCompatible(DataType type2)
         {
             if (Type == TypeKeyword.NumberLiteral && type2.IsNumber())
