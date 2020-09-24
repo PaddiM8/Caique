@@ -21,7 +21,9 @@ namespace Caique.Semantics
 
         public bool IsCompatible(DataType type2)
         {
-            return Type == type2.Type;
+            return Type == TypeKeyword.Identifier
+                ? Identifier == type2.Identifier
+                : Type == type2.Type;
         }
 
         public bool IsNumber()
