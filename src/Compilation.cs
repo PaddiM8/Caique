@@ -24,15 +24,20 @@ namespace Caique
             // The ParseModuleEnvironment traverses the ModuleEnvironment
             // tree and reads the file specified in the specific ModuleEnvironment.
             var asts = ParseModuleEnvironment(Environment);
-            foreach (var ast in asts)
-            {
-                new TypeChecker(
-                    ast,
-                    Diagnostics
-                ).Analyse();
 
-                if (Program.Options!.PrintAst)
-                    ast.Print();
+            // Only type check if the parsing didn't generate any errors
+            if (!Diagnostics.Any())
+            {
+                foreach (var ast in asts)
+                {
+                    new TypeChecker(
+                        ast,
+                        Diagnostics
+                    ).Analyse();
+
+                    if (Program.Options!.PrintAst)
+                        ast.Print();
+                }
             }
 
             if (Program.Options!.PrintEnvironment)
