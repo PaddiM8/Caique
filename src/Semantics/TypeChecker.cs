@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Caique.AST;
@@ -49,10 +49,11 @@ namespace Caique.Semantics
                 if (variableDeclStatement.Value != null)
                 {
                     var valueType = variableDeclStatement.Value!.Accept(this);
-                    if (specifiedType.Type != valueType.Type)
-                    {
-                        _diagnostics.ReportUnexpectedType(valueType, specifiedType);
-                    }
+                    CheckTypes(
+                        specifiedType,
+                        valueType,
+                        variableDeclStatement.Value.Span
+                    );
                 }
             }
             else
@@ -93,7 +94,16 @@ namespace Caique.Semantics
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
-            functionDeclStatement.Body.Accept(this);
+            _currentFunctionType = functionDeclStatement.ReturnType?.Accept(this) ?? _voidType;
+
+            var bodyType = functionDeclStatement.Body.Accept(this);
+            CheckTypes(
+                bodyType,
+                _currentFunctionType!.Value,
+                functionDeclStatement.Body.Span
+            );
+
+            _currentFunctionType = null;
 
             return null!;
         }
@@ -130,7 +140,11 @@ namespace Caique.Semantics
             var valueType = unaryExpression.Value.Accept(this);
             if (!valueType.IsNumber())
             {
-                _diagnostics.ReportUnexpectedType(valueType, "number");
+                _diagnostics.ReportUnexpectedType(
+                    valueType,
+                    "number",
+                    unaryExpression.Span
+                );
             }
 
             return valueType;
@@ -140,11 +154,7 @@ namespace Caique.Semantics
         {
             var leftType = binaryExpression.Left.Accept(this);
             var rightType = binaryExpression.Left.Accept(this);
-
-            if (!leftType.IsCompatible(rightType))
-            {
-                _diagnostics.ReportUnexpectedType(leftType, rightType);
-            }
+            CheckTypes(leftType, rightType, binaryExpression.Span);
 
             return leftType;
         }
@@ -190,7 +200,7 @@ namespace Caique.Semantics
             }
             else
             {
-                _diagnostics.ReportUnexpectedType(leftType, "object");
+                _diagnostics.ReportUnexpectedType(leftType, "object", dotExpression.Left.Span);
             }
 
             return new DataType(TypeKeyword.Unknown);
@@ -224,7 +234,7 @@ namespace Caique.Semantics
                 // it doesn't have a trailing semicolon, it should be returned.
                 if (isLast &&
                     statement is ExpressionStatement expressionStatement &&
-                    expressionStatement.TrailingSemicolon)
+                    !expressionStatement.TrailingSemicolon)
                 {
                     returnType = expressionStatement.Expression.Accept(this);
                 }
@@ -307,10 +317,7 @@ namespace Caique.Semantics
         {
             var conditionType = ifExpression.Condition.Accept(this);
             var boolType = new DataType(TypeKeyword.Bool);
-            if (!conditionType.IsCompatible(boolType))
-            {
-                _diagnostics.ReportUnexpectedType(boolType, conditionType);
-            }
+            CheckTypes(conditionType, boolType, ifExpression.Condition.Span);
 
             if (ifExpression.Branch is ExpressionStatement branchExpressionStatement &&
                 branchExpressionStatement.Expression is BlockExpression branchBlock)
@@ -402,13 +409,22 @@ namespace Caique.Semantics
             {
                 var argumentType = argument.Accept(this);
                 var parameterType = parameter.Type.Accept(this);
-                if (!argumentType.IsCompatible(parameterType))
-                {
-                    _diagnostics.ReportUnexpectedType(argumentType, parameterType);
-                }
+                CheckTypes(argumentType, parameterType, argument.Span);
             }
 
             return returnType;
+        }
+
+        private bool CheckTypes(DataType type1, DataType type2, TextSpan span)
+        {
+            if (!type1.IsCompatible(type2))
+            {
+                _diagnostics.ReportUnexpectedType(type1, type2, span);
+
+                return false;
+            }
+
+            return true;
         }
     }
 }

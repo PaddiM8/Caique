@@ -111,22 +111,22 @@ namespace Caique.Diagnostics
             );
         }
 
-        public void ReportUnexpectedType(DataType got, DataType expected)
+        public void ReportUnexpectedType(DataType got, DataType expected, TextSpan span)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
-                $"Unexpected token '{got}', expected {expected}.",
-                new TextSpan(new TextPosition(0, 0), new TextPosition(0, 0)), // TODO:
+                $"Unexpected type {got}, expected {expected}.",
+                span,
                 DiagnosticType.Error
             );
         }
 
-        public void ReportUnexpectedType(DataType got, string expected)
+        public void ReportUnexpectedType(DataType got, string expected, TextSpan span)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
-                $"Unexpected token '{got}', expected {expected}.",
-                new TextSpan(new TextPosition(0, 0), new TextPosition(0, 0)), // TODO:
+                $"Unexpected type {got}, expected {expected}.",
+                span,
                 DiagnosticType.Error
             );
         }

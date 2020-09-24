@@ -9,10 +9,13 @@ namespace Caique.AST
 
         public IExpression Right { get; }
 
+        public TextSpan Span { get; }
+
         public DotExpression(IExpression left, IExpression right)
         {
             Left = left;
             Right = right;
+            Span = Left.Span.Add(Right.Span);
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

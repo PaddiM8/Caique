@@ -10,10 +10,13 @@ namespace Caique.AST
 
         public List<IExpression> Arguments { get; }
 
-        public CallExpression(List<Token> modulePath, List<IExpression> arguments)
+        public TextSpan Span { get; }
+
+        public CallExpression(List<Token> modulePath, List<IExpression> arguments, TextSpan span)
         {
             ModulePath = modulePath;
             Arguments = arguments;
+            Span = span;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

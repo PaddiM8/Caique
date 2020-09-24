@@ -10,10 +10,14 @@ namespace Caique.AST
 
         public List<IExpression> Arguments { get; }
 
-        public NewExpression(List<Token> modulePath, List<IExpression> arguments)
+        public TextSpan Span { get; }
+
+        public NewExpression(List<Token> modulePath, List<IExpression> arguments,
+                             TextSpan span)
         {
             ModulePath = modulePath;
             Arguments = arguments;
+            Span = span;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

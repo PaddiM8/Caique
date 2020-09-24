@@ -7,9 +7,12 @@ namespace Caique.AST
     {
         public IExpression Expression { get; }
 
-        public GroupExpression(IExpression expression)
+        public TextSpan Span { get; }
+
+        public GroupExpression(IExpression expression, TextSpan span)
         {
             Expression = expression;
+            Span = span;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

@@ -11,11 +11,14 @@ namespace Caique.AST
 
         public IExpression Right { get; }
 
+        public TextSpan Span { get; }
+
         public BinaryExpression(IExpression left, Token op, IExpression right)
         {
             Left = left;
             Operator = op;
             Right = right;
+            Span = left.Span.Add(right.Span);
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

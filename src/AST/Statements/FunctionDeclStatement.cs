@@ -14,13 +14,17 @@ namespace Caique.AST
 
         public TypeExpression? ReturnType { get; }
 
+        public TextSpan Span { get; }
+
         public FunctionDeclStatement(Token identifier, List<Parameter> parameters,
-                                     BlockExpression body, TypeExpression? returnType)
+                                     BlockExpression body, TypeExpression? returnType,
+                                     TextSpan span)
         {
             Identifier = identifier;
             Parameters = parameters;
             Body = body;
             ReturnType = returnType;
+            Span = span;
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)

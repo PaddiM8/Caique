@@ -11,11 +11,15 @@ namespace Caique.AST
 
         public TypeExpression? Ancestor { get; }
 
-        public ClassDeclStatement(Token identifier, BlockExpression body, TypeExpression? ancestor = null)
+        public TextSpan Span { get; }
+
+        public ClassDeclStatement(Token identifier, BlockExpression body,
+                                  TextSpan span, TypeExpression? ancestor = null)
         {
             Identifier = identifier;
             Body = body;
             Ancestor = ancestor;
+            Span = span;
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)

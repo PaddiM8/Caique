@@ -8,9 +8,12 @@ namespace Caique.AST
     {
         public List<Token> ModulePath { get; }
 
-        public UseStatement(List<Token> modulePath)
+        public TextSpan Span { get; }
+
+        public UseStatement(List<Token> modulePath, TextSpan span)
         {
             ModulePath = modulePath;
+            Span = span;
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)

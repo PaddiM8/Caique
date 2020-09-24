@@ -11,11 +11,15 @@ namespace Caique.AST
 
         public IExpression Value { get; }
 
-        public AssignmentStatement(VariableExpression identifier, Token op, IExpression value)
+        public TextSpan Span { get; }
+
+        public AssignmentStatement(VariableExpression identifier, Token op,
+                                   IExpression value)
         {
             Variable = identifier;
             Operator = op;
             Value = value;
+            Span = Variable.Span.Add(Value.Span);
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)

@@ -9,10 +9,13 @@ namespace Caique.AST
 
         public IExpression Value { get; }
 
+        public TextSpan Span { get; }
+
         public UnaryExpression(Token op, IExpression value)
         {
             Operator = op;
             Value = value;
+            Span = Operator.Span.Add(value.Span);
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

@@ -8,9 +8,12 @@ namespace Caique.AST
     {
         public Token Identifier { get; }
 
+        public TextSpan Span { get; }
+
         public VariableExpression(Token identifier)
         {
             Identifier = identifier;
+            Span = Identifier.Span;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

@@ -14,11 +14,15 @@ namespace Caique.AST
 
         public DataType? DataType { get; set; }
 
-        public VariableDeclStatement(Token identifier, IExpression? value, TypeExpression? type = null)
+        public TextSpan Span { get; }
+
+        public VariableDeclStatement(Token identifier, TextSpan span,
+                                     IExpression? value, TypeExpression? type = null)
         {
             Identifier = identifier;
             Value = value;
             SpecifiedType = type;
+            Span = span;
         }
 
         public T Accept<T>(IStatementVisitor<T> visitor)

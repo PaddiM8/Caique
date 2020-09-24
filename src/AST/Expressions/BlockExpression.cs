@@ -11,10 +11,14 @@ namespace Caique.AST
 
         public SymbolEnvironment Environment { get; }
 
-        public BlockExpression(List<IStatement> statements, SymbolEnvironment environment)
+        public TextSpan Span { get; }
+
+        public BlockExpression(List<IStatement> statements, SymbolEnvironment environment,
+                               TextSpan span)
         {
             Statements = statements;
             Environment = environment;
+            Span = span;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

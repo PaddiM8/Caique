@@ -11,11 +11,15 @@ namespace Caique.AST
 
         public IStatement? ElseBranch { get; }
 
-        public IfExpression(IExpression condition, IStatement branch, IStatement? elseBranch)
+        public TextSpan Span { get; }
+
+        public IfExpression(IExpression condition, IStatement branch,
+                            IStatement? elseBranch, TextSpan span)
         {
             Condition = condition;
             Branch = branch;
             ElseBranch = elseBranch;
+            Span = span;
         }
 
         public T Accept<T>(IExpressionVisitor<T> visitor)

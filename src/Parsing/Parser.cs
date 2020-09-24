@@ -25,6 +25,14 @@ namespace Caique.Parsing
             }
         }
 
+        private Token Previous
+        {
+            get
+            {
+                return _tokens[_index - 1];
+            }
+        }
+
         private readonly List<Token> _tokens;
         private readonly DiagnosticBag _diagnostics;
         private ModuleEnvironment _moduleEnvironment;
@@ -74,9 +82,10 @@ namespace Caique.Parsing
 
         private UseStatement ParseUse()
         {
-            Expect(TokenKind.Use);
-            var statement = new UseStatement(ParseModulePath());
-            Expect(TokenKind.Semicolon);
+            var start = Expect(TokenKind.Use).Span;
+            var modulePath = ParseModulePath();
+            var end = Expect(TokenKind.Semicolon).Span;
+            var statement = new UseStatement(modulePath, start.Add(end));
 
             return statement;
         }
@@ -105,7 +114,7 @@ namespace Caique.Parsing
 
         private VariableDeclStatement ParseVariableDecl()
         {
-            Expect(TokenKind.Let, "variable declaration");
+            var start = Expect(TokenKind.Let, "variable declaration").Span;
             var identifier = Expect(TokenKind.Identifier);
             TypeExpression? type = null;
 
@@ -116,9 +125,14 @@ namespace Caique.Parsing
             }
 
             var value = ParseExpression();
-            Expect(TokenKind.Semicolon);
+            var end = Expect(TokenKind.Semicolon).Span;
 
-            return new VariableDeclStatement(identifier, value, type);
+            return new VariableDeclStatement(
+                identifier,
+                start.Add(end),
+                value,
+                type
+            );
         }
 
         private ReturnStatement ParseReturn()
@@ -132,16 +146,18 @@ namespace Caique.Parsing
 
         private ClassDeclStatement ParseClassDecl()
         {
-            Expect(TokenKind.Class, "class declaration");
+            var start = Expect(TokenKind.Class, "class declaration").Span;
             var identifier = Expect(TokenKind.Identifier);
             TypeExpression? ancestor = null;
 
             if (Consume(TokenKind.Colon))
                 ancestor = ParseType();
 
+            var block = ParseBlock();
             var statement = new ClassDeclStatement(
                 identifier,
-                ParseBlock(),
+                block,
+                start.Add(block.Span),
                 ancestor
             );
 
@@ -152,7 +168,7 @@ namespace Caique.Parsing
 
         private FunctionDeclStatement ParseFunctionDecl()
         {
-            Expect(TokenKind.Fn, "function declaration");
+            var start = Expect(TokenKind.Fn, "function declaration").Span;
             var identifier = Expect(TokenKind.Identifier);
             var parameters = ParseParameters();
             TypeExpression? returnType = Consume(TokenKind.Colon)
@@ -164,7 +180,12 @@ namespace Caique.Parsing
             foreach (var parameter in parameters)
             {
                 body.Environment.Add(
-                    new VariableDeclStatement(parameter.Identifier, null, parameter.Type)
+                    new VariableDeclStatement(
+                        parameter.Identifier,
+                        parameter.Type.Span.Add(parameter.Identifier.Span),
+                        null,
+                        parameter.Type
+                    )
                 );
             }
 
@@ -172,7 +193,8 @@ namespace Caique.Parsing
                 identifier,
                 parameters,
                 body,
-                returnType
+                returnType,
+                start.Add(body.Span)
             );
 
             _symbolEnvironment.Add(statement);
@@ -263,10 +285,11 @@ namespace Caique.Parsing
             }
             else if (Match(TokenKind.OpenParenthesis))
             {
+                var start = Expect(TokenKind.OpenParenthesis).Span;
                 var expression = ParseExpression();
-                Expect(TokenKind.ClosedParenthesis);
+                var end = Expect(TokenKind.ClosedParenthesis).Span;
 
-                return new GroupExpression(expression);
+                return new GroupExpression(expression, start.Add(end));
             }
             else if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral))
             {
@@ -291,21 +314,30 @@ namespace Caique.Parsing
 
         private IfExpression ParseIf()
         {
-            Expect(TokenKind.If);
+            var start = Expect(TokenKind.If).Span;
             var condition = ParseExpression();
             Consume(TokenKind.Colon); // Consume colon if there is one
             var branch = ParseStatement();
+            var end = branch.Span;
             IStatement? elseBranch = null;
 
             if (Consume(TokenKind.Else))
+            {
                 elseBranch = ParseStatement();
+                end = elseBranch.Span;
+            }
 
-            return new IfExpression(condition, branch, elseBranch);
+            return new IfExpression(
+                condition,
+                branch,
+                elseBranch,
+                start.Add(end)
+            );
         }
 
         private BlockExpression ParseBlock()
         {
-            Expect(TokenKind.OpenBrace, "block");
+            var start = Expect(TokenKind.OpenBrace, "block").Span;
             var statements = new List<IStatement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment(); // Create the scope
 
@@ -321,7 +353,11 @@ namespace Caique.Parsing
                 }
             }
 
-            var statement = new BlockExpression(statements, _symbolEnvironment);
+            var statement = new BlockExpression(
+                statements,
+                _symbolEnvironment,
+                start.Add(Previous.Span)
+            );
             _symbolEnvironment = _symbolEnvironment.Parent!; // Return to the parent scope
 
             return statement;
@@ -329,9 +365,15 @@ namespace Caique.Parsing
 
         private NewExpression ParseNew()
         {
-            Expect(TokenKind.New);
+            var start = Expect(TokenKind.New).Span;
+            var modulePath = ParseModulePath();
+            var (arguments, argumentsSpan) = ParseArguments();
 
-            return new NewExpression(ParseModulePath(), ParseArguments());
+            return new NewExpression(
+                modulePath,
+                arguments,
+                start.Add(argumentsSpan)
+            );
         }
 
         private IExpression ParseIdentifier()
@@ -340,7 +382,14 @@ namespace Caique.Parsing
             if (lookahead == TokenKind.Arrow ||
                 lookahead == TokenKind.OpenParenthesis)
             {
-                return new CallExpression(ParseModulePath(), ParseArguments());
+                var modulePath = ParseModulePath();
+                var (arguments, argumentsSpan) = ParseArguments();
+
+                return new CallExpression(
+                    modulePath,
+                    arguments,
+                    modulePath[0].Span.Add(argumentsSpan)
+                );
             }
 
             return new VariableExpression(Expect(TokenKind.Identifier));
@@ -361,9 +410,9 @@ namespace Caique.Parsing
             return identifiers;
         }
 
-        private List<IExpression> ParseArguments()
+        private (List<IExpression> arguments, TextSpan span) ParseArguments()
         {
-            Expect(TokenKind.OpenParenthesis);
+            var start = Expect(TokenKind.OpenParenthesis).Span;
 
             var arguments = new List<IExpression>();
             do
@@ -377,9 +426,9 @@ namespace Caique.Parsing
             }
             while (!IsAtEnd && Consume(TokenKind.Comma));
 
-            Expect(TokenKind.ClosedParenthesis);
+            var end = Expect(TokenKind.ClosedParenthesis).Span;
 
-            return arguments;
+            return (arguments, start.Add(end));
         }
 
         private List<Parameter> ParseParameters()
