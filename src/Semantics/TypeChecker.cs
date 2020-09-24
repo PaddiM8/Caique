@@ -213,7 +213,7 @@ namespace Caique.Semantics
         {
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
             {
-                return new DataType(TypeKeyword.i32);
+                return new DataType(TypeKeyword.NumberLiteral);
             }
 
             throw new NotImplementedException();
