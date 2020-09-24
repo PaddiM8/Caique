@@ -425,6 +425,12 @@ namespace Caique.Semantics
 
         private bool CheckTypes(DataType type1, DataType type2, TextSpan span)
         {
+            // This means an error has been found somewhere else,
+            // so just ignore it.
+            if (type1.Type == TypeKeyword.Unknown ||
+                type2.Type == TypeKeyword.Unknown)
+                return true;
+
             if (!type1.IsCompatible(type2))
             {
                 _diagnostics.ReportUnexpectedType(type1, type2, span);
