@@ -87,18 +87,46 @@ namespace Caique.Parsing
 
         private Token NextToken()
         {
-            // Ignore any whitespace
-            while (!IsAtEnd && char.IsWhiteSpace(Current))
+            // Ignore whitespace and comments
+            while (!IsAtEnd)
             {
-                if (Current == '\n')
+                // Whitespace
+                if (char.IsWhiteSpace(Current))
                 {
-                    _position.line++;
-                    _position.column = 0;
+                    if (Current == '\n') NextLine();
+                    Advance();
+
+                    continue;
                 }
 
-                Advance();
-            }
+                // Single-line comments
+                if (Current == '/' && Lookahead == '/')
+                {
+                    while (!IsAtEnd && Current != '\n')
+                        Advance();
 
+                    continue;
+                }
+
+                // Multi-line comments
+                if (Current == '/' && Lookahead == '*')
+                {
+                    while (!IsAtEnd)
+                    {
+                        if (Current == '*' && Lookahead == '/') break;
+                        if (Current == '\n') NextLine();
+                        Advance();
+                    }
+
+                    // Advance past the final * and /
+                    Advance();
+                    Advance();
+
+                    continue;
+                }
+
+                break;
+            }
 
             // If the last character is whitespace,
             // something will still be needed to be returned.
@@ -340,6 +368,16 @@ namespace Caique.Parsing
             };
 
             return (value, kind);
+        }
+
+        /// <summary>
+        /// Increment the variable that keeps track of the line,
+        /// and reset the variable that keeps track of the column
+        /// </summary>
+        private void NextLine()
+        {
+            _position.line++;
+            _position.column = 0;
         }
 
         /// <summary>
