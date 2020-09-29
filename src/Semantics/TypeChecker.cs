@@ -14,8 +14,8 @@ namespace Caique.Semantics
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
         private DataType? _currentFunctionType = null;
-        private static DataType _voidType = new DataType(TypeKeyword.Void);
-        private static DataType _boolType = new DataType(TypeKeyword.Bool);
+        private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
+        private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
 
         public TypeChecker(Ast ast, DiagnosticBag diagnostics)
         {
@@ -111,6 +111,15 @@ namespace Caique.Semantics
 
         public object Visit(ClassDeclStatement classDeclStatement)
         {
+            foreach (var parameterRef in classDeclStatement.ParameterRefs)
+            {
+                if (!classDeclStatement.Body.Environment
+                    .ContainsVariable(parameterRef.Value))
+                {
+                    _diagnostics.ReportSymbolDoesNotExist(parameterRef);
+                }
+            }
+
             classDeclStatement.Body.Accept(this);
 
             return null!;
@@ -281,7 +290,36 @@ namespace Caique.Semantics
 
         public DataType Visit(NewExpression newExpression)
         {
-            return newExpression.Type.Accept(this);
+            var type = newExpression.Type.Accept(this);
+            var classDecl = type.Module!.GetClass(type.Identifier!.Value); // TODO: Store this in the type...
+            if (classDecl == null) return new DataType(TypeKeyword.Unknown);
+
+            int argumentCount = newExpression.Arguments.Count;
+            int parameterCount = classDecl.ParameterRefs.Count;
+            if (argumentCount != parameterCount)
+            {
+                _diagnostics.ReportWrongNumberOfArguments(
+                    classDecl.Identifier,
+                    argumentCount,
+                    parameterCount
+                );
+
+                return new DataType(TypeKeyword.Unknown);
+            }
+            foreach (var (argument, i) in newExpression.Arguments.WithIndex())
+            {
+                var argumentType = argument.Accept(this);
+                var varDecl = classDecl!.Body.Environment.GetVariable(
+                    classDecl.ParameterRefs[i].Value
+                );
+
+                if (varDecl == null) continue;
+                if (varDecl.DataType == null) varDecl.Accept(this);
+
+                CheckTypes(argumentType, varDecl.DataType!.Value);
+            }
+
+            return type;
         }
 
         public DataType Visit(TypeExpression typeExpression)

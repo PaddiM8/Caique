@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 
 namespace Caique.AST
@@ -7,16 +8,22 @@ namespace Caique.AST
     {
         public Token Identifier { get; }
 
+        public List<Token> ParameterRefs { get; }
+
         public BlockExpression Body { get; }
 
         public TypeExpression? Ancestor { get; }
 
         public TextSpan Span { get; }
 
-        public ClassDeclStatement(Token identifier, BlockExpression body,
-                                  TextSpan span, TypeExpression? ancestor = null)
+        public ClassDeclStatement(Token identifier,
+                                  List<Token> parameterRefs,
+                                  BlockExpression body,
+                                  TextSpan span,
+                                  TypeExpression? ancestor = null)
         {
             Identifier = identifier;
+            ParameterRefs = parameterRefs;
             Body = body;
             Ancestor = ancestor;
             Span = span;

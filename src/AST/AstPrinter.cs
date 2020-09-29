@@ -76,6 +76,11 @@ namespace Caique.AST
         public object Visit(ClassDeclStatement classDeclStatement)
         {
             PrintStart("Class: " + classDeclStatement.Identifier.Value, ConsoleColor.DarkGreen);
+
+            foreach (var parameter in classDeclStatement.ParameterRefs)
+                PrintMiddle(parameter.Value, ConsoleColor.Green);
+            _indentationLevel--;
+
             classDeclStatement.Body.Accept(this);
 
             if (classDeclStatement.Ancestor != null)

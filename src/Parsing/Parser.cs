@@ -148,28 +148,6 @@ namespace Caique.Parsing
             return new ReturnStatement(expression, start.Add(end));
         }
 
-        private ClassDeclStatement ParseClassDecl()
-        {
-            var start = Expect(TokenKind.Class, "class declaration").Span;
-            var identifier = Expect(TokenKind.Identifier);
-            TypeExpression? ancestor = null;
-
-            if (Consume(TokenKind.Colon))
-                ancestor = ParseType();
-
-            var block = ParseBlock();
-            var statement = new ClassDeclStatement(
-                identifier,
-                block,
-                start.Add(block.Span),
-                ancestor
-            );
-
-            _moduleEnvironment.Parent!.Add(statement);
-
-            return statement;
-        }
-
         private FunctionDeclStatement ParseFunctionDecl()
         {
             var start = Expect(TokenKind.Fn, "function declaration").Span;
@@ -199,6 +177,89 @@ namespace Caique.Parsing
                 body,
                 returnType,
                 start.Add(body.Span)
+            );
+
+            _symbolEnvironment.Add(statement);
+
+            return statement;
+        }
+
+        private ClassDeclStatement ParseClassDecl()
+        {
+            Expect(TokenKind.Class, "class declaration");
+            var identifier = Expect(TokenKind.Identifier);
+
+            // Parameter refs
+            var parameterRefs = new List<Token>();
+            Expect(TokenKind.OpenParenthesis);
+
+            if (Match(TokenKind.Identifier))
+            {
+                do parameterRefs.Add(Expect(TokenKind.Identifier));
+                while (Consume(TokenKind.Comma));
+            }
+
+            Expect(TokenKind.ClosedParenthesis);
+
+            // Inheritance
+            TypeExpression? ancestor = null;
+            if (Consume(TokenKind.Colon))
+                ancestor = ParseType();
+
+            var statement = new ClassDeclStatement(
+                identifier,
+                parameterRefs,
+                ParseClassBlock(),
+                identifier.Span,
+                ancestor
+            );
+
+            _moduleEnvironment.Parent!.Add(statement);
+
+            return statement;
+        }
+
+        private BlockExpression ParseClassBlock()
+        {
+            var start = Expect(TokenKind.OpenBrace).Span;
+            var statements = new List<IStatement>();
+            _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
+            while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
+            {
+                if (Match(TokenKind.Fn)) ParseFunctionDecl();
+                else ParseObjectVariableDecl();
+            }
+
+            var statement = new BlockExpression(
+                statements,
+                _symbolEnvironment,
+                start.Add(Previous.Span)
+            );
+
+            _symbolEnvironment = _symbolEnvironment.Parent!;
+
+            return statement;
+        }
+
+        private VariableDeclStatement ParseObjectVariableDecl()
+        {
+            var identifier = Expect(TokenKind.Identifier);
+            Expect(TokenKind.Colon);
+            var type = ParseType();
+            IExpression? value = null;
+
+            if (Consume(TokenKind.Equals))
+            {
+                value = ParseExpression();
+            }
+
+            Expect(TokenKind.Semicolon);
+
+            var statement = new VariableDeclStatement(
+                identifier,
+                identifier.Span.Add(type.Span),
+                value,
+                type
             );
 
             _symbolEnvironment.Add(statement);
