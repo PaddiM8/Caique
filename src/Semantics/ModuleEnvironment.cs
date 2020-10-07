@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Caique.AST;
+using Caique.Parsing;
 
 namespace Caique.Semantics
 {
@@ -102,6 +103,20 @@ namespace Caique.Semantics
         }
 
         /// <summary>
+        /// Get a class from a module path.
+        /// </summary>
+        /// <param name="modulePath">Module path.</param>
+        /// <returns>Null if none was found.</returns>
+        public ClassDeclStatement? GetClass(List<Token> modulePath)
+        {
+            string identifier = modulePath[^1].Value;
+
+            return modulePath.Count > 1
+                ? FindByPath(modulePath)?.GetClass(identifier, false)
+                : GetClass(identifier);
+        }
+
+        /// <summary>
         /// Get a function from the current module or directly from
         /// one of its imported modules.
         /// </summary>
@@ -136,6 +151,21 @@ namespace Caique.Semantics
         /// <param name="identifiers">Module path.</param>
         /// <param name="lookInImports">Whether or not to look in imported modules.</param>
         /// <returns>Null if none was found.</returns>
+        public ModuleEnvironment? FindByPath(IEnumerable<Token> identifiers, bool lookInImported = true)
+        {
+            var values = identifiers.Select(x => x.Value);
+
+            return FindByPath(values, new Queue<string>(values), lookInImported);
+        }
+
+        /// <summary>
+        /// Find another module using a module path (list of tokens).
+        /// If the last token in the module path is a class/function/etc.
+        /// it will try to reach that, and will return the module it is in.
+        /// </summary>
+        /// <param name="identifiers">Module path.</param>
+        /// <param name="lookInImports">Whether or not to look in imported modules.</param>
+        /// <returns>Null if none was found.</returns>
         public ModuleEnvironment? FindByPath(IEnumerable<string> identifiers, bool lookInImported = true)
         {
             return FindByPath(identifiers, new Queue<string>(identifiers), lookInImported);
@@ -149,14 +179,13 @@ namespace Caique.Semantics
 
             // Start with the first identifier, and make sure the next recursion deals with the next identifier
             var identifier = identifierQueue.Dequeue();
-            var moduleList = Modules;
 
             if (identifier == "root")
             {
                 return Root.FindByPath(identifierQueue);
             }
 
-            if (moduleList.TryGetValue(identifier, out ModuleEnvironment? childEnvironment))
+            if (Modules.TryGetValue(identifier, out ModuleEnvironment? childEnvironment))
             {
                 // Proceed to search for the next identifier in the path in the child environment
                 return childEnvironment.FindByPath(identifiers, identifierQueue);

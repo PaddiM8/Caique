@@ -211,6 +211,7 @@ namespace Caique.Parsing
                 parameterRefs,
                 ParseClassBlock(),
                 identifier.Span,
+                _moduleEnvironment,
                 ancestor
             );
 

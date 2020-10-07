@@ -83,9 +83,9 @@ namespace Caique.AST
 
             classDeclStatement.Body.Accept(this);
 
-            if (classDeclStatement.Ancestor != null)
+            if (classDeclStatement.Inherited != null)
             {
-                classDeclStatement.Ancestor.Accept(this);
+                classDeclStatement.Inherited.Accept(this);
             }
 
             _indentationLevel--;

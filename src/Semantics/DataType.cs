@@ -1,4 +1,5 @@
 ﻿using System;
+using Caique.AST;
 using Caique.Parsing;
 
 namespace Caique.Semantics
@@ -10,32 +11,37 @@ namespace Caique.Semantics
     {
         public TypeKeyword Type { get; }
 
-        public Token? Identifier { get; }
+        public ClassDeclStatement? ObjectDecl { get; }
 
-        public ModuleEnvironment? Module { get; }
-
-        public DataType(TypeKeyword type, Token? identifier = null,
-                        ModuleEnvironment? module = null)
+        public DataType(TypeKeyword type, ClassDeclStatement? objectDecl = null)
         {
             Type = type;
-            Identifier = identifier;
-            Module = module;
+            ObjectDecl = objectDecl;
         }
 
         /// <summary>
         /// Checks if two types are compatible with each other.
         /// </summary>
-        public bool IsCompatible(DataType type2)
+        public bool IsCompatible(DataType expected)
         {
-            if (Type == TypeKeyword.NumberLiteral && type2.IsNumber())
+            if (Type == TypeKeyword.NumberLiteral && expected.IsNumber())
                 return true;
 
-            if (type2.Type == TypeKeyword.NumberLiteral && IsNumber())
+            if (expected.Type == TypeKeyword.NumberLiteral && IsNumber())
                 return true;
 
-            return Type == TypeKeyword.Identifier
-                ? Identifier!.Value == type2.Identifier!.Value
-                : Type == type2.Type;
+            // Objects
+            if (ObjectDecl != null && expected.ObjectDecl != null)
+            {
+                var expectedIdentifier = expected.ObjectDecl.Identifier;
+                if (ObjectDecl.HasAncestor(expectedIdentifier!.Value))
+                    return true;
+
+                return ObjectDecl?.Identifier!.Value == expectedIdentifier!.Value;
+            }
+
+
+            return Type == expected.Type;
         }
 
         public bool IsNumber()
@@ -57,7 +63,7 @@ namespace Caique.Semantics
         public override string ToString()
         {
             return Type == TypeKeyword.Identifier
-                ? Identifier!.Value
+                ? ObjectDecl!.Identifier.Value
                 : Type.ToString().ToLower();
         }
     }

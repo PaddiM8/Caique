@@ -77,6 +77,17 @@ namespace Caique.Diagnostics
                 DiagnosticType.Error
             );
         }
+
+        public void ReportUnableToInherit(Token baseType, Token inheritor)
+        {
+            Report(
+                DiagnosticIdentifier.UnableToInherit,
+                $"Unable to inherit from '${baseType}' in object '${inheritor}'.",
+                baseType.Span.Add(inheritor.Span),
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportUnexpectedToken(Token got, string expected)
         {
             Report(

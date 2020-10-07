@@ -10,6 +10,7 @@ namespace Caique.Diagnostics
         SymbolAlreadyExists,
         SymbolDoesNotExist,
         UnableToInferType,
+        UnableToInherit,
         UnexpectedToken,
         UnexpectedType,
         UnterminatedStringLiteral,
