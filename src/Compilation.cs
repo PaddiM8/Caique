@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Caique.AST;
+using Caique.Ast;
 using Caique.Diagnostics;
 using Caique.Parsing;
 using Caique.Semantics;
@@ -75,9 +75,9 @@ namespace Caique
         /// </summary>
         /// <param name="environment">Module tree.</param>
         /// <returns>List of abstract syntax trees.</returns>
-        private List<Ast> ParseModuleEnvironment(ModuleEnvironment environment)
+        private List<AbstractSyntaxTree> ParseModuleEnvironment(ModuleEnvironment environment)
         {
-            return ParseModuleEnvironment(environment, new List<Ast>());
+            return ParseModuleEnvironment(environment, new List<AbstractSyntaxTree>());
         }
 
         /// <summary>
@@ -86,8 +86,8 @@ namespace Caique
         /// </summary>
         /// <param name="environment">Module tree.</param>
         /// <returns>List of abstract syntax trees.</returns>
-        private List<Ast> ParseModuleEnvironment(ModuleEnvironment environment,
-                                                 List<Ast> asts)
+        private List<AbstractSyntaxTree> ParseModuleEnvironment(ModuleEnvironment environment,
+                                                 List<AbstractSyntaxTree> asts)
         {
             foreach (var (_, module) in environment.Modules)
             {
@@ -115,7 +115,7 @@ namespace Caique
                     Diagnostics,
                     module
                 ).Parse();
-                asts.Add(new Ast(ast, module));
+                asts.Add(new AbstractSyntaxTree(ast, module));
 
                 ParseModuleEnvironment(module, asts);
             }

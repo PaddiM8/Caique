@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Caique.AST;
+using Caique.Ast;
 using Caique.Diagnostics;
 using Caique.Parsing;
 using Caique.Util;
@@ -10,7 +10,7 @@ namespace Caique.Semantics
 {
     class TypeChecker : IStatementVisitor<object>, IExpressionVisitor<DataType>
     {
-        private readonly Ast _ast;
+        private readonly AbstractSyntaxTree _ast;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
         private DataType? _currentFunctionType = null;
@@ -18,7 +18,7 @@ namespace Caique.Semantics
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
         private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
 
-        public TypeChecker(Ast ast, DiagnosticBag diagnostics)
+        public TypeChecker(AbstractSyntaxTree ast, DiagnosticBag diagnostics)
         {
             _ast = ast;
             _diagnostics = diagnostics;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Caique.AST;
+using Caique.Ast;
 
 namespace Caique.Semantics
 {

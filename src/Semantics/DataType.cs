@@ -1,5 +1,5 @@
 ﻿using System;
-using Caique.AST;
+using Caique.Ast;
 using Caique.Parsing;
 
 namespace Caique.Semantics

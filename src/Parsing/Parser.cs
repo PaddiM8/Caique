@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Caique.AST;
+using Caique.Ast;
 using Caique.Diagnostics;
 using Caique.Semantics;
 

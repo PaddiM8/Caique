@@ -2,8 +2,8 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using Caique.CLI;
-using Caique.CLI.Options;
+using Caique.Cli;
+using Caique.Cli.Options;
 using CommandLine;
 using CommandLine.Text;
 
