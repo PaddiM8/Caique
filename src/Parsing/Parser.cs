@@ -52,9 +52,9 @@ namespace Caique.Parsing
         /// Start the parsing process.
         /// </summary>
         /// <returns>List of abstract syntax trees.</returns>
-        public List<IStatement> Parse()
+        public List<Statement> Parse()
         {
-            var statements = new List<IStatement>();
+            var statements = new List<Statement>();
 
             // Parse "use" statements at the top first
             while (!IsAtEnd && Match(TokenKind.Use))
@@ -94,7 +94,7 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private IStatement ParseStatement()
+        private Statement ParseStatement()
         {
             if (Match(TokenKind.Let))
             {
@@ -223,7 +223,7 @@ namespace Caique.Parsing
         private BlockExpression ParseClassBlock()
         {
             var start = Expect(TokenKind.OpenBrace).Span;
-            var statements = new List<IStatement>();
+            var statements = new List<Statement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
             while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
             {
@@ -247,7 +247,7 @@ namespace Caique.Parsing
             var identifier = Expect(TokenKind.Identifier);
             Expect(TokenKind.Colon);
             var type = ParseType();
-            IExpression? value = null;
+            Expression? value = null;
 
             if (Consume(TokenKind.Equals))
             {
@@ -268,7 +268,7 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private IStatement ParseExpressionStatement()
+        private Statement ParseExpressionStatement()
         {
             var expression = ParseExpression();
 
@@ -296,14 +296,14 @@ namespace Caique.Parsing
             );
         }
 
-        private IExpression ParseExpression()
+        private Expression ParseExpression()
         {
             return ParseBinary();
         }
 
-        private IExpression ParseBinary(int parentPrecendece = 0)
+        private Expression ParseBinary(int parentPrecendece = 0)
         {
-            IExpression left;
+            Expression left;
 
             int unaryOperatorPrecedence = Current.Kind.GetUnaryOperatorPrecedence();
             if (unaryOperatorPrecedence != 0 && unaryOperatorPrecedence >= parentPrecendece)
@@ -331,7 +331,7 @@ namespace Caique.Parsing
             return left;
         }
 
-        private IExpression ParseDot()
+        private Expression ParseDot()
         {
             var left = ParsePrimary();
 
@@ -343,7 +343,7 @@ namespace Caique.Parsing
             return left;
         }
 
-        private IExpression ParsePrimary()
+        private Expression ParsePrimary()
         {
             if (Match(TokenKind.If))
             {
@@ -385,7 +385,7 @@ namespace Caique.Parsing
             Consume(TokenKind.Colon); // Consume colon if there is one
             var branch = ParseStatement();
             var end = branch.Span;
-            IStatement? elseBranch = null;
+            Statement? elseBranch = null;
 
             if (Consume(TokenKind.Else))
             {
@@ -404,7 +404,7 @@ namespace Caique.Parsing
         private BlockExpression ParseBlock()
         {
             var start = Expect(TokenKind.OpenBrace, "block").Span;
-            var statements = new List<IStatement>();
+            var statements = new List<Statement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment(); // Create the scope
 
             while (!Consume(TokenKind.ClosedBrace))
@@ -442,7 +442,7 @@ namespace Caique.Parsing
             );
         }
 
-        private IExpression ParseIdentifier()
+        private Expression ParseIdentifier()
         {
             var lookahead = Peek(1)!.Kind;
             if (lookahead == TokenKind.Arrow ||
@@ -476,11 +476,11 @@ namespace Caique.Parsing
             return identifiers;
         }
 
-        private (List<IExpression> arguments, TextSpan span) ParseArguments()
+        private (List<Expression> arguments, TextSpan span) ParseArguments()
         {
             var start = Expect(TokenKind.OpenParenthesis).Span;
 
-            var arguments = new List<IExpression>();
+            var arguments = new List<Expression>();
             do
             {
                 // In case of trailing comma,

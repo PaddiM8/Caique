@@ -160,6 +160,7 @@ namespace Caique.Semantics
         public DataType Visit(UnaryExpression unaryExpression)
         {
             var valueType = unaryExpression.Value.Accept(this);
+            unaryExpression.DataType = valueType;
             if (!valueType.IsNumber())
             {
                 _diagnostics.ReportUnexpectedType(
@@ -176,6 +177,7 @@ namespace Caique.Semantics
         {
             var leftType = binaryExpression.Left.Accept(this);
             var rightType = binaryExpression.Right.Accept(this);
+            binaryExpression.DataType = leftType;
             CheckTypes(leftType, rightType, binaryExpression.Span);
 
             return binaryExpression.Operator.Kind.IsComparisonOperator()
@@ -202,15 +204,19 @@ namespace Caique.Semantics
                 {
                     var identifier = callExpression.ModulePath[^1];
                     var function = classDecl.GetFunction(identifier.Value);
+                    var type = CheckCall(identifier, function, callExpression.Arguments);
+                    callExpression.DataType = type;
 
-                    return CheckCall(identifier, function, callExpression.Arguments);
+                    return type;
                 }
                 else if (dotExpression.Right is VariableExpression variableExpression)
                 {
                     var identifier = variableExpression.Identifier;
                     var variable = classDecl.GetVariable(identifier.Value);
+                    var type = CheckVariableDecl(identifier, variable);
+                    variableExpression.DataType = type;
 
-                    return CheckVariableDecl(identifier, variable);
+                    return type;
                 }
                 else
                 {
@@ -229,7 +235,10 @@ namespace Caique.Semantics
         {
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
             {
-                return new DataType(TypeKeyword.NumberLiteral);
+                var type = new DataType(TypeKeyword.NumberLiteral);
+                literalExpression.DataType = type;
+
+                return type;
             }
 
             throw new NotImplementedException();
@@ -237,7 +246,10 @@ namespace Caique.Semantics
 
         public DataType Visit(GroupExpression groupExpression)
         {
-            return groupExpression.Expression.Accept(this);
+            var type = groupExpression.Expression.Accept(this);
+            groupExpression.DataType = type;
+
+            return type;
         }
 
         public DataType Visit(BlockExpression blockStatement)
@@ -264,6 +276,7 @@ namespace Caique.Semantics
             }
 
             _environment = _environment.Parent!;
+            blockStatement.DataType = returnType;
 
             return returnType;
         }
@@ -272,8 +285,10 @@ namespace Caique.Semantics
         {
             var variableName = variableExpression.Identifier;
             var variableDecl = _environment.GetVariable(variableName.Value);
+            var type = CheckVariableDecl(variableName, variableDecl);
+            variableExpression.DataType = type;
 
-            return CheckVariableDecl(variableName, variableDecl);
+            return type;
         }
 
         public DataType Visit(CallExpression callExpression)
@@ -288,8 +303,10 @@ namespace Caique.Semantics
             }
 
             var functionDecl = environment.GetFunction(lastIdentifier.Value);
+            var type = CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
+            callExpression.DataType = type;
 
-            return CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
+            return type;
         }
 
         public DataType Visit(NewExpression newExpression)
@@ -323,6 +340,8 @@ namespace Caique.Semantics
                 CheckTypes(varDecl.DataType!.Value, argumentType);
             }
 
+            newExpression.DataType = type;
+
             return type;
         }
 
@@ -342,7 +361,12 @@ namespace Caique.Semantics
                 };
 
                 if (keyword != TypeKeyword.Identifier)
-                    return new DataType(keyword);
+                {
+                    var dataType = new DataType(keyword);
+                    typeExpression.DataType = dataType;
+
+                    return dataType;
+                }
             }
 
             var classDecl = _ast.ModuleEnvironment.GetClass(typeExpression.ModulePath);
@@ -353,7 +377,10 @@ namespace Caique.Semantics
                 _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
             }
 
-            return new DataType(TypeKeyword.Identifier, classDecl);
+            var type = new DataType(TypeKeyword.Identifier, classDecl);
+            typeExpression.DataType = type;
+
+            return type;
         }
 
         public DataType Visit(IfExpression ifExpression)
@@ -369,6 +396,7 @@ namespace Caique.Semantics
                 var branchType = branchBlock.Accept(this);
                 var elseBranchType = elseBranchBlock.Accept(this);
                 CheckTypes(branchType, elseBranchType, ifExpression.Span);
+                ifExpression.DataType = branchType;
 
                 return branchType;
             }
@@ -423,7 +451,7 @@ namespace Caique.Semantics
         }
 
         private DataType CheckCall(Token identifier, FunctionDeclStatement? functionDecl,
-                                   List<IExpression> arguments)
+                                   List<Expression> arguments)
         {
             if (functionDecl == null)
             {
