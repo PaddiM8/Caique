@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using CommandLine;
 
-namespace Caique
+namespace Caique.CLI.Options
 {
-    class CommandLineOptions
+    [Verb("build", HelpText = "Build the project.")]
+    public class BuildOptions
     {
         [Option("ast", Required = false, HelpText = "Print the Abstract Syntax Tree")]
         public bool PrintAst { get; set; }

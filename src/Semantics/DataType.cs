@@ -40,7 +40,6 @@ namespace Caique.Semantics
                 return ObjectDecl?.Identifier!.Value == expectedIdentifier!.Value;
             }
 
-
             return Type == expected.Type;
         }
 

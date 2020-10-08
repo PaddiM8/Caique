@@ -18,15 +18,26 @@ namespace Caique
     /// </summary>
     public class Compilation
     {
-        public DiagnosticBag Diagnostics = new DiagnosticBag();
-        public ModuleEnvironment Environment;
+        public DiagnosticBag Diagnostics { get; private set; } = new DiagnosticBag();
+
+        public ModuleEnvironment Environment { get; private set; }
+
+        public bool PrintTokens { get; set; } = false;
+
+        public bool PrintAst { get; set; } = false;
+
+        public bool PrintEnvironment { get; set; } = false;
+
         private readonly string _rootPath = "";
 
         public Compilation(ModuleEnvironment environment, string rootPath)
         {
             Environment = environment;
             _rootPath = rootPath;
+        }
 
+        public void Compile()
+        {
             // Parse everything first, so that classes and functions
             // are added to the symbol table before type checking.
             // The ParseModuleEnvironment traverses the ModuleEnvironment
@@ -48,13 +59,11 @@ namespace Caique
                         Diagnostics
                     ).Analyse();
 
-                    if (Program.Options!.PrintAst)
-                        ast.Print();
+                    if (PrintAst) ast.Print();
                 }
             }
 
-            if (Program.Options!.PrintEnvironment)
-                Environment.Print();
+            if (PrintEnvironment) Environment.Print();
 
             foreach (var diagnostic in Diagnostics)
                 diagnostic.Print();
@@ -98,8 +107,7 @@ namespace Caique
                     Diagnostics)
                 .Lex();
 
-                if (Program.Options!.PrintTokens)
-                    PrintTokens(tokens);
+                if (PrintTokens) PrintTokenList(tokens);
 
                 // Parse
                 var ast = new Parser(
@@ -126,7 +134,7 @@ namespace Caique
             return Path.GetRelativePath(_rootPath, path);
         }
 
-        private void PrintTokens(List<Token> tokens)
+        private void PrintTokenList(List<Token> tokens)
         {
             foreach (var token in tokens)
             {
