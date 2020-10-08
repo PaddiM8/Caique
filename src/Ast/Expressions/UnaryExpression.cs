@@ -3,22 +3,20 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class UnaryExpression : IExpression
+    public class UnaryExpression : Expression
     {
         public Token Operator { get; }
 
-        public IExpression Value { get; }
+        public Expression Value { get; }
 
-        public TextSpan Span { get; }
-
-        public UnaryExpression(Token op, IExpression value)
+        public UnaryExpression(Token op, Expression value)
+            : base(op.Span.Add(value.Span))
         {
             Operator = op;
             Value = value;
-            Span = Operator.Span.Add(value.Span);
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

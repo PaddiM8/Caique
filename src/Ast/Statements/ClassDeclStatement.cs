@@ -5,7 +5,7 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class ClassDeclStatement : IStatement
+    public class ClassDeclStatement : Statement
     {
         public Token Identifier { get; }
 
@@ -23,8 +23,6 @@ namespace Caique.Ast
             }
         }
 
-        public TextSpan Span { get; }
-
         public ModuleEnvironment Module { get; }
 
         private readonly TypeExpression? _ancestorType;
@@ -34,14 +32,13 @@ namespace Caique.Ast
                                   BlockExpression body,
                                   TextSpan span,
                                   ModuleEnvironment module,
-                                  TypeExpression? ancestor = null)
+                                  TypeExpression? ancestor = null) : base(span)
         {
             Identifier = identifier;
             ParameterRefs = parameterRefs;
             Body = body;
             _ancestorType = ancestor;
             Module = module;
-            Span = span;
         }
 
         /// <summary>
@@ -82,7 +79,7 @@ namespace Caique.Ast
                 ?? false; // Return false if "Inherited" is null (there are no more ancestors to compare)
         }
 
-        public T Accept<T>(IStatementVisitor<T> visitor)
+        public override T Accept<T>(IStatementVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

@@ -5,23 +5,20 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class BlockExpression : IExpression
+    public class BlockExpression : Expression
     {
-        public List<IStatement> Statements { get; }
+        public List<Statement> Statements { get; }
 
         public SymbolEnvironment Environment { get; }
 
-        public TextSpan Span { get; }
-
-        public BlockExpression(List<IStatement> statements, SymbolEnvironment environment,
-                               TextSpan span)
+        public BlockExpression(List<Statement> statements, SymbolEnvironment environment,
+                               TextSpan span) : base(span)
         {
             Statements = statements;
             Environment = environment;
-            Span = span;
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

@@ -4,23 +4,20 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class NewExpression : IExpression
+    public class NewExpression : Expression
     {
         public TypeExpression Type { get; }
 
-        public List<IExpression> Arguments { get; }
+        public List<Expression> Arguments { get; }
 
-        public TextSpan Span { get; }
-
-        public NewExpression(TypeExpression type, List<IExpression> arguments,
-                             TextSpan span)
+        public NewExpression(TypeExpression type, List<Expression> arguments,
+                             TextSpan span) : base(span)
         {
             Type = type;
             Arguments = arguments;
-            Span = span;
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

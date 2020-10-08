@@ -3,22 +3,20 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class ExpressionStatement : IStatement
+    public class ExpressionStatement : Statement
     {
-        public IExpression Expression { get; }
+        public Expression Expression { get; }
 
         public bool TrailingSemicolon { get; }
 
-        public TextSpan Span { get; }
-
-        public ExpressionStatement(IExpression expr, bool trailingSemicolon)
+        public ExpressionStatement(Expression expr, bool trailingSemicolon)
+            : base(expr.Span)
         {
             Expression = expr;
             TrailingSemicolon = trailingSemicolon;
-            Span = Expression.Span;
         }
 
-        public T Accept<T>(IStatementVisitor<T> visitor)
+        public override T Accept<T>(IStatementVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

@@ -1,27 +1,26 @@
 using System;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class BinaryExpression : IExpression
+    public class BinaryExpression : Expression
     {
-        public IExpression Left { get; }
+        public Expression Left { get; }
 
         public Token Operator { get; }
 
-        public IExpression Right { get; }
+        public Expression Right { get; }
 
-        public TextSpan Span { get; }
-
-        public BinaryExpression(IExpression left, Token op, IExpression right)
+        public BinaryExpression(Expression left, Token op, Expression right)
+            : base(left.Span.Add(right.Span))
         {
             Left = left;
             Operator = op;
             Right = right;
-            Span = left.Span.Add(right.Span);
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

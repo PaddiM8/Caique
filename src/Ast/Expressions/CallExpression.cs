@@ -1,25 +1,24 @@
 using System;
 using System.Collections.Generic;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class CallExpression : IExpression
+    public class CallExpression : Expression
     {
         public List<Token> ModulePath { get; }
 
-        public List<IExpression> Arguments { get; }
+        public List<Expression> Arguments { get; }
 
-        public TextSpan Span { get; }
-
-        public CallExpression(List<Token> modulePath, List<IExpression> arguments, TextSpan span)
+        public CallExpression(List<Token> modulePath, List<Expression> arguments,
+                              TextSpan span) : base(span)
         {
             ModulePath = modulePath;
             Arguments = arguments;
-            Span = span;
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

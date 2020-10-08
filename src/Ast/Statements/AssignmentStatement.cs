@@ -3,26 +3,24 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class AssignmentStatement : IStatement
+    public class AssignmentStatement : Statement
     {
         public VariableExpression Variable { get; }
 
         public Token Operator { get; }
 
-        public IExpression Value { get; }
-
-        public TextSpan Span { get; }
+        public Expression Value { get; }
 
         public AssignmentStatement(VariableExpression identifier, Token op,
-                                   IExpression value)
+                                   Expression value)
+                                   : base(identifier.Span.Add(value.Span))
         {
             Variable = identifier;
             Operator = op;
             Value = value;
-            Span = Variable.Span.Add(Value.Span);
         }
 
-        public T Accept<T>(IStatementVisitor<T> visitor)
+        public override T Accept<T>(IStatementVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

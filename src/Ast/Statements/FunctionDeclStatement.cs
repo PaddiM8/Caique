@@ -4,7 +4,7 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class FunctionDeclStatement : IStatement
+    public class FunctionDeclStatement : Statement
     {
         public Token Identifier { get; }
 
@@ -14,20 +14,17 @@ namespace Caique.Ast
 
         public TypeExpression? ReturnType { get; }
 
-        public TextSpan Span { get; }
-
         public FunctionDeclStatement(Token identifier, List<Parameter> parameters,
                                      BlockExpression body, TypeExpression? returnType,
-                                     TextSpan span)
+                                     TextSpan span) : base(span)
         {
             Identifier = identifier;
             Parameters = parameters;
             Body = body;
             ReturnType = returnType;
-            Span = span;
         }
 
-        public T Accept<T>(IStatementVisitor<T> visitor)
+        public override T Accept<T>(IStatementVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

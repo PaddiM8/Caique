@@ -1,24 +1,23 @@
 ﻿using System;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class DotExpression : IExpression
+    public class DotExpression : Expression
     {
-        public IExpression Left { get; }
+        public Expression Left { get; }
 
-        public IExpression Right { get; }
+        public Expression Right { get; }
 
-        public TextSpan Span { get; }
-
-        public DotExpression(IExpression left, IExpression right)
+        public DotExpression(Expression left, Expression right)
+            : base(left.Span.Add(right.Span))
         {
             Left = left;
             Right = right;
-            Span = Left.Span.Add(Right.Span);
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

@@ -3,19 +3,17 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class ReturnStatement : IStatement
+    public class ReturnStatement : Statement
     {
-        public IExpression Expression { get; }
+        public Expression Expression { get; }
 
-        public TextSpan Span { get; }
-
-        public ReturnStatement(IExpression expr, TextSpan span)
+        public ReturnStatement(Expression expr, TextSpan span)
+            : base(span)
         {
             Expression = expr;
-            Span = span;
         }
 
-        public T Accept<T>(IStatementVisitor<T> visitor)
+        public override T Accept<T>(IStatementVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

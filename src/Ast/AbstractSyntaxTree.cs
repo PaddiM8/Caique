@@ -6,11 +6,11 @@ namespace Caique.Ast
 {
     public class AbstractSyntaxTree
     {
-        public List<IStatement> Statements { get; set; }
+        public List<Statement> Statements { get; set; }
 
         public ModuleEnvironment ModuleEnvironment { get; set; }
 
-        public AbstractSyntaxTree(List<IStatement> statements, ModuleEnvironment environment)
+        public AbstractSyntaxTree(List<Statement> statements, ModuleEnvironment environment)
         {
             Statements = statements;
             ModuleEnvironment = environment;

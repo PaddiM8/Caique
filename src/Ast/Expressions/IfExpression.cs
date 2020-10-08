@@ -1,28 +1,26 @@
 ﻿using System;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class IfExpression : IExpression
+    public class IfExpression : Expression
     {
-        public IExpression Condition { get; }
+        public Expression Condition { get; }
 
-        public IStatement Branch { get; }
+        public Statement Branch { get; }
 
-        public IStatement? ElseBranch { get; }
+        public Statement? ElseBranch { get; }
 
-        public TextSpan Span { get; }
-
-        public IfExpression(IExpression condition, IStatement branch,
-                            IStatement? elseBranch, TextSpan span)
+        public IfExpression(Expression condition, Statement branch,
+                            Statement? elseBranch, TextSpan span) : base(span)
         {
             Condition = condition;
             Branch = branch;
             ElseBranch = elseBranch;
-            Span = span;
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

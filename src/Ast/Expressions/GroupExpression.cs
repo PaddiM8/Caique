@@ -1,21 +1,20 @@
 using System;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class GroupExpression : IExpression
+    public class GroupExpression : Expression
     {
-        public IExpression Expression { get; }
+        public Expression Expression { get; }
 
-        public TextSpan Span { get; }
-
-        public GroupExpression(IExpression expression, TextSpan span)
+        public GroupExpression(Expression expression, TextSpan span)
+            : base(span)
         {
             Expression = expression;
-            Span = span;
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

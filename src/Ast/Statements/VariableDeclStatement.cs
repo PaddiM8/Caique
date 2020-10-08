@@ -4,28 +4,26 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class VariableDeclStatement : IStatement
+    public class VariableDeclStatement : Statement
     {
         public Token Identifier { get; }
 
-        public IExpression? Value { get; }
+        public Expression? Value { get; }
 
         public TypeExpression? SpecifiedType { get; }
 
         public DataType? DataType { get; set; }
 
-        public TextSpan Span { get; }
-
         public VariableDeclStatement(Token identifier, TextSpan span,
-                                     IExpression? value, TypeExpression? type = null)
+                                     Expression? value, TypeExpression? type = null)
+                                     : base(span)
         {
             Identifier = identifier;
             Value = value;
             SpecifiedType = type;
-            Span = span;
         }
 
-        public T Accept<T>(IStatementVisitor<T> visitor)
+        public override T Accept<T>(IStatementVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }

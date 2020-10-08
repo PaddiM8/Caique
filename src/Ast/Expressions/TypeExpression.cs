@@ -4,19 +4,17 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class TypeExpression : IExpression
+    public class TypeExpression : Expression
     {
         public List<Token> ModulePath { get; }
 
-        public TextSpan Span { get; }
-
         public TypeExpression(List<Token> modulePath)
+            : base(modulePath[0].Span.Add(modulePath[^1].Span))
         {
             ModulePath = modulePath;
-            Span = modulePath[0].Span.Add(modulePath[^1].Span);
         }
 
-        public T Accept<T>(IExpressionVisitor<T> visitor)
+        public override T Accept<T>(IExpressionVisitor<T> visitor)
         {
             return visitor.Visit(this);
         }
