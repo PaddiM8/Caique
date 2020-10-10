@@ -60,7 +60,7 @@ namespace Caique
                         Diagnostics
                     ).Analyse();
 
-                    //new LLVMGenerator(ast).Generate();
+                    new LllvmGenerator(ast).Generate();
 
                     if (PrintAst) ast.Print();
                 }

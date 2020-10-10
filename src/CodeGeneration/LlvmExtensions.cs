@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using Caique.Semantics;
 using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
 {
-    public static class LLVMExtensions
+    public static class LlvmExtensions
     {
         public static unsafe LLVMOpaqueType* ToLLVMType(this DataType dataType)
         {

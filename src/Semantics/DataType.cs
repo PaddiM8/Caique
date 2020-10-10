@@ -45,11 +45,24 @@ namespace Caique.Semantics
 
         public bool IsNumber()
         {
+            return IsInt() || IsFloat();
+        }
+
+        public bool IsInt()
+        {
             return Type switch
             {
                 TypeKeyword.i8 or
                 TypeKeyword.i32 or
-                TypeKeyword.i64 or
+                TypeKeyword.i64 => true,
+                _ => false,
+            };
+        }
+
+        public bool IsFloat()
+        {
+            return Type switch
+            {
                 TypeKeyword.f8 or
                 TypeKeyword.f32 or
                 TypeKeyword.f64 => true,

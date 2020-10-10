@@ -252,14 +252,14 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(BlockExpression blockStatement)
+        public DataType Visit(BlockExpression blockExpression)
         {
-            _environment = blockStatement.Environment;
+            _environment = blockExpression.Environment;
             DataType returnType = _voidType;
 
-            foreach (var (statement, i) in blockStatement.Statements.WithIndex())
+            foreach (var (statement, i) in blockExpression.Statements.WithIndex())
             {
-                bool isLast = i == blockStatement.Statements.Count - 1;
+                bool isLast = i == blockExpression.Statements.Count - 1;
 
                 // If it's an expression statement and
                 // it doesn't have a trailing semicolon, it should be returned.
@@ -276,7 +276,7 @@ namespace Caique.Semantics
             }
 
             _environment = _environment.Parent!;
-            blockStatement.DataType = returnType;
+            blockExpression.DataType = returnType;
 
             return returnType;
         }
