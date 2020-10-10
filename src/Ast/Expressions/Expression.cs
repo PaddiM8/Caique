@@ -4,7 +4,7 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public abstract class Expression
+    public class Expression
     {
         public TextSpan Span { get; }
 
@@ -14,7 +14,5 @@ namespace Caique.Ast
         {
             Span = span;
         }
-
-        public abstract T Accept<T>(IExpressionVisitor<T> visitor);
     }
 }

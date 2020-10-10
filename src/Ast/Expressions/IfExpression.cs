@@ -19,10 +19,5 @@ namespace Caique.Ast
             Branch = branch;
             ElseBranch = elseBranch;
         }
-
-        public override T Accept<T>(IExpressionVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

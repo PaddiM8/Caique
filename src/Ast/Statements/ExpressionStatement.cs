@@ -15,10 +15,5 @@ namespace Caique.Ast
             Expression = expr;
             TrailingSemicolon = trailingSemicolon;
         }
-
-        public override T Accept<T>(IStatementVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

@@ -17,10 +17,5 @@ namespace Caique.Ast
             ModulePath = modulePath;
             Arguments = arguments;
         }
-
-        public override T Accept<T>(IExpressionVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

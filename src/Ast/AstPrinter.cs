@@ -5,7 +5,7 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    class AstPrinter : IStatementVisitor<object>, IExpressionVisitor<object>
+    class AstPrinter : IAstTraverser<object, object>
     {
         private int _indentationLevel = 1;
         private readonly AbstractSyntaxTree _ast;
@@ -15,17 +15,27 @@ namespace Caique.Ast
             _ast = ast;
         }
 
+        private void Next(Statement statement)
+        {
+            ((IAstTraverser<object, object>)this).Next(statement);
+        }
+
+        private void Next(Expression expression)
+        {
+            ((IAstTraverser<object, object>)this).Next(expression);
+        }
+
         public void Print()
         {
             foreach (var statement in _ast.Statements)
             {
-                statement.Accept(this);
+                Next(statement);
             }
         }
 
         public object Visit(ExpressionStatement expressionStatement)
         {
-            expressionStatement.Expression.Accept(this);
+            Next(expressionStatement.Expression);
 
             return null!;
         }
@@ -36,10 +46,10 @@ namespace Caique.Ast
 
             if (variableDeclStatement.SpecifiedType != null)
             {
-                variableDeclStatement.SpecifiedType.Accept(this);
+                Next(variableDeclStatement.SpecifiedType);
             }
 
-            variableDeclStatement.Value!.Accept(this);
+            Next(variableDeclStatement.Value!);
             _indentationLevel--;
 
             return null!;
@@ -48,7 +58,7 @@ namespace Caique.Ast
         public object Visit(ReturnStatement returnStatement)
         {
             PrintStart("ret", ConsoleColor.Magenta);
-            returnStatement.Expression.Accept(this);
+            Next(returnStatement.Expression);
             _indentationLevel--;
 
             return null!;
@@ -61,13 +71,13 @@ namespace Caique.Ast
             // Parameters
             PrintStart("Parameters: ", ConsoleColor.Magenta);
             foreach (var parameter in functionDeclStatement.Parameters)
-                parameter.Type.Accept(this);
+                Next(parameter.Type);
             _indentationLevel--;
 
             if (functionDeclStatement.ReturnType != null)
-                functionDeclStatement.ReturnType.Accept(this);
+                Next(functionDeclStatement.ReturnType);
 
-            functionDeclStatement.Body.Accept(this);
+            Next(functionDeclStatement.Body);
             _indentationLevel--;
 
             return null!;
@@ -81,11 +91,11 @@ namespace Caique.Ast
                 PrintMiddle(parameter.Value, ConsoleColor.Green);
             _indentationLevel--;
 
-            classDeclStatement.Body.Accept(this);
+            Next(classDeclStatement.Body);
 
             if (classDeclStatement.Inherited != null)
             {
-                classDeclStatement.Inherited.Accept(this);
+                Next(classDeclStatement.Inherited);
             }
 
             _indentationLevel--;
@@ -96,8 +106,8 @@ namespace Caique.Ast
         public object Visit(AssignmentStatement assignmentStatement)
         {
             PrintStart(assignmentStatement.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
-            assignmentStatement.Variable.Accept(this);
-            assignmentStatement.Value.Accept(this);
+            Next(assignmentStatement.Variable);
+            Next(assignmentStatement.Value);
             _indentationLevel--;
 
             return null!;
@@ -115,7 +125,7 @@ namespace Caique.Ast
         public object Visit(UnaryExpression unaryExpression)
         {
             PrintStart(unaryExpression.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
-            unaryExpression.Value.Accept(this);
+            Next(unaryExpression.Value);
             _indentationLevel--;
 
             return null!;
@@ -124,8 +134,8 @@ namespace Caique.Ast
         public object Visit(BinaryExpression binaryExpression)
         {
             PrintStart(binaryExpression.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
-            binaryExpression.Left.Accept(this);
-            binaryExpression.Right.Accept(this);
+            Next(binaryExpression.Left);
+            Next(binaryExpression.Right);
             _indentationLevel--;
 
             return null!;
@@ -134,8 +144,8 @@ namespace Caique.Ast
         public object Visit(DotExpression dotExpression)
         {
             PrintStart(".", ConsoleColor.Magenta);
-            dotExpression.Left.Accept(this);
-            dotExpression.Right.Accept(this);
+            Next(dotExpression.Left);
+            Next(dotExpression.Right);
             _indentationLevel--;
 
             return null!;
@@ -151,7 +161,7 @@ namespace Caique.Ast
         public object Visit(GroupExpression groupExpression)
         {
             PrintStart("Group", ConsoleColor.Magenta);
-            groupExpression.Expression.Accept(this);
+            Next(groupExpression.Expression);
             _indentationLevel--;
 
             return null!;
@@ -162,7 +172,7 @@ namespace Caique.Ast
             PrintStart("Block", ConsoleColor.Magenta);
 
             foreach (var statement in blockStatement.Statements)
-                statement.Accept(this);
+                Next(statement);
 
             _indentationLevel--;
 
@@ -184,7 +194,7 @@ namespace Caique.Ast
             );
 
             foreach (var arg in callExpression.Arguments)
-                arg.Accept(this);
+                Next(arg);
 
             _indentationLevel--;
 
@@ -194,9 +204,9 @@ namespace Caique.Ast
         public object Visit(NewExpression newExpression)
         {
             PrintStart("new ", ConsoleColor.Yellow);
-            newExpression.Type.Accept(this);
+            Next(newExpression.Type);
             foreach (var arg in newExpression.Arguments)
-                arg.Accept(this);
+                Next(arg);
 
             _indentationLevel--;
 
@@ -216,13 +226,13 @@ namespace Caique.Ast
         public object Visit(IfExpression ifExpression)
         {
             PrintStart("If ", ConsoleColor.Blue);
-            ifExpression.Condition.Accept(this);
-            ifExpression.Branch.Accept(this);
+            Next(ifExpression.Condition);
+            Next(ifExpression.Branch);
 
             if (ifExpression.ElseBranch != null)
             {
                 PrintStart("Else ", ConsoleColor.Blue);
-                ifExpression.ElseBranch.Accept(this);
+                Next(ifExpression.ElseBranch);
                 _indentationLevel--;
             }
 

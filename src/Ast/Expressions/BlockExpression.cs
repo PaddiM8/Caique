@@ -17,10 +17,5 @@ namespace Caique.Ast
             Statements = statements;
             Environment = environment;
         }
-
-        public override T Accept<T>(IExpressionVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

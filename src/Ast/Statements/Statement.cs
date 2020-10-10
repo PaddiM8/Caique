@@ -3,7 +3,7 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public abstract class Statement
+    public class Statement
     {
         public TextSpan Span { get; }
 
@@ -11,7 +11,5 @@ namespace Caique.Ast
         {
             Span = span;
         }
-
-        public abstract T Accept<T>(IStatementVisitor<T> visitor);
     }
 }

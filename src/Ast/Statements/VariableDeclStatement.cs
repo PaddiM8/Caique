@@ -22,10 +22,5 @@ namespace Caique.Ast
             Value = value;
             SpecifiedType = type;
         }
-
-        public override T Accept<T>(IStatementVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

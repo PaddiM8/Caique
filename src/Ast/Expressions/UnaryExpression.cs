@@ -15,10 +15,5 @@ namespace Caique.Ast
             Operator = op;
             Value = value;
         }
-
-        public override T Accept<T>(IExpressionVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

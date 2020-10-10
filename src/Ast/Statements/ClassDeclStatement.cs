@@ -78,10 +78,5 @@ namespace Caique.Ast
             return Inherited?.HasAncestor(identifier)
                 ?? false; // Return false if "Inherited" is null (there are no more ancestors to compare)
         }
-
-        public override T Accept<T>(IStatementVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }

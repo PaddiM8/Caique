@@ -8,7 +8,7 @@ using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
 {
-    public unsafe class LllvmGenerator : IStatementVisitor<object>, IExpressionVisitor<LLVMValueRef>
+    public unsafe class LllvmGenerator : IAstTraverser<object, LLVMValueRef>
     {
         private readonly AbstractSyntaxTree _ast;
         private readonly LLVMModuleRef _module;
@@ -28,7 +28,7 @@ namespace Caique.CodeGeneration
         {
             foreach (var statement in _ast.Statements)
             {
-                statement.Accept(this);
+                Next(statement);
             }
 
             sbyte* moduleError;
@@ -41,9 +41,20 @@ namespace Caique.CodeGeneration
             LLVM.DumpModule(_module);
         }
 
+        private void Next(Statement statement)
+        {
+            ((IAstTraverser<object, LLVMValueRef>)this).Next(statement);
+        }
+
+        private LLVMValueRef Next(Expression expression)
+        {
+            return ((IAstTraverser<object, LLVMValueRef>)this).Next(expression);
+        }
+
+
         public object Visit(ExpressionStatement expressionStatement)
         {
-            expressionStatement.Expression.Accept(this);
+            Next(expressionStatement.Expression);
 
             ClearEnvironment();
             return null!;
@@ -59,7 +70,7 @@ namespace Caique.CodeGeneration
         {
             LLVM.BuildRet(
                 _builder,
-                returnStatement.Expression.Accept(this)
+                Next(returnStatement.Expression)
             );
 
             ClearEnvironment();
@@ -91,7 +102,7 @@ namespace Caique.CodeGeneration
             );
 
             _environment.ParentValue = function;
-            var bodyValue = functionDeclStatement.Body.Accept(this);
+            var bodyValue = Next(functionDeclStatement.Body);
 
             // If void function
             if (functionDeclStatement.Body.DataType?.Type == TypeKeyword.Void)
@@ -162,8 +173,8 @@ namespace Caique.CodeGeneration
             return LLVM.BuildBinOp(
                 _builder,
                 opcode,
-                binaryExpression.Left.Accept(this),
-                binaryExpression.Right.Accept(this),
+                Next(binaryExpression.Left),
+                Next(binaryExpression.Right),
                 "binOp".ToCString()
             );
         }
@@ -223,11 +234,11 @@ namespace Caique.CodeGeneration
                     !expressionStatement.TrailingSemicolon)
                 {
                     ClearEnvironment();
-                    return expressionStatement.Expression.Accept(this);
+                    return Next(expressionStatement.Expression);
                 }
                 else
                 {
-                    statement.Accept(this);
+                    Next(statement);
                 }
             }
 

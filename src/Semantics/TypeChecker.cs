@@ -8,7 +8,7 @@ using Caique.Util;
 
 namespace Caique.Semantics
 {
-    class TypeChecker : IStatementVisitor<object>, IExpressionVisitor<DataType>
+    class TypeChecker : IAstTraverser<object, DataType>
     {
         private readonly AbstractSyntaxTree _ast;
         private readonly DiagnosticBag _diagnostics;
@@ -25,15 +25,25 @@ namespace Caique.Semantics
             _environment = ast.ModuleEnvironment.SymbolEnvironment;
         }
 
+        private void Next(Statement statement)
+        {
+            ((IAstTraverser<object, DataType>)this).Next(statement);
+        }
+
+        private DataType Next(Expression expression)
+        {
+            return ((IAstTraverser<object, DataType>)this).Next(expression);
+        }
+
         public void Analyse()
         {
             foreach (var statement in _ast.Statements)
-                statement.Accept(this);
+                Next(statement);
         }
 
         public object Visit(ExpressionStatement expressionStatement)
         {
-            expressionStatement.Expression.Accept(this);
+            Next(expressionStatement.Expression);
 
             return null!;
         }
@@ -43,14 +53,14 @@ namespace Caique.Semantics
             // If a type was specified
             if (variableDeclStatement.SpecifiedType != null)
             {
-                var specifiedType = variableDeclStatement.SpecifiedType.Accept(this);
+                var specifiedType = Next(variableDeclStatement.SpecifiedType);
                 variableDeclStatement.DataType = specifiedType;
 
                 // Make sure the value type match up with the specified type
                 // if there is a value
                 if (variableDeclStatement.Value != null)
                 {
-                    var valueType = variableDeclStatement.Value!.Accept(this);
+                    var valueType = Next(variableDeclStatement.Value!);
                     CheckTypes(
                         specifiedType,
                         valueType,
@@ -60,7 +70,7 @@ namespace Caique.Semantics
             }
             else
             {
-                var valueType = variableDeclStatement.Value!.Accept(this);
+                var valueType = Next(variableDeclStatement.Value!);
                 variableDeclStatement.DataType = valueType;
             }
 
@@ -78,7 +88,7 @@ namespace Caique.Semantics
 
         public object Visit(ReturnStatement returnStatement)
         {
-            var type = returnStatement.Expression.Accept(this);
+            var type = Next(returnStatement.Expression);
             CheckTypes(_currentFunctionType!.Value, type, returnStatement.Span);
 
             return null!;
@@ -86,8 +96,8 @@ namespace Caique.Semantics
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            var variableType = assignmentStatement.Variable.Accept(this);
-            var valueType = assignmentStatement.Value.Accept(this);
+            var variableType = Next(assignmentStatement.Variable);
+            var valueType = Next(assignmentStatement.Value);
 
             CheckTypes(variableType, valueType);
 
@@ -96,9 +106,11 @@ namespace Caique.Semantics
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
-            _currentFunctionType = functionDeclStatement.ReturnType?.Accept(this) ?? _voidType;
+            _currentFunctionType = functionDeclStatement.ReturnType == null
+                ? _voidType
+                : Next(functionDeclStatement.ReturnType);
 
-            var bodyType = functionDeclStatement.Body.Accept(this);
+            var bodyType = Next(functionDeclStatement.Body);
             CheckTypes(
                 _currentFunctionType!.Value,
                 bodyType,
@@ -132,7 +144,7 @@ namespace Caique.Semantics
                 }
             }
 
-            classDeclStatement.Body.Accept(this);
+            Next(classDeclStatement.Body);
 
             return null!;
         }
@@ -159,7 +171,7 @@ namespace Caique.Semantics
 
         public DataType Visit(UnaryExpression unaryExpression)
         {
-            var valueType = unaryExpression.Value.Accept(this);
+            var valueType = Next(unaryExpression.Value);
             unaryExpression.DataType = valueType;
             if (!valueType.IsNumber())
             {
@@ -175,8 +187,8 @@ namespace Caique.Semantics
 
         public DataType Visit(BinaryExpression binaryExpression)
         {
-            var leftType = binaryExpression.Left.Accept(this);
-            var rightType = binaryExpression.Right.Accept(this);
+            var leftType = Next(binaryExpression.Left);
+            var rightType = Next(binaryExpression.Right);
             binaryExpression.DataType = leftType;
             CheckTypes(leftType, rightType, binaryExpression.Span);
 
@@ -187,7 +199,7 @@ namespace Caique.Semantics
 
         public DataType Visit(DotExpression dotExpression)
         {
-            var leftType = dotExpression.Left.Accept(this);
+            var leftType = Next(dotExpression.Left);
 
             // If it's a user-made class
             if (leftType.Type == TypeKeyword.Identifier)
@@ -246,7 +258,7 @@ namespace Caique.Semantics
 
         public DataType Visit(GroupExpression groupExpression)
         {
-            var type = groupExpression.Expression.Accept(this);
+            var type = Next(groupExpression.Expression);
             groupExpression.DataType = type;
 
             return type;
@@ -267,11 +279,11 @@ namespace Caique.Semantics
                     statement is ExpressionStatement expressionStatement &&
                     !expressionStatement.TrailingSemicolon)
                 {
-                    returnType = expressionStatement.Expression.Accept(this);
+                    returnType = Next(expressionStatement.Expression);
                 }
                 else
                 {
-                    statement.Accept(this);
+                    Next(statement);
                 }
             }
 
@@ -311,7 +323,7 @@ namespace Caique.Semantics
 
         public DataType Visit(NewExpression newExpression)
         {
-            var type = newExpression.Type.Accept(this);
+            var type = Next(newExpression.Type);
             var classDecl = type.ObjectDecl!;
             if (classDecl == null) return _unknownType;
 
@@ -329,13 +341,13 @@ namespace Caique.Semantics
             }
             foreach (var (argument, i) in newExpression.Arguments.WithIndex())
             {
-                var argumentType = argument.Accept(this);
+                var argumentType = Next(argument);
                 var varDecl = classDecl!.Body.Environment.GetVariable(
                     classDecl.ParameterRefs[i].Value
                 );
 
                 if (varDecl == null) continue;
-                if (varDecl.DataType == null) varDecl.Accept(this);
+                if (varDecl.DataType == null) Next(varDecl);
 
                 CheckTypes(varDecl.DataType!.Value, argumentType);
             }
@@ -385,7 +397,7 @@ namespace Caique.Semantics
 
         public DataType Visit(IfExpression ifExpression)
         {
-            var conditionType = ifExpression.Condition.Accept(this);
+            var conditionType = Next(ifExpression.Condition);
             CheckTypes(_boolType, conditionType, ifExpression.Condition.Span);
 
             if (ifExpression.Branch is ExpressionStatement branchExprStmt &&
@@ -393,8 +405,8 @@ namespace Caique.Semantics
                 ifExpression.ElseBranch is ExpressionStatement elseBranchExprStmt &&
                 elseBranchExprStmt.Expression is BlockExpression elseBranchBlock)
             {
-                var branchType = branchBlock.Accept(this);
-                var elseBranchType = elseBranchBlock.Accept(this);
+                var branchType = Next(branchBlock);
+                var elseBranchType = Next(elseBranchBlock);
                 CheckTypes(branchType, elseBranchType, ifExpression.Span);
                 ifExpression.DataType = branchType;
 
@@ -438,11 +450,11 @@ namespace Caique.Semantics
             DataType type;
             if (variableDecl.SpecifiedType != null)
             {
-                type = variableDecl.SpecifiedType.Accept(this);
+                type = Next(variableDecl.SpecifiedType);
             }
             else
             {
-                type = variableDecl.Value!.Accept(this);
+                type = Next(variableDecl.Value!);
             }
 
             variableDecl.DataType = type;
@@ -463,7 +475,7 @@ namespace Caique.Semantics
 
             var returnType = functionDecl.ReturnType == null
                 ? _voidType
-                : functionDecl.ReturnType.Accept(this);
+                : Next(functionDecl.ReturnType);
 
             // If wrong number of arguments
             if (arguments.Count != functionDecl.Parameters.Count)
@@ -480,8 +492,8 @@ namespace Caique.Semantics
             foreach (var (argument, parameter) in
                      arguments.Zip(functionDecl.Parameters))
             {
-                var argumentType = argument.Accept(this);
-                var parameterType = parameter.Type.Accept(this);
+                var argumentType = Next(argument);
+                var parameterType = Next(parameter.Type);
                 CheckTypes(parameterType, argumentType, argument.Span);
             }
 

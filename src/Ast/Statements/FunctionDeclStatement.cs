@@ -23,10 +23,5 @@ namespace Caique.Ast
             Body = body;
             ReturnType = returnType;
         }
-
-        public override T Accept<T>(IStatementVisitor<T> visitor)
-        {
-            return visitor.Visit(this);
-        }
     }
 }
