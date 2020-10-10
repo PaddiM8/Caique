@@ -8,7 +8,7 @@ namespace Caique.Ast
     class AstPrinter : IStatementVisitor<object>, IExpressionVisitor<object>
     {
         private int _indentationLevel = 1;
-        private AbstractSyntaxTree _ast;
+        private readonly AbstractSyntaxTree _ast;
 
         public AstPrinter(AbstractSyntaxTree ast)
         {
@@ -252,7 +252,7 @@ namespace Caique.Ast
             Console.ResetColor();
         }
 
-        private string StringifyModulePath(List<Token> modulePath)
+        private static string StringifyModulePath(List<Token> modulePath)
             => string.Join("->", modulePath.Select(x => x.Value));
     }
 }

@@ -63,7 +63,7 @@ namespace Caique.Cli
         /// </summary>
         public void Build(BuildOptions buildOptions)
         {
-            string projectPath = _projectFile!.Directory.FullName;
+            string projectPath = _projectFile!.Directory!.FullName;
             string sourcePath = $"{projectPath}/src";
 
             var environment = CreateModuleEnvironment(sourcePath);

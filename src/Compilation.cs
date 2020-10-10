@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Caique.Ast;
+using Caique.CodeGeneration;
 using Caique.Diagnostics;
 using Caique.Parsing;
 using Caique.Semantics;
@@ -22,11 +23,11 @@ namespace Caique
 
         public ModuleEnvironment Environment { get; private set; }
 
-        public bool PrintTokens { get; set; } = false;
+        public bool PrintTokens { get; set; }
 
-        public bool PrintAst { get; set; } = false;
+        public bool PrintAst { get; set; }
 
-        public bool PrintEnvironment { get; set; } = false;
+        public bool PrintEnvironment { get; set; }
 
         private readonly string _rootPath = "";
 
@@ -58,6 +59,8 @@ namespace Caique
                         ast,
                         Diagnostics
                     ).Analyse();
+
+                    //new LLVMGenerator(ast).Generate();
 
                     if (PrintAst) ast.Print();
                 }
@@ -134,7 +137,7 @@ namespace Caique
             return Path.GetRelativePath(_rootPath, path);
         }
 
-        private void PrintTokenList(List<Token> tokens)
+        private static void PrintTokenList(List<Token> tokens)
         {
             foreach (var token in tokens)
             {

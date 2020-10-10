@@ -116,7 +116,7 @@ namespace Caique.Diagnostics
                 // If not one of the last two
                 if (i < expected.Length - 2)
                 {
-                    expectedString.Append(",");
+                    expectedString.Append(',');
                 }
             }
 

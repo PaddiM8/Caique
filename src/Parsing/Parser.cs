@@ -35,7 +35,7 @@ namespace Caique.Parsing
 
         private readonly List<Token> _tokens;
         private readonly DiagnosticBag _diagnostics;
-        private ModuleEnvironment _moduleEnvironment;
+        private readonly ModuleEnvironment _moduleEnvironment;
         private SymbolEnvironment _symbolEnvironment;
         private int _index;
 

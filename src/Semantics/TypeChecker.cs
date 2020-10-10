@@ -13,7 +13,7 @@ namespace Caique.Semantics
         private readonly AbstractSyntaxTree _ast;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
-        private DataType? _currentFunctionType = null;
+        private DataType? _currentFunctionType;
         private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
         private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
@@ -404,7 +404,7 @@ namespace Caique.Semantics
             return _voidType;
         }
 
-        private bool CheckTypes(DataType type1, DataType type2)
+        private static bool CheckTypes(DataType type1, DataType type2)
         {
             return type1.Type == type2.Type;
         }

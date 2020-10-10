@@ -45,18 +45,16 @@ namespace Caique.Semantics
 
         public bool IsNumber()
         {
-            switch (Type)
+            return Type switch
             {
-                case TypeKeyword.i8:
-                case TypeKeyword.i32:
-                case TypeKeyword.i64:
-                case TypeKeyword.f8:
-                case TypeKeyword.f32:
-                case TypeKeyword.f64:
-                    return true;
-                default:
-                    return false;
-            }
+                TypeKeyword.i8 or
+                TypeKeyword.i32 or
+                TypeKeyword.i64 or
+                TypeKeyword.f8 or
+                TypeKeyword.f32 or
+                TypeKeyword.f64 => true,
+                _ => false,
+            };
         }
 
         public override string ToString()

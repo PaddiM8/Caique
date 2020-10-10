@@ -64,49 +64,44 @@ namespace Caique.Parsing
 
         public static bool IsComparisonOperator(this TokenKind kind)
         {
-            switch (kind)
+            return kind switch
             {
-                case TokenKind.EqualsEquals:
-                case TokenKind.BangEquals:
-                case TokenKind.MoreOrEquals:
-                case TokenKind.LessOrEquals:
-                case TokenKind.OpenAngleBracket:
-                case TokenKind.ClosedAngleBracket:
-                    return true;
-                default:
-                    return false;
-            }
+                TokenKind.EqualsEquals or
+                TokenKind.BangEquals or
+                TokenKind.MoreOrEquals or
+                TokenKind.LessOrEquals or
+                TokenKind.OpenAngleBracket or
+                TokenKind.ClosedAngleBracket => true,
+                _ => false,
+            };
         }
 
         public static bool IsAssignmentOperator(this TokenKind kind)
         {
-            switch (kind)
+            return kind switch
             {
-                case TokenKind.Equals:
-                case TokenKind.PlusEquals:
-                case TokenKind.MinusEquals:
-                case TokenKind.StarEquals:
-                case TokenKind.SlashEquals:
-                    return true;
-                default:
-                    return false;
-            }
+                TokenKind.Equals or
+                TokenKind.PlusEquals or
+                TokenKind.MinusEquals or
+                TokenKind.StarEquals or
+                TokenKind.SlashEquals => true,
+                _ => false,
+            };
         }
 
         public static bool IsKeyword(this TokenKind kind)
         {
-            switch (kind)
+            return kind switch
             {
-                case TokenKind.If:
-                case TokenKind.Else:
-                case TokenKind.Fn:
-                case TokenKind.Let:
-                case TokenKind.Class:
-                case TokenKind.Ret:
-                    return true;
-                default:
-                    return false;
+                TokenKind.If or
+                TokenKind.Else or
+                TokenKind.Fn or
+                TokenKind.Let or
+                TokenKind.Class or
+                TokenKind.Ret => true,
+                _ => false,
             };
+            ;
         }
 
         public static string ToStringRepresentation(this TokenKind kind)
