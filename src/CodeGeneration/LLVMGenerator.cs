@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Caique.Ast;
+using Caique.Semantics;
 using Caique.Util;
 using LLVMSharp.Interop;
 
@@ -10,6 +12,8 @@ namespace Caique.CodeGeneration
         private readonly AbstractSyntaxTree _ast;
         private readonly LLVMModuleRef _module;
         private readonly LLVMBuilderRef _builder;
+        private readonly Stack<(LLVMValueRef entry, BlockExpression block)> _valueStack =
+            new Stack<(LLVMValueRef, BlockExpression)>();
 
         public LLVMGenerator(AbstractSyntaxTree ast)
         {
@@ -27,8 +31,13 @@ namespace Caique.CodeGeneration
                 statement.Accept(this);
             }
 
+            while (_valueStack.Count > 0)
+            {
+                _valueStack.Peek().block.Accept(this);
+            }
+
             sbyte* moduleError;
-            LLVM.VerifyModule(
+            _ = LLVM.VerifyModule(
                 _module,
                 LLVMVerifierFailureAction.LLVMPrintMessageAction,
                 &moduleError
@@ -59,7 +68,25 @@ namespace Caique.CodeGeneration
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
-            throw new NotImplementedException();
+            var returnType = functionDeclStatement.ReturnType?.DataType
+                ?? new DataType(TypeKeyword.Void);
+
+            LLVMTypeRef functionType = LLVM.FunctionType(
+                returnType.ToLLVMType(),
+                null,
+                0,
+                0
+            );
+
+            LLVMValueRef function = LLVM.AddFunction(
+                _module,
+                functionDeclStatement.Identifier.Value.ToCString(),
+                functionType
+            );
+
+            _valueStack.Push((function, functionDeclStatement.Body));
+
+            return null!;
         }
 
         public object Visit(ClassDeclStatement classDeclStatement)
@@ -94,7 +121,18 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
-            throw new NotImplementedException();
+            LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
+                _valueStack.Pop().entry,
+                "entry".ToCString()
+            );
+            LLVM.PositionBuilderAtEnd(_builder, block);
+
+            foreach (var statement in blockExpression.Statements)
+            {
+                statement.Accept(this);
+            }
+
+            return null!;
         }
 
         public LLVMValueRef Visit(VariableExpression variableExpression)
