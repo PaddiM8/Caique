@@ -13,7 +13,7 @@ namespace Caique.CodeGeneration
         private readonly AbstractSyntaxTree _ast;
         private readonly LLVMModuleRef _module;
         private readonly LLVMBuilderRef _builder;
-        private LllvmGeneratorEnvironment _environment = new LllvmGeneratorEnvironment();
+        private LlvmGeneratorContext _current = new LlvmGeneratorContext();
 
         public LllvmGenerator(AbstractSyntaxTree ast)
         {
@@ -43,12 +43,18 @@ namespace Caique.CodeGeneration
 
         private void Next(Statement statement)
         {
+            _current = _current.CreateChild();
             ((IAstTraverser<object, LLVMValueRef>)this).Next(statement);
+            _current = _current.Parent!;
         }
 
         private LLVMValueRef Next(Expression expression)
         {
-            return ((IAstTraverser<object, LLVMValueRef>)this).Next(expression);
+            _current = _current.CreateChild();
+            var value = ((IAstTraverser<object, LLVMValueRef>)this).Next(expression);
+            _current = _current.Parent!;
+
+            return value;
         }
 
 
@@ -56,13 +62,11 @@ namespace Caique.CodeGeneration
         {
             Next(expressionStatement.Expression);
 
-            ClearEnvironment();
             return null!;
         }
 
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
@@ -73,13 +77,11 @@ namespace Caique.CodeGeneration
                 Next(returnStatement.Expression)
             );
 
-            ClearEnvironment();
             return null!;
         }
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
@@ -101,7 +103,7 @@ namespace Caique.CodeGeneration
                 functionType
             );
 
-            _environment.ParentValue = function;
+            _current.LLVMValue = function;
             var bodyValue = Next(functionDeclStatement.Body);
 
             // If void function
@@ -117,25 +119,21 @@ namespace Caique.CodeGeneration
                 );
             }
 
-            ClearEnvironment();
             return null!;
         }
 
         public object Visit(ClassDeclStatement classDeclStatement)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public object Visit(UseStatement useStatement)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(UnaryExpression unaryExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
@@ -169,7 +167,6 @@ namespace Caique.CodeGeneration
                 throw new NotImplementedException();
             }
 
-            ClearEnvironment();
             return LLVM.BuildBinOp(
                 _builder,
                 opcode,
@@ -189,7 +186,6 @@ namespace Caique.CodeGeneration
                 // Float
                 if (tokenValue.Contains("."))
                 {
-                    ClearEnvironment();
                     return LLVM.ConstReal(
                         LLVM.FloatType(),
                         double.Parse(tokenValue)
@@ -198,7 +194,6 @@ namespace Caique.CodeGeneration
                 else // Int
                 {
                     var value = ulong.Parse(tokenValue);
-                    ClearEnvironment();
                     return LLVM.ConstInt(
                         LLVM.Int32Type(),
                         value,
@@ -207,20 +202,18 @@ namespace Caique.CodeGeneration
                 }
             }
 
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(GroupExpression groupExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
             LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
-                _environment.ParentValue!.Value,
+                _current.Parent!.LLVMValue!.Value,
                 "entry".ToCString()
             );
             LLVM.PositionBuilderAtEnd(_builder, block);
@@ -233,7 +226,6 @@ namespace Caique.CodeGeneration
                     statement is ExpressionStatement expressionStatement &&
                     !expressionStatement.TrailingSemicolon)
                 {
-                    ClearEnvironment();
                     return Next(expressionStatement.Expression);
                 }
                 else
@@ -242,49 +234,37 @@ namespace Caique.CodeGeneration
                 }
             }
 
-            ClearEnvironment();
             return null;
         }
 
         public LLVMValueRef Visit(VariableExpression variableExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(CallExpression callExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(TypeExpression typeExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(IfExpression ifExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(NewExpression newExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
         }
 
         public LLVMValueRef Visit(DotExpression dotExpression)
         {
-            ClearEnvironment();
             throw new NotImplementedException();
-        }
-
-        private void ClearEnvironment()
-        {
-            _environment = new LllvmGeneratorEnvironment();
         }
     }
 }

@@ -13,7 +13,7 @@ namespace Caique.Semantics
         private readonly AbstractSyntaxTree _ast;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
-        private DataType? _currentFunctionType;
+        private TypeCheckerContext _current = new TypeCheckerContext();
         private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
         private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
@@ -27,12 +27,18 @@ namespace Caique.Semantics
 
         private void Next(Statement statement)
         {
+            _current = _current.CreateChild();
             ((IAstTraverser<object, DataType>)this).Next(statement);
+            _current = _current.Parent!;
         }
 
         private DataType Next(Expression expression)
         {
-            return ((IAstTraverser<object, DataType>)this).Next(expression);
+            _current = _current.CreateChild();
+            var value = ((IAstTraverser<object, DataType>)this).Next(expression);
+            _current = _current.Parent!;
+
+            return value;
         }
 
         public void Analyse()
@@ -89,7 +95,7 @@ namespace Caique.Semantics
         public object Visit(ReturnStatement returnStatement)
         {
             var type = Next(returnStatement.Expression);
-            CheckTypes(_currentFunctionType!.Value, type, returnStatement.Span);
+            CheckTypes(_current.FunctionType!.Value, type, returnStatement.Span);
 
             return null!;
         }
@@ -106,18 +112,18 @@ namespace Caique.Semantics
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
-            _currentFunctionType = functionDeclStatement.ReturnType == null
+            _current.FunctionType = functionDeclStatement.ReturnType == null
                 ? _voidType
                 : Next(functionDeclStatement.ReturnType);
 
             var bodyType = Next(functionDeclStatement.Body);
             CheckTypes(
-                _currentFunctionType!.Value,
+                _current.FunctionType!.Value,
                 bodyType,
                 functionDeclStatement.Body.Span
             );
 
-            _currentFunctionType = null;
+            _current.FunctionType = null;
 
             return null!;
         }
