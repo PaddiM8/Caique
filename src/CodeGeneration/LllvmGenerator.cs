@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Caique.Ast;
 using Caique.Parsing;
 using Caique.Semantics;
@@ -14,6 +15,9 @@ namespace Caique.CodeGeneration
         private readonly LLVMModuleRef _module;
         private readonly LLVMBuilderRef _builder;
         private LlvmGeneratorContext _current = new LlvmGeneratorContext();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float Main();
 
         public LllvmGenerator(AbstractSyntaxTree ast)
         {
@@ -38,6 +42,43 @@ namespace Caique.CodeGeneration
                 &moduleError
             );
             if (moduleError != null) Console.WriteLine(*moduleError);
+
+            // Everything below is temporary code for testing purpsoes
+            LLVM.LinkInMCJIT();
+
+            LLVM.InitializeX86TargetMC();
+            LLVM.InitializeX86Target();
+            LLVM.InitializeX86TargetInfo();
+            LLVM.InitializeX86AsmParser();
+            LLVM.InitializeX86AsmPrinter();
+
+            var options = new LLVMMCJITCompilerOptions { NoFramePointerElim = 1 };
+            var optionsSize = new UIntPtr(1);
+            LLVM.InitializeMCJITCompilerOptions(&options, optionsSize);
+
+            LLVMOpaqueExecutionEngine* engine;
+            sbyte* error;
+            if (LLVM.CreateMCJITCompilerForModule(&engine, _module, &options, optionsSize, &error) != 0)
+            {
+                Console.WriteLine($"Error: {*error}");
+            }
+
+            LLVMOpaqueValue* mainFnValue;
+            if (LLVM.FindFunction(engine, "main".ToCString(), &mainFnValue) == 0)
+            {
+                var mainFn = (Main)Marshal.GetDelegateForFunctionPointer(
+                    (IntPtr)LLVM.GetPointerToGlobal(engine, mainFnValue),
+                    typeof(Main)
+                );
+                float result = mainFn();
+
+                Console.WriteLine("Result: " + result);
+            }
+            else
+            {
+                Console.WriteLine("Couldn't find main function.");
+            }
+
             LLVM.DumpModule(_module);
         }
 
@@ -67,7 +108,24 @@ namespace Caique.CodeGeneration
 
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
-            throw new NotImplementedException();
+            string identifier = variableDeclStatement.Identifier.Value;
+
+            // Allocate variable
+            LLVMValueRef alloca = LLVM.BuildAlloca(
+                _builder,
+                variableDeclStatement.DataType!.Value.ToLLVMType(),
+                identifier.ToCString()
+            );
+
+            _current.Parent!.AddVariable(identifier, alloca);
+
+            if (variableDeclStatement.Value != null)
+            {
+                LLVMValueRef initializer = Next(variableDeclStatement.Value);
+                LLVM.BuildStore(_builder, initializer, alloca);
+            }
+
+            return null!;
         }
 
         public object Visit(ReturnStatement returnStatement)
@@ -82,7 +140,12 @@ namespace Caique.CodeGeneration
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            throw new NotImplementedException();
+            LLVMValueRef value = Next(assignmentStatement.Value);
+            var leftIdentifier = assignmentStatement.Variable.Identifier.Value;
+            var variableRef = _current.GetVariable(leftIdentifier)!.Value;
+            LLVM.BuildStore(_builder, value, variableRef);
+
+            return null!;
         }
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
@@ -239,7 +302,15 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(VariableExpression variableExpression)
         {
-            throw new NotImplementedException();
+            string identifier = variableExpression.Identifier.Value;
+            var value = _current.GetVariable(identifier)!.Value;
+            value = LLVM.BuildLoad(
+                _builder,
+                value,
+                ("l" + identifier).ToCString()
+            );
+
+            return value;
         }
 
         public LLVMValueRef Visit(CallExpression callExpression)

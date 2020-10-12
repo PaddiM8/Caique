@@ -281,6 +281,25 @@ namespace Caique.Parsing
                     var value = ParseExpression();
                     Expect(TokenKind.Semicolon);
 
+                    var binaryOpKind = op.Kind switch
+                    {
+                        TokenKind.PlusEquals => TokenKind.Plus,
+                        TokenKind.MinusEquals => TokenKind.Minus,
+                        TokenKind.StarEquals => TokenKind.Star,
+                        TokenKind.SlashEquals => TokenKind.Slash,
+                        _ => throw new NotImplementedException()
+                    };
+
+                    // Turn eg. x += 3 into x = x + 3
+                    if (op.Kind != TokenKind.EqualsEquals)
+                    {
+                        value = new BinaryExpression(
+                            variableExpression,
+                            new Token(binaryOpKind, "", op.Span), // Turn eg. += into +
+                            value
+                        );
+                    }
+
                     return new AssignmentStatement(variableExpression, op, value);
                 }
                 else
