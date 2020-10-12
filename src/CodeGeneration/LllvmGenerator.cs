@@ -179,12 +179,12 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(LiteralExpression literalExpression)
         {
             var dataType = literalExpression.DataType!.Value;
-            if (dataType.Type == TypeKeyword.NumberLiteral)
+            if (dataType.IsNumber())
             {
                 string tokenValue = literalExpression.Value.Value;
 
                 // Float
-                if (tokenValue.Contains("."))
+                if (dataType.IsFloat())
                 {
                     return LLVM.ConstReal(
                         LLVM.FloatType(),

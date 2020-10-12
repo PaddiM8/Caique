@@ -24,12 +24,6 @@ namespace Caique.Semantics
         /// </summary>
         public bool IsCompatible(DataType expected)
         {
-            if (Type == TypeKeyword.NumberLiteral && expected.IsNumber())
-                return true;
-
-            if (expected.Type == TypeKeyword.NumberLiteral && IsNumber())
-                return true;
-
             // Objects
             if (ObjectDecl != null && expected.ObjectDecl != null)
             {

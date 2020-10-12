@@ -12,14 +12,13 @@ namespace Caique.CodeGeneration
 
             return keyword switch
             {
-                TypeKeyword.i8 => throw new NotImplementedException(),
+                TypeKeyword.i8 => LLVM.Int8Type(),
                 TypeKeyword.i32 => LLVM.Int32Type(),
-                TypeKeyword.i64 => throw new NotImplementedException(),
-                TypeKeyword.f8 => throw new NotImplementedException(),
-                TypeKeyword.f32 => throw new NotImplementedException(),
-                TypeKeyword.f64 => throw new NotImplementedException(),
-                TypeKeyword.NumberLiteral => throw new NotImplementedException(),
-                TypeKeyword.Bool => throw new NotImplementedException(),
+                TypeKeyword.i64 => LLVM.Int64Type(),
+                TypeKeyword.f8 => LLVM.FloatType(),
+                TypeKeyword.f32 => LLVM.FloatType(),
+                TypeKeyword.f64 => LLVM.FloatType(),
+                TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Void => LLVM.VoidType(),
                 TypeKeyword.Identifier => throw new NotImplementedException(),
                 TypeKeyword.Unknown => throw new NotImplementedException(),

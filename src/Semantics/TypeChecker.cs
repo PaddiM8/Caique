@@ -35,6 +35,7 @@ namespace Caique.Semantics
         private DataType Next(Expression expression)
         {
             _current = _current.CreateChild();
+            _current.DataType = _current.Parent!.DataType; // Expressions should carry on the infer-type
             var value = ((IAstTraverser<object, DataType>)this).Next(expression);
             _current = _current.Parent!;
 
@@ -61,6 +62,7 @@ namespace Caique.Semantics
             {
                 var specifiedType = Next(variableDeclStatement.SpecifiedType);
                 variableDeclStatement.DataType = specifiedType;
+                _current.DataType = specifiedType;
 
                 // Make sure the value type match up with the specified type
                 // if there is a value
@@ -94,6 +96,7 @@ namespace Caique.Semantics
 
         public object Visit(ReturnStatement returnStatement)
         {
+            _current.DataType = _current.FunctionType;
             var type = Next(returnStatement.Expression);
             CheckTypes(_current.FunctionType!.Value, type, returnStatement.Span);
 
@@ -103,6 +106,7 @@ namespace Caique.Semantics
         public object Visit(AssignmentStatement assignmentStatement)
         {
             var variableType = Next(assignmentStatement.Variable);
+            _current.DataType = variableType;
             var valueType = Next(assignmentStatement.Value);
 
             CheckTypes(variableType, valueType);
@@ -115,6 +119,7 @@ namespace Caique.Semantics
             _current.FunctionType = functionDeclStatement.ReturnType == null
                 ? _voidType
                 : Next(functionDeclStatement.ReturnType);
+            _current.DataType = _current.FunctionType;
 
             var bodyType = Next(functionDeclStatement.Body);
             CheckTypes(
@@ -122,8 +127,6 @@ namespace Caique.Semantics
                 bodyType,
                 functionDeclStatement.Body.Span
             );
-
-            _current.FunctionType = null;
 
             return null!;
         }
@@ -253,7 +256,10 @@ namespace Caique.Semantics
         {
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
             {
-                var type = new DataType(TypeKeyword.NumberLiteral);
+                bool isFloat = literalExpression.Value.Value.Contains(".");
+                var type = _current.Parent!.DataType ?? new DataType(
+                    isFloat ? TypeKeyword.f32 : TypeKeyword.i32
+                );
                 literalExpression.DataType = type;
 
                 return type;
@@ -285,6 +291,7 @@ namespace Caique.Semantics
                     statement is ExpressionStatement expressionStatement &&
                     !expressionStatement.TrailingSemicolon)
                 {
+                    _current.DataType = _current.Parent!.DataType;
                     returnType = Next(expressionStatement.Expression);
                 }
                 else
