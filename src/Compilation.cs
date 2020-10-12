@@ -61,7 +61,8 @@ namespace Caique
                         Diagnostics
                     ).Analyse();
 
-                    new LllvmGenerator(ast).Generate();
+                    if (!Diagnostics.Any())
+                        new LllvmGenerator(ast).Generate();
 
                     if (PrintAst) ast.Print();
                 }
