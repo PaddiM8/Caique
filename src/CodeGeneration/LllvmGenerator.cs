@@ -45,8 +45,7 @@ namespace Caique.CodeGeneration
                         Statement = statement
                     };
 
-                    var bodyValue = Next(functionDeclStatement.Body);
-
+                    Next(functionDeclStatement.Body);
                 }
             }
 
@@ -203,39 +202,42 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(BinaryExpression binaryExpression)
         {
-            LLVMOpcode opcode;
-            if (binaryExpression.DataType!.Value.IsInt())
+            bool isFloat = binaryExpression.DataType!.Value.IsFloat();
+            LLVMValueRef leftValue = Next(binaryExpression.Left);
+            LLVMValueRef rightValue = Next(binaryExpression.Right);
+            if (binaryExpression.Operator.Kind.IsComparisonOperator())
             {
-                opcode = binaryExpression.Operator.Kind switch
+                if (isFloat)
                 {
-                    TokenKind.Plus => LLVMOpcode.LLVMAdd,
-                    TokenKind.Minus => LLVMOpcode.LLVMSub,
-                    TokenKind.Star => LLVMOpcode.LLVMMul,
-                    TokenKind.Slash => LLVMOpcode.LLVMSDiv,
-                    _ => throw new NotImplementedException()
-                };
-            }
-            else if (binaryExpression.DataType!.Value.IsFloat())
-            {
-                opcode = binaryExpression.Operator.Kind switch
+                    return LLVM.BuildFCmp(
+                        _builder,
+                        binaryExpression.Operator.Kind.ToLlvmRealPredicate(),
+                        leftValue,
+                        rightValue,
+                        "cmp".ToCString()
+                    );
+                }
+                else
                 {
-                    TokenKind.Plus => LLVMOpcode.LLVMFAdd,
-                    TokenKind.Minus => LLVMOpcode.LLVMFSub,
-                    TokenKind.Star => LLVMOpcode.LLVMFMul,
-                    TokenKind.Slash => LLVMOpcode.LLVMFDiv,
-                    _ => throw new NotImplementedException()
-                };
+                    return LLVM.BuildICmp(
+                        _builder,
+                        binaryExpression.Operator.Kind.ToLlvmIntPredicate(),
+                        leftValue,
+                        rightValue,
+                        "cmp".ToCString()
+                    );
+                }
             }
-            else
-            {
-                throw new NotImplementedException();
-            }
+
+            LLVMOpcode opcode = binaryExpression.Operator.Kind.ToLlvmOpcode(
+                isFloat
+            );
 
             return LLVM.BuildBinOp(
                 _builder,
                 opcode,
-                Next(binaryExpression.Left),
-                Next(binaryExpression.Right),
+                leftValue,
+                rightValue,
                 "binOp".ToCString()
             );
         }
@@ -276,13 +278,15 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
-            _current.IsBlock = true;
-
-            LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
-                _current.Parent!.Statement!.LlvmValue!.Value,
-                "entry".ToCString()
-            );
-            LLVM.PositionBuilderAtEnd(_builder, block);
+            var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
+            if (parentStatementValue != null)
+            {
+                LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
+                    parentStatementValue!.Value,
+                    "entry".ToCString()
+                );
+                LLVM.PositionBuilderAtEnd(_builder, block);
+            }
 
             LLVMValueRef? returnValue = null;
             foreach (var (statement, i) in blockExpression.Statements.WithIndex())
@@ -301,6 +305,17 @@ namespace Caique.CodeGeneration
                 }
             }
 
+            // If the parent expects the block expression to
+            // assign the return value to an alloca (which is outside of the block).
+            if (_current.Parent!.BlockReturnValueAlloca != null)
+            {
+                LLVM.BuildStore(
+                    _builder,
+                    returnValue!.Value,
+                    _current.Parent!.BlockReturnValueAlloca!.Value
+                );
+            }
+
             // If it belongs to a function
             if (_current.Parent.Statement is FunctionDeclStatement functionDeclStatement)
             {
@@ -313,12 +328,12 @@ namespace Caique.CodeGeneration
                 {
                     LLVM.BuildRet(
                         _builder,
-                        returnValue
+                        returnValue!.Value
                     );
                 }
             }
 
-            return returnValue;
+            return returnValue ?? null;
         }
 
         public LLVMValueRef Visit(VariableExpression variableExpression)
@@ -353,7 +368,48 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(IfExpression ifExpression)
         {
-            throw new NotImplementedException();
+            LLVMValueRef parent = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(_builder));
+
+            // Blocks
+            LLVMBasicBlockRef thenBB = LLVM.AppendBasicBlock(parent, "then".ToCString());
+            LLVMBasicBlockRef elseBB = LLVM.AppendBasicBlock(parent, "else".ToCString());
+            LLVMBasicBlockRef mergeBB = LLVM.AppendBasicBlock(parent, "ifcont".ToCString());
+
+            bool returnsValue = ifExpression.DataType!.Value.Type != TypeKeyword.Void;
+            if (returnsValue)
+            {
+                // Allocate space for the return value,
+                // since it is an if *expression*, that can return a value.
+                // The block expression will use this alloca and give it a value.
+                _current.BlockReturnValueAlloca = LLVM.BuildAlloca(
+                    _builder,
+                    ifExpression.DataType!.Value.ToLLVMType(),
+                    "retVal".ToCString()
+                );
+            }
+
+            // Build condition
+            LLVM.BuildCondBr(_builder, Next(ifExpression.Condition), thenBB, elseBB);
+
+            // Then branch
+            LLVM.PositionBuilderAtEnd(_builder, thenBB); // Position builder at block
+            Next(ifExpression.Branch); // Generate branch code
+            LLVM.BuildBr(_builder, mergeBB); // Redirect to merge
+
+            // Else branch
+            LLVM.PositionBuilderAtEnd(_builder, elseBB); // Position builder at block
+            if (ifExpression.ElseBranch != null) Next(ifExpression.ElseBranch); // Generate branch code if else statement is present
+            LLVM.BuildBr(_builder, mergeBB); // Redirect to merge
+
+            LLVM.PositionBuilderAtEnd(_builder, mergeBB);
+
+            return returnsValue
+                ? LLVM.BuildLoad(
+                    _builder,
+                    _current.BlockReturnValueAlloca!.Value,
+                    "retVal".ToCString()
+                )
+                : null;
         }
 
         public LLVMValueRef Visit(NewExpression newExpression)

@@ -13,7 +13,7 @@ namespace Caique.CodeGeneration
 
         public Expression? Expression { get; init; }
 
-        public bool IsBlock { get; set; }
+        public LLVMValueRef? BlockReturnValueAlloca { get; set; }
 
         private readonly Dictionary<string, LLVMValueRef> _variables =
             new Dictionary<string, LLVMValueRef>();
@@ -23,7 +23,8 @@ namespace Caique.CodeGeneration
             return new LlvmGeneratorContext
             {
                 Parent = this,
-                Statement = statement
+                Statement = statement,
+                BlockReturnValueAlloca = BlockReturnValueAlloca,
             };
         }
 
@@ -32,7 +33,8 @@ namespace Caique.CodeGeneration
             return new LlvmGeneratorContext
             {
                 Parent = this,
-                Expression = expression
+                Expression = expression,
+                BlockReturnValueAlloca = BlockReturnValueAlloca,
             };
         }
 
@@ -43,7 +45,8 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef? GetVariable(string identifier)
         {
-            if (IsBlock && _variables.TryGetValue(identifier, out LLVMValueRef value))
+            if (Expression is BlockExpression &&
+                _variables.TryGetValue(identifier, out LLVMValueRef value))
             {
                 return value;
             }
