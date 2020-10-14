@@ -11,6 +11,8 @@ namespace Caique.Ast
 
         public List<Expression> Arguments { get; }
 
+        public FunctionDeclStatement? FunctionDecl { get; set; }
+
         public CallExpression(List<Token> modulePath, List<Expression> arguments,
                               TextSpan span) : base(span)
         {

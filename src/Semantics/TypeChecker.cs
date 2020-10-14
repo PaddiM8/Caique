@@ -329,6 +329,7 @@ namespace Caique.Semantics
 
             var functionDecl = environment.GetFunction(lastIdentifier.Value);
             var type = CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
+            callExpression.FunctionDecl = functionDecl;
             callExpression.DataType = type;
 
             return type;

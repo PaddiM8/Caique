@@ -12,7 +12,7 @@ namespace Caique.CodeGeneration
     public unsafe class LllvmGenerator : IAstTraverser<object, LLVMValueRef>
     {
         private readonly AbstractSyntaxTree _ast;
-        private readonly LLVMModuleRef _module;
+        private readonly LLVMModuleRef _llvmModule;
         private readonly LLVMBuilderRef _builder;
         private LlvmGeneratorContext _current = new LlvmGeneratorContext();
 
@@ -22,7 +22,7 @@ namespace Caique.CodeGeneration
         public LllvmGenerator(AbstractSyntaxTree ast)
         {
             _ast = ast;
-            _module = LLVM.ModuleCreateWithName(
+            _llvmModule = LLVM.ModuleCreateWithName(
                 ast.ModuleEnvironment.Identifier.ToCString()
             );
             _builder = LLVM.CreateBuilder();
@@ -35,9 +35,24 @@ namespace Caique.CodeGeneration
                 Next(statement);
             }
 
+            foreach (var statement in _ast.Statements)
+            {
+                if (statement is FunctionDeclStatement functionDeclStatement)
+                {
+                    _current = new LlvmGeneratorContext
+                    {
+                        Parent = null,
+                        Statement = statement
+                    };
+
+                    var bodyValue = Next(functionDeclStatement.Body);
+
+                }
+            }
+
             sbyte* moduleError;
             _ = LLVM.VerifyModule(
-                _module,
+                _llvmModule,
                 LLVMVerifierFailureAction.LLVMPrintMessageAction,
                 &moduleError
             );
@@ -58,7 +73,7 @@ namespace Caique.CodeGeneration
 
             LLVMOpaqueExecutionEngine* engine;
             sbyte* error;
-            if (LLVM.CreateMCJITCompilerForModule(&engine, _module, &options, optionsSize, &error) != 0)
+            if (LLVM.CreateMCJITCompilerForModule(&engine, _llvmModule, &options, optionsSize, &error) != 0)
             {
                 Console.WriteLine($"Error: {*error}");
             }
@@ -79,19 +94,19 @@ namespace Caique.CodeGeneration
                 Console.WriteLine("Couldn't find main function.");
             }
 
-            LLVM.DumpModule(_module);
+            LLVM.DumpModule(_llvmModule);
         }
 
         private void Next(Statement statement)
         {
-            _current = _current.CreateChild();
+            _current = _current.CreateChild(statement);
             ((IAstTraverser<object, LLVMValueRef>)this).Next(statement);
             _current = _current.Parent!;
         }
 
         private LLVMValueRef Next(Expression expression)
         {
-            _current = _current.CreateChild();
+            _current = _current.CreateChild(expression);
             var value = ((IAstTraverser<object, LLVMValueRef>)this).Next(expression);
             _current = _current.Parent!;
 
@@ -161,26 +176,12 @@ namespace Caique.CodeGeneration
             );
 
             LLVMValueRef function = LLVM.AddFunction(
-                _module,
+                _llvmModule,
                 functionDeclStatement.Identifier.Value.ToCString(),
                 functionType
             );
 
-            _current.LLVMValue = function;
-            var bodyValue = Next(functionDeclStatement.Body);
-
-            // If void function
-            if (functionDeclStatement.Body.DataType?.Type == TypeKeyword.Void)
-            {
-                LLVM.BuildRetVoid(_builder);
-            }
-            else
-            {
-                LLVM.BuildRet(
-                    _builder,
-                    bodyValue
-                );
-            }
+            functionDeclStatement.LlvmValue = function;
 
             return null!;
         }
@@ -270,17 +271,20 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(GroupExpression groupExpression)
         {
-            throw new NotImplementedException();
+            return Next(groupExpression.Expression);
         }
 
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
+            _current.IsBlock = true;
+
             LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
-                _current.Parent!.LLVMValue!.Value,
+                _current.Parent!.Statement!.LlvmValue!.Value,
                 "entry".ToCString()
             );
             LLVM.PositionBuilderAtEnd(_builder, block);
 
+            LLVMValueRef? returnValue = null;
             foreach (var (statement, i) in blockExpression.Statements.WithIndex())
             {
                 bool isLast = i == blockExpression.Statements.Count - 1;
@@ -289,7 +293,7 @@ namespace Caique.CodeGeneration
                     statement is ExpressionStatement expressionStatement &&
                     !expressionStatement.TrailingSemicolon)
                 {
-                    return Next(expressionStatement.Expression);
+                    returnValue = Next(expressionStatement.Expression);
                 }
                 else
                 {
@@ -297,7 +301,24 @@ namespace Caique.CodeGeneration
                 }
             }
 
-            return null;
+            // If it belongs to a function
+            if (_current.Parent.Statement is FunctionDeclStatement functionDeclStatement)
+            {
+                // Build the appropriate return statement for the function
+                if (functionDeclStatement.Body.DataType?.Type == TypeKeyword.Void)
+                {
+                    LLVM.BuildRetVoid(_builder);
+                }
+                else
+                {
+                    LLVM.BuildRet(
+                        _builder,
+                        returnValue
+                    );
+                }
+            }
+
+            return returnValue;
         }
 
         public LLVMValueRef Visit(VariableExpression variableExpression)
@@ -315,7 +336,14 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(CallExpression callExpression)
         {
-            throw new NotImplementedException();
+            var identifier = callExpression.ModulePath[^1].Value;
+            return LLVM.BuildCall(
+                _builder,
+                callExpression.FunctionDecl!.LlvmValue!.Value,
+                null,
+                0,
+                identifier.ToCString()
+            );
         }
 
         public LLVMValueRef Visit(TypeExpression typeExpression)

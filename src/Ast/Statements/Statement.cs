@@ -3,7 +3,7 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class Statement
+    public partial class Statement
     {
         public TextSpan Span { get; }
 
