@@ -113,7 +113,51 @@ namespace Caique.Parsing
                 return ParseClassDecl();
             }
 
-            return ParseExpressionStatement();
+            var expressionStatement = ParseExpressionStatement();
+
+            // Assignment statement parsing
+            if (Current.Kind.IsAssignmentOperator())
+            {
+                if (expressionStatement.Expression is VariableExpression variableExpression)
+                {
+                    return ParseAssignment(variableExpression);
+                }
+                else
+                {
+                    _diagnostics.ReportMisplacedAssignmentOperator(Current);
+                    throw new ParsingErrorException();
+                }
+            }
+
+            return expressionStatement;
+        }
+
+        private AssignmentStatement ParseAssignment(VariableExpression variableExpression)
+        {
+            var op = Advance();
+            var value = ParseExpression();
+            Expect(TokenKind.Semicolon);
+
+            var binaryOpKind = op.Kind switch
+            {
+                TokenKind.PlusEquals => TokenKind.Plus,
+                TokenKind.MinusEquals => TokenKind.Minus,
+                TokenKind.StarEquals => TokenKind.Star,
+                TokenKind.SlashEquals => TokenKind.Slash,
+                _ => throw new NotImplementedException()
+            };
+
+            // Turn eg. x += 3 into x = x + 3
+            if (op.Kind != TokenKind.EqualsEquals)
+            {
+                value = new BinaryExpression(
+                    variableExpression,
+                    new Token(binaryOpKind, "", op.Span), // Turn eg. += into +
+                    value
+                );
+            }
+
+            return new AssignmentStatement(variableExpression, op, value);
         }
 
         private VariableDeclStatement ParseVariableDecl()
@@ -128,12 +172,11 @@ namespace Caique.Parsing
                 Expect(TokenKind.Equals);
             }
 
-            var value = ParseExpression();
-            var end = Expect(TokenKind.Semicolon).Span;
+            var value = ParseExpressionStatement().Expression;
 
             return new VariableDeclStatement(
                 identifier,
-                start.Add(end),
+                start.Add(value.Span),
                 value,
                 type
             );
@@ -142,10 +185,9 @@ namespace Caique.Parsing
         private ReturnStatement ParseReturn()
         {
             var start = Expect(TokenKind.Ret).Span;
-            var expression = ParseExpression();
-            var end = Expect(TokenKind.Semicolon).Span;
+            var expression = ParseExpressionStatement().Expression;
 
-            return new ReturnStatement(expression, start.Add(end));
+            return new ReturnStatement(expression, start.Add(expression.Span));
         }
 
         private FunctionDeclStatement ParseFunctionDecl()
@@ -268,46 +310,9 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private Statement ParseExpressionStatement()
+        private ExpressionStatement ParseExpressionStatement()
         {
             var expression = ParseExpression();
-
-            // Assignment statement parsing
-            if (Current.Kind.IsAssignmentOperator())
-            {
-                if (expression is VariableExpression variableExpression)
-                {
-                    var op = Advance();
-                    var value = ParseExpression();
-                    Expect(TokenKind.Semicolon);
-
-                    var binaryOpKind = op.Kind switch
-                    {
-                        TokenKind.PlusEquals => TokenKind.Plus,
-                        TokenKind.MinusEquals => TokenKind.Minus,
-                        TokenKind.StarEquals => TokenKind.Star,
-                        TokenKind.SlashEquals => TokenKind.Slash,
-                        _ => throw new NotImplementedException()
-                    };
-
-                    // Turn eg. x += 3 into x = x + 3
-                    if (op.Kind != TokenKind.EqualsEquals)
-                    {
-                        value = new BinaryExpression(
-                            variableExpression,
-                            new Token(binaryOpKind, "", op.Span), // Turn eg. += into +
-                            value
-                        );
-                    }
-
-                    return new AssignmentStatement(variableExpression, op, value);
-                }
-                else
-                {
-                    _diagnostics.ReportMisplacedAssignmentOperator(Current);
-                    throw new ParsingErrorException();
-                }
-            }
 
             return new ExpressionStatement(
                 expression,
