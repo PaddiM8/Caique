@@ -14,6 +14,8 @@ namespace Caique.Ast
 
         public TypeExpression? ReturnType { get; }
 
+        public ClassDeclStatement? ParentObject { get; set; }
+
         public FunctionDeclStatement(Token identifier, List<Parameter> parameters,
                                      BlockExpression body, TypeExpression? returnType,
                                      TextSpan span) : base(span)

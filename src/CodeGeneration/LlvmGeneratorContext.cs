@@ -15,6 +15,8 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef? BlockReturnValueAlloca { get; set; }
 
+        public LLVMValueRef? FunctionCallParentObject { get; set; }
+
         private readonly Dictionary<string, LLVMValueRef> _variables =
             new Dictionary<string, LLVMValueRef>();
 
@@ -35,6 +37,7 @@ namespace Caique.CodeGeneration
                 Parent = this,
                 Expression = expression,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
+                FunctionCallParentObject = expression is CallExpression ? FunctionCallParentObject : null
             };
         }
 

@@ -12,6 +12,22 @@ namespace Caique.Semantics
     {
         public SymbolEnvironment? Parent { get; }
 
+        public ICollection<FunctionDeclStatement> Functions
+        {
+            get
+            {
+                return _functions.Values;
+            }
+        }
+
+        public ICollection<VariableDeclStatement?> Variables
+        {
+            get
+            {
+                return _variables.Values;
+            }
+        }
+
         private readonly Dictionary<string, FunctionDeclStatement> _functions =
             new Dictionary<string, FunctionDeclStatement>();
         private readonly Dictionary<string, VariableDeclStatement?> _variables =

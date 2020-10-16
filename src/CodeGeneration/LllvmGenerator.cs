@@ -12,6 +12,7 @@ namespace Caique.CodeGeneration
     public unsafe class LllvmGenerator : IAstTraverser<object, LLVMValueRef>
     {
         private readonly AbstractSyntaxTree _ast;
+        private readonly LLVMContextRef _context;
         private readonly LLVMModuleRef _llvmModule;
         private readonly LLVMBuilderRef _builder;
         private LlvmGeneratorContext _current = new LlvmGeneratorContext();
@@ -22,31 +23,44 @@ namespace Caique.CodeGeneration
         public LllvmGenerator(AbstractSyntaxTree ast)
         {
             _ast = ast;
+            _context = LLVM.ContextCreate();
             _llvmModule = LLVM.ModuleCreateWithName(
                 ast.ModuleEnvironment.Identifier.ToCString()
             );
-            _builder = LLVM.CreateBuilder();
+            _builder = LLVM.CreateBuilderInContext(_context);
         }
 
         public void Generate()
         {
+            var functions = new List<FunctionDeclStatement>();
             foreach (var statement in _ast.Statements)
             {
                 Next(statement);
+
+                switch (statement)
+                {
+                    case ClassDeclStatement classDeclStatement:
+                        foreach (var function in classDeclStatement.Body.Environment.Functions)
+                        {
+                            Next(function);
+                            functions.Add(function);
+                        }
+                        break;
+                    case FunctionDeclStatement functionDeclStatement:
+                        functions.Add(functionDeclStatement);
+                        break;
+                }
             }
 
-            foreach (var statement in _ast.Statements)
+            foreach (var functionDeclStatement in functions)
             {
-                if (statement is FunctionDeclStatement functionDeclStatement)
+                _current = new LlvmGeneratorContext
                 {
-                    _current = new LlvmGeneratorContext
-                    {
-                        Parent = null,
-                        Statement = statement
-                    };
+                    Parent = null,
+                    Statement = functionDeclStatement
+                };
 
-                    Next(functionDeclStatement.Body);
-                }
+                Next(functionDeclStatement.Body);
             }
 
             sbyte* moduleError;
@@ -56,6 +70,9 @@ namespace Caique.CodeGeneration
                 &moduleError
             );
             if (moduleError != null) Console.WriteLine(*moduleError);
+
+            // Print out the LLVM IR
+            LLVM.DumpModule(_llvmModule);
 
             // Everything below is temporary code for testing purpsoes
             LLVM.LinkInMCJIT();
@@ -93,7 +110,7 @@ namespace Caique.CodeGeneration
                 Console.WriteLine("Couldn't find main function.");
             }
 
-            LLVM.DumpModule(_llvmModule);
+            LLVM.ContextDispose(_context);
         }
 
         private void Next(Statement statement)
@@ -167,27 +184,77 @@ namespace Caique.CodeGeneration
             var returnType = functionDeclStatement.ReturnType?.DataType
                 ?? new DataType(TypeKeyword.Void);
 
-            LLVMTypeRef functionType = LLVM.FunctionType(
-                returnType.ToLLVMType(),
-                null,
-                0,
-                0
-            );
+            string identifier = functionDeclStatement.Identifier.Value;
 
-            LLVMValueRef function = LLVM.AddFunction(
-                _llvmModule,
-                functionDeclStatement.Identifier.Value.ToCString(),
-                functionType
-            );
+            // If it belongs to an object
+            int parameterOffset = 0;
+            if (functionDeclStatement.ParentObject != null)
+            {
+                identifier = identifier + "_" + functionDeclStatement
+                    .ParentObject.Identifier.Value;
+                parameterOffset++;
+            }
 
-            functionDeclStatement.LlvmValue = function;
+            // Convert to LLVM types
+            fixed (LLVMOpaqueType** parameters =
+                   new LLVMOpaqueType*[functionDeclStatement.Parameters.Count + parameterOffset])
+            {
+                foreach (var (parameter, i) in functionDeclStatement.Parameters.WithIndex())
+                {
+                    parameters[i + parameterOffset] = parameter.Type.DataType!.Value.ToLLVMType();
+                }
+
+                // If it belongs to an object, add the type of the object to the start of the array
+                if (functionDeclStatement.ParentObject != null)
+                {
+                    parameters[0] = functionDeclStatement.ParentObject.DataType!.Value.ToLLVMType();
+                }
+
+                LLVMTypeRef functionType = LLVM.FunctionType(
+                    returnType.ToLLVMType(),
+                    parameters,
+                    0,
+                    0
+                );
+
+                LLVMValueRef function = LLVM.AddFunction(
+                    _llvmModule,
+                    identifier.ToCString(),
+                    functionType
+                );
+
+                functionDeclStatement.LlvmValue = function;
+            }
 
             return null!;
         }
 
         public object Visit(ClassDeclStatement classDeclStatement)
         {
-            throw new NotImplementedException();
+            var variableDecls = classDeclStatement.Body.Environment.Variables;
+            fixed (LLVMOpaqueType** variableTypes = new LLVMOpaqueType*[variableDecls.Count])
+            {
+                foreach (var (variable, i) in variableDecls!.WithIndex())
+                {
+                    variableTypes[i] = variable.DataType!.Value.ToLLVMType();
+                }
+
+                var namedStruct = LLVM.StructCreateNamed(
+                    _context,
+                    ("class." + classDeclStatement.Identifier.Value).ToCString()
+                );
+
+                LLVM.StructSetBody(
+                    namedStruct,
+                    variableTypes,
+                    (uint)variableDecls.Count,
+                    0
+                );
+
+                classDeclStatement.LlvmType = namedStruct;
+            }
+
+            return null!;
         }
 
         public object Visit(UseStatement useStatement)
@@ -352,18 +419,39 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(CallExpression callExpression)
         {
             var identifier = callExpression.ModulePath[^1].Value;
-            return LLVM.BuildCall(
-                _builder,
-                callExpression.FunctionDecl!.LlvmValue!.Value,
-                null,
-                0,
-                identifier.ToCString()
-            );
+            var functionDecl = callExpression.FunctionDecl!;
+
+            // If the function belongs to an object, reserve the first spot for the object
+            int argumentOffset = functionDecl.ParentObject == null ? 0 : 1;
+            fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[callExpression.Arguments.Count + argumentOffset])
+            {
+                // Generate all the arguments
+                foreach (var (argument, i) in callExpression.Arguments.WithIndex())
+                {
+                    arguments[i + argumentOffset] = Next(argument);
+                }
+
+                // If the function belongs to an object, set the first argument to the object,
+                // which should be set already in the context.
+                if (functionDecl.ParentObject != null)
+                {
+                    arguments[0] = _current.FunctionCallParentObject!.Value;
+                }
+
+                var call = LLVM.BuildCall(
+                    _builder,
+                    functionDecl.LlvmValue!.Value,
+                    arguments,
+                    0,
+                    identifier.ToCString()
+                );
+                return call;
+            }
         }
 
         public LLVMValueRef Visit(TypeExpression typeExpression)
         {
-            throw new NotImplementedException();
+            throw new InvalidOperationException();
         }
 
         public LLVMValueRef Visit(IfExpression ifExpression)
@@ -414,11 +502,24 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(NewExpression newExpression)
         {
-            throw new NotImplementedException();
+            var type = newExpression.DataType!.Value.ObjectDecl!.LlvmType;
+            return LLVM.BuildMalloc(
+                _builder,
+                type!.Value,
+                "new".ToCString()
+            );
         }
 
         public LLVMValueRef Visit(DotExpression dotExpression)
         {
+            LLVMValueRef leftValue = Next(dotExpression.Left);
+
+            if (dotExpression.Right is CallExpression callExpression)
+            {
+                _current.FunctionCallParentObject = leftValue;
+                return Next(callExpression);
+            }
+
             throw new NotImplementedException();
         }
     }

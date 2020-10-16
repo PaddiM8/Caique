@@ -21,7 +21,7 @@ namespace Caique.CodeGeneration
                 TypeKeyword.f64 => LLVM.FloatType(),
                 TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Void => LLVM.VoidType(),
-                TypeKeyword.Identifier => throw new NotImplementedException(),
+                TypeKeyword.Identifier => dataType.ObjectDecl!.LlvmType!.Value,
                 TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };

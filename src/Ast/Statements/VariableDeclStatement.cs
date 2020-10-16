@@ -12,15 +12,19 @@ namespace Caique.Ast
 
         public TypeExpression? SpecifiedType { get; }
 
-        public DataType? DataType { get; set; }
+        public VariableType VariableType { get; }
 
-        public VariableDeclStatement(Token identifier, TextSpan span,
-                                     Expression? value, TypeExpression? type = null)
+        public VariableDeclStatement(Token identifier,
+                                     TextSpan span,
+                                     Expression? value,
+                                     TypeExpression? type = null,
+                                     VariableType variableType = VariableType.Local)
                                      : base(span)
         {
             Identifier = identifier;
             Value = value;
             SpecifiedType = type;
+            VariableType = variableType;
         }
     }
 }

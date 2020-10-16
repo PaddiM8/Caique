@@ -84,7 +84,8 @@ namespace Caique.Semantics
 
             try
             {
-                _environment.Add(variableDeclStatement);
+                if (variableDeclStatement.VariableType == VariableType.Local)
+                    _environment.Add(variableDeclStatement);
             }
             catch (ArgumentException)
             {
@@ -96,9 +97,9 @@ namespace Caique.Semantics
 
         public object Visit(ReturnStatement returnStatement)
         {
-            _current.DataType = _current.FunctionType;
+            _current.DataType = _current.CurrentFunctionType;
             var type = Next(returnStatement.Expression);
-            CheckTypes(_current.FunctionType!.Value, type, returnStatement.Span);
+            CheckTypes(_current.CurrentFunctionType!.Value, type, returnStatement.Span);
 
             return null!;
         }
@@ -116,14 +117,19 @@ namespace Caique.Semantics
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
         {
-            _current.FunctionType = functionDeclStatement.ReturnType == null
+            _current.CurrentFunctionType = functionDeclStatement.ReturnType == null
                 ? _voidType
                 : Next(functionDeclStatement.ReturnType);
-            _current.DataType = _current.FunctionType;
+            _current.DataType = _current.CurrentFunctionType;
+
+            if (_current.CurrentObject != null)
+            {
+                functionDeclStatement.ParentObject = _current.CurrentObject;
+            }
 
             var bodyType = Next(functionDeclStatement.Body);
             CheckTypes(
-                _current.FunctionType!.Value,
+                _current.CurrentFunctionType!.Value,
                 bodyType,
                 functionDeclStatement.Body.Span
             );
@@ -133,6 +139,12 @@ namespace Caique.Semantics
 
         public object Visit(ClassDeclStatement classDeclStatement)
         {
+            _current.CurrentObject = classDeclStatement;
+            classDeclStatement.DataType = new DataType(
+                TypeKeyword.Identifier,
+                classDeclStatement
+            );
+
             var ancestor = classDeclStatement.Inherited;
             if (ancestor != null)
             {
@@ -210,7 +222,7 @@ namespace Caique.Semantics
         {
             var leftType = Next(dotExpression.Left);
 
-            // If it's a user-made class
+            // If it's an object
             if (leftType.Type == TypeKeyword.Identifier)
             {
                 var classDecl = leftType.ObjectDecl!;
@@ -227,6 +239,7 @@ namespace Caique.Semantics
                     var function = classDecl.GetFunction(identifier.Value);
                     var type = CheckCall(identifier, function, callExpression.Arguments);
                     callExpression.DataType = type;
+                    callExpression.FunctionDecl = function;
 
                     return type;
                 }

@@ -269,8 +269,8 @@ namespace Caique.Parsing
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
             while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
             {
-                if (Match(TokenKind.Fn)) ParseFunctionDecl();
-                else ParseObjectVariableDecl();
+                if (Match(TokenKind.Fn)) statements.Add(ParseFunctionDecl());
+                else statements.Add(ParseObjectVariableDecl());
             }
 
             var statement = new BlockExpression(
@@ -302,7 +302,8 @@ namespace Caique.Parsing
                 identifier,
                 identifier.Span.Add(type.Span),
                 value,
-                type
+                type,
+                VariableType.Object
             );
 
             _symbolEnvironment.Add(statement);
