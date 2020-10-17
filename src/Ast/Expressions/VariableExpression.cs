@@ -8,6 +8,7 @@ namespace Caique.Ast
     {
         public Token Identifier { get; }
 
+        public VariableDeclStatement? VariableDecl { get; set; }
         public VariableExpression(Token identifier)
             : base(identifier.Span)
         {

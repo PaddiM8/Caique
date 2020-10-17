@@ -18,7 +18,7 @@ namespace Caique.CodeGeneration
         private LlvmGeneratorContext _current = new LlvmGeneratorContext();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate float Main();
+        private delegate int Main();
 
         public LllvmGenerator(AbstractSyntaxTree ast)
         {
@@ -148,7 +148,7 @@ namespace Caique.CodeGeneration
                 identifier.ToCString()
             );
 
-            _current.Parent!.AddVariable(identifier, alloca);
+            variableDeclStatement.LlvmValue = alloca;
 
             if (variableDeclStatement.Value != null)
             {
@@ -171,12 +171,13 @@ namespace Caique.CodeGeneration
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            LLVMValueRef value = Next(assignmentStatement.Value);
+            /*LLVMValueRef value = Next(assignmentStatement.Value);
             var leftIdentifier = assignmentStatement.Variable.Identifier.Value;
             var variableRef = _current.GetVariable(leftIdentifier)!.Value;
-            LLVM.BuildStore(_builder, value, variableRef);
+            LLVM.BuildStore(_builder, value, variableRef);*/
+            throw new NotImplementedException();
 
-            return null!;
+            //return null!;
         }
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
@@ -406,14 +407,11 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(VariableExpression variableExpression)
         {
             string identifier = variableExpression.Identifier.Value;
-            var value = _current.GetVariable(identifier)!.Value;
-            value = LLVM.BuildLoad(
+            return LLVM.BuildLoad(
                 _builder,
-                value,
+                variableExpression.VariableDecl!.LlvmValue!.Value,
                 ("l" + identifier).ToCString()
             );
-
-            return value;
         }
 
         public LLVMValueRef Visit(CallExpression callExpression)
@@ -435,17 +433,16 @@ namespace Caique.CodeGeneration
                 // which should be set already in the context.
                 if (functionDecl.ParentObject != null)
                 {
-                    arguments[0] = _current.FunctionCallParentObject!.Value;
+                    arguments[0] = _current.DotExpressionObject!.Value;
                 }
 
-                var call = LLVM.BuildCall(
+                return LLVM.BuildCall(
                     _builder,
                     functionDecl.LlvmValue!.Value,
                     arguments,
                     0,
                     identifier.ToCString()
                 );
-                return call;
             }
         }
 
@@ -512,12 +509,30 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(DotExpression dotExpression)
         {
-            LLVMValueRef leftValue = Next(dotExpression.Left);
-
-            if (dotExpression.Right is CallExpression callExpression)
+            if (dotExpression.Right is CallExpression _)
             {
-                _current.FunctionCallParentObject = leftValue;
-                return Next(callExpression);
+                _current.DotExpressionObject = Next(dotExpression.Left);
+                var value = Next(dotExpression.Right);
+                _current.DotExpressionObject = null;
+
+                return value;
+            }
+            else if (dotExpression.Right is VariableExpression _)
+            {
+                var left = (VariableExpression)dotExpression.Left;
+                var variableDecl = left.VariableDecl!;
+                var elementPointer = LLVM.BuildStructGEP(
+                    _builder,
+                    variableDecl.LlvmValue!.Value,
+                    (uint)variableDecl.IndexInObject,
+                    "member".ToCString()
+                );
+
+                return LLVM.BuildLoad(
+                    _builder,
+                    elementPointer,
+                    "load".ToCString()
+                );
             }
 
             throw new NotImplementedException();

@@ -267,10 +267,17 @@ namespace Caique.Parsing
             var start = Expect(TokenKind.OpenBrace).Span;
             var statements = new List<Statement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
+            int variableDeclIndex = 0;
             while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
             {
-                if (Match(TokenKind.Fn)) statements.Add(ParseFunctionDecl());
-                else statements.Add(ParseObjectVariableDecl());
+                if (Match(TokenKind.Fn))
+                {
+                    statements.Add(ParseFunctionDecl());
+                }
+                else
+                {
+                    statements.Add(ParseObjectVariableDecl(variableDeclIndex++));
+                }
             }
 
             var statement = new BlockExpression(
@@ -284,7 +291,7 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private VariableDeclStatement ParseObjectVariableDecl()
+        private VariableDeclStatement ParseObjectVariableDecl(int index)
         {
             var identifier = Expect(TokenKind.Identifier);
             Expect(TokenKind.Colon);
@@ -303,7 +310,8 @@ namespace Caique.Parsing
                 identifier.Span.Add(type.Span),
                 value,
                 type,
-                VariableType.Object
+                VariableType.Object,
+                index
             );
 
             _symbolEnvironment.Add(statement);

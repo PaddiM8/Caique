@@ -15,10 +15,7 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef? BlockReturnValueAlloca { get; set; }
 
-        public LLVMValueRef? FunctionCallParentObject { get; set; }
-
-        private readonly Dictionary<string, LLVMValueRef> _variables =
-            new Dictionary<string, LLVMValueRef>();
+        public LLVMValueRef? DotExpressionObject { get; set; }
 
         public LlvmGeneratorContext CreateChild(Statement statement)
         {
@@ -37,28 +34,8 @@ namespace Caique.CodeGeneration
                 Parent = this,
                 Expression = expression,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
-                FunctionCallParentObject = expression is CallExpression ? FunctionCallParentObject : null
+                DotExpressionObject = DotExpressionObject,
             };
-        }
-
-        public void AddVariable(string identifier, LLVMValueRef value)
-        {
-            _variables.Add(identifier, value);
-        }
-
-        public LLVMValueRef? GetVariable(string identifier)
-        {
-            if (Expression is BlockExpression &&
-                _variables.TryGetValue(identifier, out LLVMValueRef value))
-            {
-                return value;
-            }
-            else
-            {
-                if (Parent == null) return null;
-
-                return Parent.GetVariable(identifier);
-            }
         }
     }
 }

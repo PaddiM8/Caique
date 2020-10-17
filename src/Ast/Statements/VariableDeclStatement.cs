@@ -14,17 +14,21 @@ namespace Caique.Ast
 
         public VariableType VariableType { get; }
 
+        public int IndexInObject { get; }
+
         public VariableDeclStatement(Token identifier,
                                      TextSpan span,
                                      Expression? value,
                                      TypeExpression? type = null,
-                                     VariableType variableType = VariableType.Local)
+                                     VariableType variableType = VariableType.Local,
+                                     int indexInObject = 0)
                                      : base(span)
         {
             Identifier = identifier;
             Value = value;
             SpecifiedType = type;
             VariableType = variableType;
+            IndexInObject = indexInObject;
         }
     }
 }

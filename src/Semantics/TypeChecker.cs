@@ -249,6 +249,7 @@ namespace Caique.Semantics
                     var variable = classDecl.GetVariable(identifier.Value);
                     var type = CheckVariableDecl(identifier, variable);
                     variableExpression.DataType = type;
+                    variableExpression.VariableDecl = variable;
 
                     return type;
                 }
@@ -325,6 +326,7 @@ namespace Caique.Semantics
             var variableDecl = _environment.GetVariable(variableName.Value);
             var type = CheckVariableDecl(variableName, variableDecl);
             variableExpression.DataType = type;
+            variableExpression.VariableDecl = variableDecl;
 
             return type;
         }
