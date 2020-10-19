@@ -106,7 +106,7 @@ namespace Caique.Semantics
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            var variableType = Next(assignmentStatement.Variable);
+            var variableType = Next(assignmentStatement.Assignee);
             _current.DataType = variableType;
             var valueType = Next(assignmentStatement.Value);
 

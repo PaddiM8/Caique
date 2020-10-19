@@ -118,46 +118,38 @@ namespace Caique.Parsing
             // Assignment statement parsing
             if (Current.Kind.IsAssignmentOperator())
             {
-                if (expressionStatement.Expression is VariableExpression variableExpression)
-                {
-                    return ParseAssignment(variableExpression);
-                }
-                else
-                {
-                    _diagnostics.ReportMisplacedAssignmentOperator(Current);
-                    throw new ParsingErrorException();
-                }
+                return ParseAssignment(expressionStatement.Expression);
             }
 
             return expressionStatement;
         }
 
-        private AssignmentStatement ParseAssignment(VariableExpression variableExpression)
+        private AssignmentStatement ParseAssignment(Expression expression)
         {
             var op = Advance();
             var value = ParseExpression();
             Expect(TokenKind.Semicolon);
 
-            var binaryOpKind = op.Kind switch
+            TokenKind? modifyingOpKind = op.Kind switch
             {
                 TokenKind.PlusEquals => TokenKind.Plus,
                 TokenKind.MinusEquals => TokenKind.Minus,
                 TokenKind.StarEquals => TokenKind.Star,
                 TokenKind.SlashEquals => TokenKind.Slash,
-                _ => throw new NotImplementedException()
+                _ => null,
             };
 
             // Turn eg. x += 3 into x = x + 3
-            if (op.Kind != TokenKind.EqualsEquals)
+            if (modifyingOpKind != null)
             {
                 value = new BinaryExpression(
-                    variableExpression,
-                    new Token(binaryOpKind, "", op.Span), // Turn eg. += into +
+                    expression,
+                    new Token(modifyingOpKind!.Value, "", op.Span), // Turn eg. += into +
                     value
                 );
             }
 
-            return new AssignmentStatement(variableExpression, op, value);
+            return new AssignmentStatement(expression, value);
         }
 
         private VariableDeclStatement ParseVariableDecl()

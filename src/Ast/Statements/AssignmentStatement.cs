@@ -1,22 +1,20 @@
 ﻿using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 
 namespace Caique.Ast
 {
     public class AssignmentStatement : Statement
     {
-        public VariableExpression Variable { get; }
-
-        public Token Operator { get; }
+        public Expression Assignee { get; }
 
         public Expression Value { get; }
 
-        public AssignmentStatement(VariableExpression identifier, Token op,
+        public AssignmentStatement(Expression left,
                                    Expression value)
-                                   : base(identifier.Span.Add(value.Span))
+                                   : base(left.Span.Add(value.Span))
         {
-            Variable = identifier;
-            Operator = op;
+            Assignee = left;
             Value = value;
         }
     }

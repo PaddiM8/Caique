@@ -140,11 +140,18 @@ namespace Caique.CodeGeneration
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
             string identifier = variableDeclStatement.Identifier.Value;
+            LLVMTypeRef type = variableDeclStatement.DataType!.Value.ToLLVMType();
+
+            // If it's a class, the type should be a pointer
+            if (variableDeclStatement.DataType?.ObjectDecl != null)
+            {
+                type = LLVM.PointerType(type, 0);
+            }
 
             // Allocate variable
             LLVMValueRef alloca = LLVM.BuildAlloca(
                 _builder,
-                variableDeclStatement.DataType!.Value.ToLLVMType(),
+                type,
                 identifier.ToCString()
             );
 
@@ -171,13 +178,11 @@ namespace Caique.CodeGeneration
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            /*LLVMValueRef value = Next(assignmentStatement.Value);
-            var leftIdentifier = assignmentStatement.Variable.Identifier.Value;
-            var variableRef = _current.GetVariable(leftIdentifier)!.Value;
-            LLVM.BuildStore(_builder, value, variableRef);*/
-            throw new NotImplementedException();
+            LLVMValueRef assignee = Next(assignmentStatement.Assignee);
+            LLVMValueRef value = Next(assignmentStatement.Value);
+            LLVM.BuildStore(_builder, value, assignee);
 
-            //return null!;
+            return null!;
         }
 
         public object Visit(FunctionDeclStatement functionDeclStatement)
@@ -191,7 +196,7 @@ namespace Caique.CodeGeneration
             int parameterOffset = 0;
             if (functionDeclStatement.ParentObject != null)
             {
-                identifier = identifier + "_" + functionDeclStatement
+                identifier = identifier + "." + functionDeclStatement
                     .ParentObject.Identifier.Value;
                 parameterOffset++;
             }
@@ -517,25 +522,36 @@ namespace Caique.CodeGeneration
 
                 return value;
             }
-            else if (dotExpression.Right is VariableExpression _)
+            else if (dotExpression.Right is VariableExpression variableExpression)
             {
                 var left = (VariableExpression)dotExpression.Left;
                 var variableDecl = left.VariableDecl!;
+
+                // Get the pointer of the field in the struct
                 var elementPointer = LLVM.BuildStructGEP(
                     _builder,
-                    variableDecl.LlvmValue!.Value,
+                    Next(dotExpression.Left),
                     (uint)variableDecl.IndexInObject,
-                    "member".ToCString()
+                    variableExpression.Identifier.Value.ToCString()
                 );
 
-                return LLVM.BuildLoad(
-                    _builder,
-                    elementPointer,
-                    "load".ToCString()
-                );
+                // If it's for an assignment statement, it shouldn't be loaded,
+                // since it's just going to be assigned to.
+                if (_current.Parent?.Statement is AssignmentStatement)
+                {
+                    return elementPointer;
+                }
+                else
+                {
+                    return LLVM.BuildLoad(
+                        _builder,
+                        elementPointer,
+                        "load".ToCString()
+                    );
+                }
             }
 
-            throw new NotImplementedException();
+            throw new InvalidOperationException();
         }
     }
 }

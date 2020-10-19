@@ -105,8 +105,8 @@ namespace Caique.Ast
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            PrintStart(assignmentStatement.Operator.Kind.ToStringRepresentation(), ConsoleColor.Green);
-            Next(assignmentStatement.Variable);
+            PrintStart("=", ConsoleColor.Green);
+            Next(assignmentStatement.Assignee);
             Next(assignmentStatement.Value);
             _indentationLevel--;
 
