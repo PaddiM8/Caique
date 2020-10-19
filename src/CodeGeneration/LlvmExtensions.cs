@@ -7,7 +7,7 @@ namespace Caique.CodeGeneration
 {
     public static class LlvmExtensions
     {
-        public static unsafe LLVMOpaqueType* ToLLVMType(this DataType dataType)
+        public static unsafe LLVMOpaqueType* ToLlvmType(this DataType dataType)
         {
             var keyword = dataType.Type;
 

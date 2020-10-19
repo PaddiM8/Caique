@@ -140,7 +140,7 @@ namespace Caique.CodeGeneration
         public object Visit(VariableDeclStatement variableDeclStatement)
         {
             string identifier = variableDeclStatement.Identifier.Value;
-            LLVMTypeRef type = variableDeclStatement.DataType!.Value.ToLLVMType();
+            LLVMTypeRef type = variableDeclStatement.DataType!.Value.ToLlvmType();
 
             // If it's a class, the type should be a pointer
             if (variableDeclStatement.DataType?.ObjectDecl != null)
@@ -207,17 +207,17 @@ namespace Caique.CodeGeneration
             {
                 foreach (var (parameter, i) in functionDeclStatement.Parameters.WithIndex())
                 {
-                    parameters[i + parameterOffset] = parameter.Type.DataType!.Value.ToLLVMType();
+                    parameters[i + parameterOffset] = parameter.Type.DataType!.Value.ToLlvmType();
                 }
 
                 // If it belongs to an object, add the type of the object to the start of the array
                 if (functionDeclStatement.ParentObject != null)
                 {
-                    parameters[0] = functionDeclStatement.ParentObject.DataType!.Value.ToLLVMType();
+                    parameters[0] = functionDeclStatement.ParentObject.DataType!.Value.ToLlvmType();
                 }
 
                 LLVMTypeRef functionType = LLVM.FunctionType(
-                    returnType.ToLLVMType(),
+                    returnType.ToLlvmType(),
                     parameters,
                     0,
                     0
@@ -242,7 +242,7 @@ namespace Caique.CodeGeneration
             {
                 foreach (var (variable, i) in variableDecls!.WithIndex())
                 {
-                    variableTypes[i] = variable.DataType!.Value.ToLLVMType();
+                    variableTypes[i] = variable.DataType!.Value.ToLlvmType();
                 }
 
                 var namedStruct = LLVM.StructCreateNamed(
@@ -473,7 +473,7 @@ namespace Caique.CodeGeneration
                 // The block expression will use this alloca and give it a value.
                 _current.BlockReturnValueAlloca = LLVM.BuildAlloca(
                     _builder,
-                    ifExpression.DataType!.Value.ToLLVMType(),
+                    ifExpression.DataType!.Value.ToLlvmType(),
                     "retVal".ToCString()
                 );
             }
