@@ -178,7 +178,11 @@ namespace Caique.CodeGeneration
 
         public object Visit(AssignmentStatement assignmentStatement)
         {
-            LLVMValueRef assignee = Next(assignmentStatement.Assignee);
+            // If it's a normal variable, get the LLVM value of its declaration,
+            // otherwise just get its pointer.
+            LLVMValueRef assignee = assignmentStatement.Assignee is VariableExpression variableExpression
+                ? variableExpression.VariableDecl!.LlvmValue!.Value
+                : Next(assignmentStatement.Assignee);
             LLVMValueRef value = Next(assignmentStatement.Value);
             LLVM.BuildStore(_builder, value, assignee);
 
