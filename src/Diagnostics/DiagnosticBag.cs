@@ -38,12 +38,12 @@ namespace Caique.Diagnostics
             );
         }
 
-        public void ReportMisplacedAssignmentOperator(Token comparisonOperator)
+        public void ReportMisplacedAssignmentOperator(TextSpan span)
         {
             Report(
                 DiagnosticIdentifier.MisplacedAssignmentOperator,
                 $"Misplaced comparison operator. Expected the left-hand expression to be a variable.",
-                comparisonOperator.Span,
+                span,
                 DiagnosticType.Error
             );
         }

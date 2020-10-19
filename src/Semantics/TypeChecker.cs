@@ -112,6 +112,21 @@ namespace Caique.Semantics
 
             CheckTypes(variableType, valueType);
 
+            // Go through the asignee and make sure it can be assigned to
+            var statement = assignmentStatement.Assignee;
+            while (!(statement is VariableExpression))
+            {
+                if (statement is DotExpression dotExpression)
+                {
+                    statement = dotExpression.Right;
+                }
+                else
+                {
+                    _diagnostics.ReportMisplacedAssignmentOperator(assignmentStatement.Span);
+                    break;
+                }
+            }
+
             return null!;
         }
 
