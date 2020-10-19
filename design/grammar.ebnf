@@ -19,7 +19,7 @@ statement = expressionStmt
           | returnStmt ;
 expressionStmt = expression , ";" ;
 blockStmt = [{ varDecl | statement }] ;
-assignmentStmt = variableExpr , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
+assignmentStmt = expression , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
 returnStmt = "ret" , expression ;
 
 expression = precedenceExpr ;
