@@ -8,7 +8,8 @@ declaration = classDecl
             | varDecl ;
 classDecl = "class" , identifier , parameters , [ ":" , type , { ", " type } ] , blockStmt ;
 functionDecl = "fn" , identifier , parameters , [ ":" , type ] , blockStmt ;
-varDecl = "let" , identifier , "=" , expression , ";" ;
+varDecl = "let" , identifier [ ":",  type ] , "=" , expression , ";" ;
+objVarDecl = identifier ":" , type , [ "=" , expression ] , ";" ;
 
 parameters = "(" , [ parameter , [{ "," , parameter }] ] , ")" ;
 parameter = identifier , ":" , type ;
@@ -19,7 +20,9 @@ statement = expressionStmt
           | returnStmt ;
 expressionStmt = expression , ";" ;
 blockStmt = [{ varDecl | statement }] ;
+classBlody = [{ objectVarDecl | initStmt | statement }] ;
 assignmentStmt = expression , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
+initStmt = "init" , blockStmt ;
 returnStmt = "ret" , expression ;
 
 expression = precedenceExpr ;
