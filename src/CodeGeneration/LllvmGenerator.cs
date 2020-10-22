@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Caique.Ast;
 using Caique.Parsing;
@@ -9,7 +10,7 @@ using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
 {
-    public unsafe class LllvmGenerator : IAstTraverser<object, LLVMValueRef>
+    public unsafe class LllvmGenerator : IAstTraverser<LLVMValueRef, LLVMValueRef>
     {
         private readonly AbstractSyntaxTree _ast;
         private readonly LLVMContextRef _context;
@@ -113,40 +114,36 @@ namespace Caique.CodeGeneration
             LLVM.ContextDispose(_context);
         }
 
-        private void Next(Statement statement)
+        private LLVMValueRef Next(Statement statement)
         {
             _current = _current.CreateChild(statement);
-            ((IAstTraverser<object, LLVMValueRef>)this).Next(statement);
+            var value = ((IAstTraverser<LLVMValueRef, LLVMValueRef>)this).Next(statement);
             _current = _current.Parent!;
+
+            return value;
         }
 
         private LLVMValueRef Next(Expression expression)
         {
             _current = _current.CreateChild(expression);
-            var value = ((IAstTraverser<object, LLVMValueRef>)this).Next(expression);
+            var value = ((IAstTraverser<LLVMValueRef, LLVMValueRef>)this).Next(expression);
             _current = _current.Parent!;
 
             return value;
         }
 
 
-        public object Visit(ExpressionStatement expressionStatement)
+        public LLVMValueRef Visit(ExpressionStatement expressionStatement)
         {
             Next(expressionStatement.Expression);
 
             return null!;
         }
 
-        public object Visit(VariableDeclStatement variableDeclStatement)
+        public LLVMValueRef Visit(VariableDeclStatement variableDeclStatement)
         {
             string identifier = variableDeclStatement.Identifier.Value;
             LLVMTypeRef type = variableDeclStatement.DataType!.Value.ToLlvmType();
-
-            // If it's a class, the type should be a pointer
-            if (variableDeclStatement.DataType?.ObjectDecl != null)
-            {
-                type = LLVM.PointerType(type, 0);
-            }
 
             // Allocate variable
             LLVMValueRef alloca = LLVM.BuildAlloca(
@@ -166,7 +163,7 @@ namespace Caique.CodeGeneration
             return null!;
         }
 
-        public object Visit(ReturnStatement returnStatement)
+        public LLVMValueRef Visit(ReturnStatement returnStatement)
         {
             LLVM.BuildRet(
                 _builder,
@@ -176,7 +173,7 @@ namespace Caique.CodeGeneration
             return null!;
         }
 
-        public object Visit(AssignmentStatement assignmentStatement)
+        public LLVMValueRef Visit(AssignmentStatement assignmentStatement)
         {
             // If it's a normal variable, get the LLVM value of its declaration,
             // otherwise just get its pointer.
@@ -189,12 +186,12 @@ namespace Caique.CodeGeneration
             return null!;
         }
 
-        public object Visit(FunctionDeclStatement functionDeclStatement)
+        public LLVMValueRef Visit(FunctionDeclStatement functionDeclStatement)
         {
             var returnType = functionDeclStatement.ReturnType?.DataType
                 ?? new DataType(TypeKeyword.Void);
-
             string identifier = functionDeclStatement.Identifier.Value;
+            var parameterDataTypes = new List<DataType>();
 
             // If it belongs to an object
             int parameterOffset = 0;
@@ -203,71 +200,90 @@ namespace Caique.CodeGeneration
                 identifier = identifier + "." + functionDeclStatement
                     .ParentObject.Identifier.Value;
                 parameterOffset++;
+
+                // Add the parent object type as the first parameter
+                parameterDataTypes.Add(functionDeclStatement.ParentObject.DataType!.Value);
             }
 
-            // Convert to LLVM types
-            fixed (LLVMOpaqueType** parameters =
-                   new LLVMOpaqueType*[functionDeclStatement.Parameters.Count + parameterOffset])
-            {
-                foreach (var (parameter, i) in functionDeclStatement.Parameters.WithIndex())
-                {
-                    parameters[i + parameterOffset] = parameter.Type.DataType!.Value.ToLlvmType();
-                }
+            // Add the parameter types to the parameter list
+            parameterDataTypes.AddRange(
+                functionDeclStatement.Parameters.Select(x => x.Type.DataType!.Value)
+            );
 
-                // If it belongs to an object, add the type of the object to the start of the array
-                if (functionDeclStatement.ParentObject != null)
-                {
-                    parameters[0] = functionDeclStatement.ParentObject.DataType!.Value.ToLlvmType();
-                }
+            LLVMTypeRef functionType = LLVM.FunctionType(
+                returnType.ToLlvmType(),
+                parameterDataTypes.ToLlvmTypeArray(),
+                (uint)parameterDataTypes.Count,
+                0
+            );
+            LLVMValueRef function = LLVM.AddFunction(
+                _llvmModule,
+                identifier.ToCString(),
+                functionType
+            );
 
-                LLVMTypeRef functionType = LLVM.FunctionType(
-                    returnType.ToLlvmType(),
-                    parameters,
-                    0,
-                    0
-                );
+            functionDeclStatement.LlvmValue = function;
 
-                LLVMValueRef function = LLVM.AddFunction(
-                    _llvmModule,
-                    identifier.ToCString(),
-                    functionType
-                );
-
-                functionDeclStatement.LlvmValue = function;
-            }
-
-            return null!;
+            return function;
         }
 
-        public object Visit(ClassDeclStatement classDeclStatement)
+        public LLVMValueRef Visit(ClassDeclStatement classDeclStatement)
         {
+            // Create the struct type
+            string identifier = classDeclStatement.Identifier.Value;
+            var namedStruct = LLVM.StructCreateNamed(
+                _context,
+                ("class." + identifier).ToCString()
+            );
+
+            // Set the structure field types
             var variableDecls = classDeclStatement.Body.Environment.Variables;
-            fixed (LLVMOpaqueType** variableTypes = new LLVMOpaqueType*[variableDecls.Count])
+            var fieldTypes = variableDecls
+                .Select(x => x!.DataType!.Value)
+                .ToList()
+                .ToLlvmTypeArray();
+
+            LLVM.StructSetBody(
+                namedStruct,
+                fieldTypes,
+                (uint)variableDecls.Count,
+                0
+            );
+
+            classDeclStatement.LlvmType = namedStruct;
+
+            // Constructor parameters
+            var parameterDataTypes = new List<DataType>
             {
-                foreach (var (variable, i) in variableDecls!.WithIndex())
-                {
-                    variableTypes[i] = variable.DataType!.Value.ToLlvmType();
-                }
+                classDeclStatement.DataType!.Value
+            };
+            parameterDataTypes.AddRange(
+                classDeclStatement.ParameterRefDecls!
+                    .Select(x => x.DataType!.Value)
+            );
 
-                var namedStruct = LLVM.StructCreateNamed(
-                    _context,
-                    ("class." + classDeclStatement.Identifier.Value).ToCString()
-                );
+            // Constructor function
+            LLVMTypeRef functionType = LLVM.FunctionType(
+                LLVM.VoidType(),
+                parameterDataTypes.ToLlvmTypeArray(),
+                (uint)parameterDataTypes.Count,
+                0
+            );
+            LLVMValueRef function = LLVM.AddFunction(
+                _llvmModule,
+                (identifier + "." + identifier).ToCString(),
+                functionType
+            );
 
-                LLVM.StructSetBody(
-                    namedStruct,
-                    variableTypes,
-                    (uint)variableDecls.Count,
-                    0
-                );
+            classDeclStatement.InitLlvmValue = function;
 
-                classDeclStatement.LlvmType = namedStruct;
-            }
+            if (classDeclStatement.InitBody != null)
+                Next(classDeclStatement.InitBody);
 
             return null!;
         }
 
-        public object Visit(UseStatement useStatement)
+        public LLVMValueRef Visit(UseStatement useStatement)
         {
             throw new NotImplementedException();
         }
@@ -356,6 +372,16 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
             var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
+
+            // If the previous statement was a class
+            // and the class object has an InitLlvmValue set,
+            // use that value instead.
+            if (_current.Parent!.Statement is ClassDeclStatement classDeclStatement &&
+                classDeclStatement.InitLlvmValue != null)
+            {
+                parentStatementValue = classDeclStatement.InitLlvmValue;
+            }
+
             if (parentStatementValue != null)
             {
                 LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
@@ -394,20 +420,18 @@ namespace Caique.CodeGeneration
             }
 
             // If it belongs to a function
-            if (_current.Parent.Statement is FunctionDeclStatement functionDeclStatement)
+            // Build the appropriate return statement for the function
+            if (_current.Parent.Statement is FunctionDeclStatement functionDeclStatement &&
+                functionDeclStatement.Body.DataType?.Type != TypeKeyword.Void)
             {
-                // Build the appropriate return statement for the function
-                if (functionDeclStatement.Body.DataType?.Type == TypeKeyword.Void)
-                {
-                    LLVM.BuildRetVoid(_builder);
-                }
-                else
-                {
-                    LLVM.BuildRet(
-                        _builder,
-                        returnValue!.Value
-                    );
-                }
+                LLVM.BuildRet(
+                    _builder,
+                    returnValue!.Value
+                );
+            }
+            else
+            {
+                LLVM.BuildRetVoid(_builder);
             }
 
             return returnValue ?? null;
@@ -430,7 +454,8 @@ namespace Caique.CodeGeneration
 
             // If the function belongs to an object, reserve the first spot for the object
             int argumentOffset = functionDecl.ParentObject == null ? 0 : 1;
-            fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[callExpression.Arguments.Count + argumentOffset])
+            int argumentCount = callExpression.Arguments.Count + argumentOffset;
+            fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
             {
                 // Generate all the arguments
                 foreach (var (argument, i) in callExpression.Arguments.WithIndex())
@@ -449,7 +474,7 @@ namespace Caique.CodeGeneration
                     _builder,
                     functionDecl.LlvmValue!.Value,
                     arguments,
-                    0,
+                    (uint)argumentCount,
                     identifier.ToCString()
                 );
             }
@@ -508,12 +533,46 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(NewExpression newExpression)
         {
-            var type = newExpression.DataType!.Value.ObjectDecl!.LlvmType;
-            return LLVM.BuildMalloc(
+            var objectDecl = newExpression.DataType!.Value.ObjectDecl!;
+            var type = objectDecl.LlvmType;
+            var malloc = LLVM.BuildMalloc(
                 _builder,
                 type!.Value,
                 "new".ToCString()
             );
+
+            // Arguments
+            int argumentCount = newExpression.Arguments.Count + 1;
+            fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
+            {
+                // Generate all the arguments specified arguments and do the assignments
+                foreach (var (argument, i) in newExpression.Arguments.WithIndex())
+                {
+                    arguments[i + 1] = Next(argument);
+
+                    // Get the pointer to the struct field, and assign the argument value to it.
+                    var structField = LLVM.BuildStructGEP(
+                        _builder,
+                        malloc,
+                        (uint)objectDecl.ParameterRefDecls![i].IndexInObject,
+                        "paramAssignment".ToCString()
+                    );
+                    LLVM.BuildStore(_builder, arguments[i], structField);
+                }
+
+                // Call the constructor in this particular object
+                arguments[0] = malloc;
+
+                LLVM.BuildCall(
+                    _builder,
+                    objectDecl.InitLlvmValue!.Value,
+                    arguments,
+                    (uint)argumentCount,
+                    "".ToCString()
+                );
+            }
+
+            return malloc;
         }
 
         public LLVMValueRef Visit(DotExpression dotExpression)

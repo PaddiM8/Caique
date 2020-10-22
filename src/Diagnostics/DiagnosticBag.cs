@@ -27,6 +27,16 @@ namespace Caique.Diagnostics
             _diagnostics.AddRange(diagnostics);
         }
 
+        public void ReportCanOnlyHaveOneConstructor(Token initToken)
+        {
+            Report(
+                DiagnosticIdentifier.CanOnlyHaveOneConstructor,
+                $"An object can only contain one constructor (init).",
+                initToken.Span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportInvalidModulePath(List<Token> identifiers)
         {
             var path = string.Join("->", identifiers.Select(x => x.Value));

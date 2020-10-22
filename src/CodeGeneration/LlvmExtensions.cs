@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 using Caique.Semantics;
+using Caique.Util;
 using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
@@ -21,10 +23,24 @@ namespace Caique.CodeGeneration
                 TypeKeyword.f64 => LLVM.FloatType(),
                 TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Void => LLVM.VoidType(),
-                TypeKeyword.Identifier => dataType.ObjectDecl!.LlvmType!.Value,
+                TypeKeyword.Identifier => LLVM.PointerType(dataType.ObjectDecl!.LlvmType!.Value, 0),
                 TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };
+        }
+
+        public static unsafe LLVMOpaqueType** ToLlvmTypeArray(this ICollection<DataType> dataTypes)
+        {
+            var llvmTypes = new LLVMOpaqueType*[dataTypes.Count];
+            foreach (var (dataType, i) in dataTypes.WithIndex())
+            {
+                llvmTypes[i] = dataType.ToLlvmType();
+            }
+
+            fixed (LLVMOpaqueType** llvmTypesPointer = llvmTypes)
+            {
+                return llvmTypesPointer;
+            }
         }
 
         public static LLVMOpcode ToLlvmOpcode(this TokenKind kind, bool isFloat)

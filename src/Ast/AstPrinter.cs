@@ -87,7 +87,7 @@ namespace Caique.Ast
         {
             PrintStart("Class: " + classDeclStatement.Identifier.Value, ConsoleColor.DarkGreen);
 
-            foreach (var parameter in classDeclStatement.ParameterRefs)
+            foreach (var parameter in classDeclStatement.ParameterRefTokens)
                 PrintMiddle(parameter.Value, ConsoleColor.Green);
             _indentationLevel--;
 

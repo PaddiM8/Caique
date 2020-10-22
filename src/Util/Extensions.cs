@@ -12,10 +12,14 @@ namespace Caique.Util
 
         public unsafe static sbyte* ToCString(this string str)
         {
-            fixed (byte* ptr = &Encoding.Default.GetBytes(str)[0])
+            if (str == "")
             {
-                return (sbyte*)ptr;
+                fixed (sbyte* ptr = new[] { (sbyte)'\0' })
+                    return ptr;
             }
+
+            fixed (byte* ptr = &Encoding.Default.GetBytes(str)[0])
+                return (sbyte*)ptr;
         }
     }
 }

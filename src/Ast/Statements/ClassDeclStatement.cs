@@ -5,13 +5,17 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class ClassDeclStatement : Statement
+    public partial class ClassDeclStatement : Statement
     {
         public Token Identifier { get; }
 
-        public List<Token> ParameterRefs { get; }
+        public List<Token> ParameterRefTokens { get; }
+
+        public List<VariableDeclStatement>? ParameterRefDecls { get; set; }
 
         public BlockExpression Body { get; }
+
+        public BlockExpression? InitBody { get; set; }
 
         public ClassDeclStatement? Inherited
         {
@@ -32,13 +36,15 @@ namespace Caique.Ast
                                   BlockExpression body,
                                   TextSpan span,
                                   ModuleEnvironment module,
-                                  TypeExpression? ancestor = null) : base(span)
+                                  TypeExpression? ancestor = null,
+                                  BlockExpression? initBody = null) : base(span)
         {
             Identifier = identifier;
-            ParameterRefs = parameterRefs;
+            ParameterRefTokens = parameterRefs;
             Body = body;
             _ancestorType = ancestor;
             Module = module;
+            InitBody = initBody;
         }
 
         /// <summary>

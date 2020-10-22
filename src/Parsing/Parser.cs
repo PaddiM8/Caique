@@ -240,13 +240,15 @@ namespace Caique.Parsing
             if (Consume(TokenKind.Colon))
                 ancestor = ParseType();
 
+            var (block, init) = ParseClassBlock();
             var statement = new ClassDeclStatement(
                 identifier,
                 parameterRefs,
-                ParseClassBlock(),
+                block,
                 identifier.Span,
                 _moduleEnvironment,
-                ancestor
+                ancestor,
+                init
             );
 
             _moduleEnvironment.Parent!.Add(statement);
@@ -254,17 +256,29 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private BlockExpression ParseClassBlock()
+        private (BlockExpression block, BlockExpression? initBody) ParseClassBlock()
         {
             var start = Expect(TokenKind.OpenBrace).Span;
             var statements = new List<Statement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
             int variableDeclIndex = 0;
+            BlockExpression? initBody = null;
+
             while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
             {
                 if (Match(TokenKind.Fn))
                 {
                     statements.Add(ParseFunctionDecl());
+                }
+                else if (Match(TokenKind.Init))
+                {
+                    if (initBody != null)
+                    {
+                        _diagnostics.ReportCanOnlyHaveOneConstructor(Current);
+                        continue;
+                    }
+
+                    initBody = ParseInit();
                 }
                 else
                 {
@@ -280,7 +294,7 @@ namespace Caique.Parsing
 
             _symbolEnvironment = _symbolEnvironment.Parent!;
 
-            return statement;
+            return (statement, initBody);
         }
 
         private VariableDeclStatement ParseObjectVariableDecl(int index)
@@ -309,6 +323,13 @@ namespace Caique.Parsing
             _symbolEnvironment.Add(statement);
 
             return statement;
+        }
+
+        private BlockExpression ParseInit()
+        {
+            Expect(TokenKind.Init);
+
+            return ParseBlock();
         }
 
         private ExpressionStatement ParseExpressionStatement()

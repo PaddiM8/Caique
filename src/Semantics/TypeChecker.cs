@@ -110,7 +110,7 @@ namespace Caique.Semantics
             _current.DataType = variableType;
             var valueType = Next(assignmentStatement.Value);
 
-            CheckTypes(variableType, valueType);
+            CheckTypes(variableType, valueType, assignmentStatement.Span);
 
             // Go through the asignee and make sure it can be assigned to
             var statement = assignmentStatement.Assignee;
@@ -172,12 +172,27 @@ namespace Caique.Semantics
                 }
             }
 
-            foreach (var parameterRef in classDeclStatement.ParameterRefs)
+            // Parameters
+            classDeclStatement.ParameterRefDecls = new List<VariableDeclStatement>();
+            foreach (var parameterRef in classDeclStatement.ParameterRefTokens)
             {
-                if (classDeclStatement.GetVariable(parameterRef.Value) == null)
+                var parameterRefDecl = classDeclStatement.GetVariable(parameterRef.Value);
+                if (parameterRefDecl == null)
                 {
                     _diagnostics.ReportSymbolDoesNotExist(parameterRef);
                 }
+                else
+                {
+                    // Add the declarations to the list
+                    classDeclStatement.ParameterRefDecls.Add(parameterRefDecl);
+                }
+            }
+
+            // Constructor
+            if (classDeclStatement.InitBody != null)
+            {
+                var initBodyType = Next(classDeclStatement.InitBody);
+                CheckTypes(initBodyType, _voidType, classDeclStatement.InitBody.Span);
             }
 
             Next(classDeclStatement.Body);
@@ -372,7 +387,7 @@ namespace Caique.Semantics
             if (classDecl == null) return _unknownType;
 
             int argumentCount = newExpression.Arguments.Count;
-            int parameterCount = classDecl.ParameterRefs.Count;
+            int parameterCount = classDecl.ParameterRefTokens.Count;
             if (argumentCount != parameterCount)
             {
                 _diagnostics.ReportWrongNumberOfArguments(
@@ -387,13 +402,13 @@ namespace Caique.Semantics
             {
                 var argumentType = Next(argument);
                 var varDecl = classDecl!.Body.Environment.GetVariable(
-                    classDecl.ParameterRefs[i].Value
+                    classDecl.ParameterRefTokens[i].Value
                 );
 
                 if (varDecl == null) continue;
                 if (varDecl.DataType == null) Next(varDecl);
 
-                CheckTypes(varDecl.DataType!.Value, argumentType);
+                CheckTypes(varDecl.DataType!.Value, argumentType, argument.Span);
             }
 
             newExpression.DataType = type;
@@ -458,11 +473,6 @@ namespace Caique.Semantics
             }
 
             return _voidType;
-        }
-
-        private static bool CheckTypes(DataType type1, DataType type2)
-        {
-            return type1.Type == type2.Type;
         }
 
         private ModuleEnvironment? GetModule(List<Token> modulePath)

@@ -7,7 +7,7 @@ namespace Caique.Ast
 {
     public class BlockExpression : Expression
     {
-        public List<Statement> Statements { get; }
+        public List<Statement> Statements { get; set; }
 
         public SymbolEnvironment Environment { get; }
 

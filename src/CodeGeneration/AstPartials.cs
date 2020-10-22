@@ -9,4 +9,9 @@ namespace Caique.Ast
 
         public LLVMTypeRef? LlvmType { get; set; }
     }
+
+    public partial class ClassDeclStatement
+    {
+        public LLVMValueRef? InitLlvmValue { get; set; }
+    }
 }

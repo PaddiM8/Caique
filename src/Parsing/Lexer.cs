@@ -355,6 +355,7 @@ namespace Caique.Parsing
                 "ret" => TokenKind.Ret,
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
+                "init" => TokenKind.Init,
                 "new" => TokenKind.New,
                 "use" => TokenKind.Use,
                 "void" => TokenKind.Void,
