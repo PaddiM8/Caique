@@ -263,22 +263,55 @@ namespace Caique.CodeGeneration
             );
 
             // Constructor function
-            LLVMTypeRef functionType = LLVM.FunctionType(
+            LLVMTypeRef constructorFunctionType = LLVM.FunctionType(
                 LLVM.VoidType(),
                 parameterDataTypes.ToLlvmTypeArray(),
                 (uint)parameterDataTypes.Count,
                 0
             );
-            LLVMValueRef function = LLVM.AddFunction(
+            LLVMValueRef constructorFunction = LLVM.AddFunction(
                 _llvmModule,
                 (identifier + "." + identifier).ToCString(),
-                functionType
+                constructorFunctionType
             );
 
-            classDeclStatement.InitLlvmValue = function;
+            // Constructor content
+            LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
+                constructorFunction,
+                "entry".ToCString()
+            );
+            LLVM.PositionBuilderAtEnd(_builder, block);
+
+            // Class parameters
+            var firstParameter = LLVM.GetParam(constructorFunction, 0);
+            foreach (var (parameter, i) in classDeclStatement.ParameterRefDecls.WithIndex())
+            {
+                var parameterValue = LLVM.GetParam(constructorFunction, (uint)(i + 1));
+                var objectFieldValue = LLVM.BuildStructGEP(
+                    _builder,
+                    firstParameter,
+                    (uint)parameter.IndexInObject,
+                    "structField".ToCString()
+                );
+
+                LLVM.BuildStore(
+                    _builder,
+                    parameterValue,
+                    objectFieldValue
+                );
+            }
 
             if (classDeclStatement.InitBody != null)
-                Next(classDeclStatement.InitBody);
+            {
+                foreach (var initStatement in classDeclStatement.InitBody.Statements)
+                {
+                    Next(initStatement);
+                }
+            }
+
+            LLVM.BuildRetVoid(_builder);
+
+            classDeclStatement.InitLlvmValue = constructorFunction;
 
             return null!;
         }
@@ -372,15 +405,6 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
             var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
-
-            // If the previous statement was a class
-            // and the class object has an InitLlvmValue set,
-            // use that value instead.
-            if (_current.Parent!.Statement is ClassDeclStatement classDeclStatement &&
-                classDeclStatement.InitLlvmValue != null)
-            {
-                parentStatementValue = classDeclStatement.InitLlvmValue;
-            }
 
             if (parentStatementValue != null)
             {
@@ -545,19 +569,10 @@ namespace Caique.CodeGeneration
             int argumentCount = newExpression.Arguments.Count + 1;
             fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
             {
-                // Generate all the arguments specified arguments and do the assignments
+                // Generate all the arguments
                 foreach (var (argument, i) in newExpression.Arguments.WithIndex())
                 {
                     arguments[i + 1] = Next(argument);
-
-                    // Get the pointer to the struct field, and assign the argument value to it.
-                    var structField = LLVM.BuildStructGEP(
-                        _builder,
-                        malloc,
-                        (uint)objectDecl.ParameterRefDecls![i].IndexInObject,
-                        "paramAssignment".ToCString()
-                    );
-                    LLVM.BuildStore(_builder, arguments[i], structField);
                 }
 
                 // Call the constructor in this particular object
