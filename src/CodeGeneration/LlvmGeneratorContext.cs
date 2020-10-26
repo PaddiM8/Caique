@@ -17,6 +17,8 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef? DotExpressionObject { get; set; }
 
+        public FunctionDeclStatement? FunctionDecl { get; set; }
+
         public LlvmGeneratorContext CreateChild(Statement statement)
         {
             return new LlvmGeneratorContext
@@ -24,6 +26,7 @@ namespace Caique.CodeGeneration
                 Parent = this,
                 Statement = statement,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
+                FunctionDecl = FunctionDecl,
             };
         }
 
@@ -35,6 +38,7 @@ namespace Caique.CodeGeneration
                 Expression = expression,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
                 DotExpressionObject = DotExpressionObject,
+                FunctionDecl = FunctionDecl,
             };
         }
     }

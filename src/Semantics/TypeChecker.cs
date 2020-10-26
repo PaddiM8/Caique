@@ -99,7 +99,7 @@ namespace Caique.Semantics
         {
             _current.DataType = _current.CurrentFunctionType;
             var type = Next(returnStatement.Expression);
-            CheckTypes(_current.CurrentFunctionType!.Value, type, returnStatement.Span);
+            CheckTypes(_current.CurrentFunctionType!, type, returnStatement.Span);
 
             return null!;
         }
@@ -144,7 +144,7 @@ namespace Caique.Semantics
 
             var bodyType = Next(functionDeclStatement.Body);
             CheckTypes(
-                _current.CurrentFunctionType!.Value,
+                _current.CurrentFunctionType!,
                 bodyType,
                 functionDeclStatement.Body.Span
             );
@@ -408,7 +408,7 @@ namespace Caique.Semantics
                 if (varDecl == null) continue;
                 if (varDecl.DataType == null) Next(varDecl);
 
-                CheckTypes(varDecl.DataType!.Value, argumentType, argument.Span);
+                CheckTypes(varDecl.DataType!, argumentType, argument.Span);
             }
 
             newExpression.DataType = type;
@@ -499,7 +499,7 @@ namespace Caique.Semantics
             // If it has already been checked once before,
             // the DataType will be cached (stored in the object).
             if (variableDecl.DataType != null)
-                return variableDecl.DataType.Value;
+                return variableDecl.DataType;
 
             DataType type;
             if (variableDecl.SpecifiedType != null)

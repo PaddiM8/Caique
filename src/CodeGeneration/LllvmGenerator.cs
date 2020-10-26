@@ -61,6 +61,7 @@ namespace Caique.CodeGeneration
                     Statement = functionDeclStatement
                 };
 
+                _current.FunctionDecl = functionDeclStatement;
                 Next(functionDeclStatement.Body);
             }
 
@@ -143,7 +144,7 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(VariableDeclStatement variableDeclStatement)
         {
             string identifier = variableDeclStatement.Identifier.Value;
-            LLVMTypeRef type = variableDeclStatement.DataType!.Value.ToLlvmType();
+            LLVMTypeRef type = variableDeclStatement.DataType!.ToLlvmType();
 
             // Allocate variable
             LLVMValueRef alloca = LLVM.BuildAlloca(
@@ -202,12 +203,12 @@ namespace Caique.CodeGeneration
                 parameterOffset++;
 
                 // Add the parent object type as the first parameter
-                parameterDataTypes.Add(functionDeclStatement.ParentObject.DataType!.Value);
+                parameterDataTypes.Add(functionDeclStatement.ParentObject.DataType!);
             }
 
             // Add the parameter types to the parameter list
             parameterDataTypes.AddRange(
-                functionDeclStatement.Parameters.Select(x => x.Type.DataType!.Value)
+                functionDeclStatement.Parameters.Select(x => x.Type.DataType!)
             );
 
             LLVMTypeRef functionType = LLVM.FunctionType(
@@ -239,7 +240,7 @@ namespace Caique.CodeGeneration
             // Set the structure field types
             var variableDecls = classDeclStatement.Body.Environment.Variables;
             var fieldTypes = variableDecls
-                .Select(x => x!.DataType!.Value)
+                .Select(x => x!.DataType!)
                 .ToList()
                 .ToLlvmTypeArray();
 
@@ -255,11 +256,11 @@ namespace Caique.CodeGeneration
             // Constructor parameters
             var parameterDataTypes = new List<DataType>
             {
-                classDeclStatement.DataType!.Value
+                classDeclStatement.DataType!
             };
             parameterDataTypes.AddRange(
                 classDeclStatement.ParameterRefDecls!
-                    .Select(x => x.DataType!.Value)
+                    .Select(x => x.DataType!)
             );
 
             // Constructor function
@@ -328,7 +329,7 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(BinaryExpression binaryExpression)
         {
-            bool isFloat = binaryExpression.DataType!.Value.IsFloat();
+            bool isFloat = binaryExpression.DataType!.IsFloat();
             LLVMValueRef leftValue = Next(binaryExpression.Left);
             LLVMValueRef rightValue = Next(binaryExpression.Right);
             if (binaryExpression.Operator.Kind.IsComparisonOperator())
@@ -370,7 +371,7 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(LiteralExpression literalExpression)
         {
-            var dataType = literalExpression.DataType!.Value;
+            var dataType = literalExpression.DataType!;
             if (dataType.IsNumber())
             {
                 string tokenValue = literalExpression.Value.Value;
@@ -464,9 +465,28 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(VariableExpression variableExpression)
         {
             string identifier = variableExpression.Identifier.Value;
+
+            // If it's an object field, get the pointer through the object,
+            // otherwise get the variable declaration llvm value.
+            LLVMValueRef loadPointer;
+            if (variableExpression.VariableDecl!.VariableType == VariableType.Object)
+            {
+                var objectInstance = LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, 0);
+                loadPointer = LLVM.BuildStructGEP(
+                    _builder,
+                    objectInstance,
+                    0,
+                    "field".ToCString()
+                );
+            }
+            else
+            {
+                loadPointer = variableExpression.VariableDecl!.LlvmValue!.Value;
+            }
+
             return LLVM.BuildLoad(
                 _builder,
-                variableExpression.VariableDecl!.LlvmValue!.Value,
+                loadPointer,
                 ("l" + identifier).ToCString()
             );
         }
@@ -518,7 +538,7 @@ namespace Caique.CodeGeneration
             LLVMBasicBlockRef elseBB = LLVM.AppendBasicBlock(parent, "else".ToCString());
             LLVMBasicBlockRef mergeBB = LLVM.AppendBasicBlock(parent, "ifcont".ToCString());
 
-            bool returnsValue = ifExpression.DataType!.Value.Type != TypeKeyword.Void;
+            bool returnsValue = ifExpression.DataType!.Type != TypeKeyword.Void;
             if (returnsValue)
             {
                 // Allocate space for the return value,
@@ -526,7 +546,7 @@ namespace Caique.CodeGeneration
                 // The block expression will use this alloca and give it a value.
                 _current.BlockReturnValueAlloca = LLVM.BuildAlloca(
                     _builder,
-                    ifExpression.DataType!.Value.ToLlvmType(),
+                    ifExpression.DataType!.ToLlvmType(),
                     "retVal".ToCString()
                 );
             }
@@ -557,11 +577,11 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(NewExpression newExpression)
         {
-            var objectDecl = newExpression.DataType!.Value.ObjectDecl!;
-            var type = objectDecl.LlvmType;
+            var objectDecl = newExpression.DataType!.ObjectDecl!;
+            var type = objectDecl.LlvmType!.Value;
             var malloc = LLVM.BuildMalloc(
                 _builder,
-                type!.Value,
+                type,
                 "new".ToCString()
             );
 
