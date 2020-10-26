@@ -311,12 +311,12 @@ namespace Caique.CodeGeneration
 
             if (classDeclStatement.InitFunction != null)
             {
+                classDeclStatement.InitFunction.LlvmValue = initFunction;
+                _current.FunctionDecl = classDeclStatement.InitFunction;
                 foreach (var initStatement in classDeclStatement.InitFunction.Body.Statements)
                 {
                     Next(initStatement);
                 }
-
-                classDeclStatement.InitFunction.LlvmValue = initFunction;
             }
 
             LLVM.BuildRetVoid(_builder);
