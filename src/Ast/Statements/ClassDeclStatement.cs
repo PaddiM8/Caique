@@ -15,7 +15,7 @@ namespace Caique.Ast
 
         public BlockExpression Body { get; }
 
-        public BlockExpression? InitBody { get; set; }
+        public FunctionDeclStatement? InitFunction { get; set; }
 
         public ClassDeclStatement? Inherited
         {
@@ -37,14 +37,14 @@ namespace Caique.Ast
                                   TextSpan span,
                                   ModuleEnvironment module,
                                   TypeExpression? ancestor = null,
-                                  BlockExpression? initBody = null) : base(span)
+                                  FunctionDeclStatement? initFunction = null) : base(span)
         {
             Identifier = identifier;
             ParameterRefTokens = parameterRefs;
             Body = body;
             _ancestorType = ancestor;
             Module = module;
-            InitBody = initBody;
+            InitFunction = initFunction;
         }
 
         /// <summary>

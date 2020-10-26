@@ -189,10 +189,14 @@ namespace Caique.Semantics
             }
 
             // Constructor
-            if (classDeclStatement.InitBody != null)
+            if (classDeclStatement.InitFunction != null)
             {
-                var initBodyType = Next(classDeclStatement.InitBody);
-                CheckTypes(initBodyType, _voidType, classDeclStatement.InitBody.Span);
+                var initBodyType = Next(classDeclStatement.InitFunction.Body);
+                CheckTypes(
+                    initBodyType,
+                    _voidType,
+                    classDeclStatement.InitFunction.Body.Span
+                );
             }
 
             Next(classDeclStatement.Body);

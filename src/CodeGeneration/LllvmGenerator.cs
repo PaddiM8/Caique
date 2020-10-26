@@ -252,7 +252,13 @@ namespace Caique.CodeGeneration
             );
 
             classDeclStatement.LlvmType = namedStruct;
+            GenerateInitFunction(classDeclStatement);
 
+            return null!;
+        }
+
+        private LLVMValueRef GenerateInitFunction(ClassDeclStatement classDeclStatement)
+        {
             // Constructor parameters
             var parameterDataTypes = new List<DataType>
             {
@@ -264,30 +270,31 @@ namespace Caique.CodeGeneration
             );
 
             // Constructor function
-            LLVMTypeRef constructorFunctionType = LLVM.FunctionType(
+            LLVMTypeRef initFunctionType = LLVM.FunctionType(
                 LLVM.VoidType(),
                 parameterDataTypes.ToLlvmTypeArray(),
                 (uint)parameterDataTypes.Count,
                 0
             );
-            LLVMValueRef constructorFunction = LLVM.AddFunction(
+            string identifier = classDeclStatement.Identifier.Value;
+            LLVMValueRef initFunction = LLVM.AddFunction(
                 _llvmModule,
                 (identifier + "." + identifier).ToCString(),
-                constructorFunctionType
+                initFunctionType
             );
 
             // Constructor content
             LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
-                constructorFunction,
+                initFunction,
                 "entry".ToCString()
             );
             LLVM.PositionBuilderAtEnd(_builder, block);
 
             // Class parameters
-            var firstParameter = LLVM.GetParam(constructorFunction, 0);
+            var firstParameter = LLVM.GetParam(initFunction, 0);
             foreach (var (parameter, i) in classDeclStatement.ParameterRefDecls.WithIndex())
             {
-                var parameterValue = LLVM.GetParam(constructorFunction, (uint)(i + 1));
+                var parameterValue = LLVM.GetParam(initFunction, (uint)(i + 1));
                 var objectFieldValue = LLVM.BuildStructGEP(
                     _builder,
                     firstParameter,
@@ -302,19 +309,20 @@ namespace Caique.CodeGeneration
                 );
             }
 
-            if (classDeclStatement.InitBody != null)
+            if (classDeclStatement.InitFunction != null)
             {
-                foreach (var initStatement in classDeclStatement.InitBody.Statements)
+                foreach (var initStatement in classDeclStatement.InitFunction.Body.Statements)
                 {
                     Next(initStatement);
                 }
+
+                classDeclStatement.InitFunction.LlvmValue = initFunction;
             }
 
             LLVM.BuildRetVoid(_builder);
+            classDeclStatement.InitLlvmValue = initFunction;
 
-            classDeclStatement.InitLlvmValue = constructorFunction;
-
-            return null!;
+            return initFunction;
         }
 
         public LLVMValueRef Visit(UseStatement useStatement)

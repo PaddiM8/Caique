@@ -16,13 +16,19 @@ namespace Caique.Ast
 
         public ClassDeclStatement? ParentObject { get; set; }
 
-        public FunctionDeclStatement(Token identifier, List<Parameter> parameters,
-                                     BlockExpression body, TypeExpression? returnType,
+        public bool IsInitFunction { get; set; }
+
+        public FunctionDeclStatement(Token identifier,
+                                     List<Parameter> parameters,
+                                     BlockExpression body,
+                                     TypeExpression? returnType,
+                                     bool isInitFunction,
                                      TextSpan span) : base(span)
         {
             Identifier = identifier;
             Parameters = parameters;
             Body = body;
+            IsInitFunction = isInitFunction;
             ReturnType = returnType;
         }
     }

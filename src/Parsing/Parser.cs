@@ -210,6 +210,7 @@ namespace Caique.Parsing
                 parameters,
                 body,
                 returnType,
+                false,
                 start.Add(body.Span)
             );
 
@@ -256,13 +257,13 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private (BlockExpression block, BlockExpression? initBody) ParseClassBlock()
+        private (BlockExpression block, FunctionDeclStatement? initFunction) ParseClassBlock()
         {
             var start = Expect(TokenKind.OpenBrace).Span;
             var statements = new List<Statement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
             int variableDeclIndex = 0;
-            BlockExpression? initBody = null;
+            FunctionDeclStatement? initFunction = null;
 
             while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
             {
@@ -272,13 +273,13 @@ namespace Caique.Parsing
                 }
                 else if (Match(TokenKind.Init))
                 {
-                    if (initBody != null)
+                    if (initFunction != null)
                     {
                         _diagnostics.ReportCanOnlyHaveOneConstructor(Current);
                         continue;
                     }
 
-                    initBody = ParseInit();
+                    initFunction = ParseInit();
                 }
                 else
                 {
@@ -294,7 +295,7 @@ namespace Caique.Parsing
 
             _symbolEnvironment = _symbolEnvironment.Parent!;
 
-            return (statement, initBody);
+            return (statement, initFunction);
         }
 
         private VariableDeclStatement ParseObjectVariableDecl(int index)
@@ -325,11 +326,17 @@ namespace Caique.Parsing
             return statement;
         }
 
-        private BlockExpression ParseInit()
+        private FunctionDeclStatement ParseInit()
         {
-            Expect(TokenKind.Init);
-
-            return ParseBlock();
+            var keyword = Expect(TokenKind.Init);
+            return new FunctionDeclStatement(
+                keyword,
+                new List<Parameter>(),
+                ParseBlock(),
+                null,
+                true,
+                keyword.Span
+            );
         }
 
         private ExpressionStatement ParseExpressionStatement()
