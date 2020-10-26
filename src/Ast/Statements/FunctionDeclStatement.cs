@@ -4,7 +4,7 @@ using Caique.Parsing;
 
 namespace Caique.Ast
 {
-    public class FunctionDeclStatement : Statement
+    public partial class FunctionDeclStatement : Statement
     {
         public Token Identifier { get; }
 

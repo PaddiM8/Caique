@@ -9,10 +9,6 @@ namespace Caique.Ast
     {
         public Token Identifier { get; }
 
-        public List<Token> ParameterRefTokens { get; }
-
-        public List<VariableDeclStatement>? ParameterRefDecls { get; set; }
-
         public BlockExpression Body { get; }
 
         public FunctionDeclStatement? InitFunction { get; set; }
@@ -32,7 +28,6 @@ namespace Caique.Ast
         private readonly TypeExpression? _ancestorType;
 
         public ClassDeclStatement(Token identifier,
-                                  List<Token> parameterRefs,
                                   BlockExpression body,
                                   TextSpan span,
                                   ModuleEnvironment module,
@@ -40,7 +35,6 @@ namespace Caique.Ast
                                   FunctionDeclStatement? initFunction = null) : base(span)
         {
             Identifier = identifier;
-            ParameterRefTokens = parameterRefs;
             Body = body;
             _ancestorType = ancestor;
             Module = module;

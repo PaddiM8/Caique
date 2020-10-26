@@ -10,8 +10,8 @@ namespace Caique.Ast
         public LLVMTypeRef? LlvmType { get; set; }
     }
 
-    public partial class ClassDeclStatement
+    public partial class FunctionDeclStatement
     {
-        public LLVMValueRef? InitLlvmValue { get; set; }
+        public LLVMBasicBlockRef? BlockLlvmValue { get; set; }
     }
 }

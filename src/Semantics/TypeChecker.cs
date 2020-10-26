@@ -142,6 +142,17 @@ namespace Caique.Semantics
                 functionDeclStatement.ParentObject = _current.CurrentObject;
             }
 
+            // Parameters
+            foreach (var parameter in functionDeclStatement.Parameters)
+            {
+                if (parameter.Type!.DataType == null)
+                {
+                    parameter.Type!.DataType = Next(parameter.Type!);
+                }
+
+                parameter.DataType = parameter.Type!.DataType;
+            }
+
             var bodyType = Next(functionDeclStatement.Body);
             CheckTypes(
                 _current.CurrentFunctionType!,
@@ -173,7 +184,7 @@ namespace Caique.Semantics
             }
 
             // Parameters
-            classDeclStatement.ParameterRefDecls = new List<VariableDeclStatement>();
+            /*classDeclStatement.ParameterRefDecls = new List<VariableDeclStatement>();
             foreach (var parameterRef in classDeclStatement.ParameterRefTokens)
             {
                 var parameterRefDecl = classDeclStatement.GetVariable(parameterRef.Value);
@@ -186,11 +197,30 @@ namespace Caique.Semantics
                     // Add the declarations to the list
                     classDeclStatement.ParameterRefDecls.Add(parameterRefDecl);
                 }
-            }
+            }*/
+
+            Next(classDeclStatement.Body);
 
             // Constructor
             if (classDeclStatement.InitFunction != null)
             {
+                classDeclStatement.InitFunction.ParentObject = classDeclStatement;
+                foreach (var parameter in classDeclStatement.InitFunction.Parameters)
+                {
+                    if (parameter.IsReference)
+                    {
+                        var variableDecl = classDeclStatement.GetVariable(parameter.Identifier.Value);
+                        if (variableDecl == null)
+                        {
+                            _diagnostics.ReportSymbolDoesNotExist(parameter.Identifier);
+                        }
+                        else
+                        {
+                            parameter.DataType = variableDecl.DataType;
+                        }
+                    }
+                }
+
                 var initBodyType = Next(classDeclStatement.InitFunction.Body);
                 CheckTypes(
                     initBodyType,
@@ -198,8 +228,6 @@ namespace Caique.Semantics
                     classDeclStatement.InitFunction.Body.Span
                 );
             }
-
-            Next(classDeclStatement.Body);
 
             return null!;
         }
@@ -387,11 +415,13 @@ namespace Caique.Semantics
         public DataType Visit(NewExpression newExpression)
         {
             var type = Next(newExpression.Type);
+            newExpression.DataType = type;
+
             var classDecl = type.ObjectDecl!;
             if (classDecl == null) return _unknownType;
 
             int argumentCount = newExpression.Arguments.Count;
-            int parameterCount = classDecl.ParameterRefTokens.Count;
+            int parameterCount = classDecl.InitFunction?.Parameters.Count ?? 0;
             if (argumentCount != parameterCount)
             {
                 _diagnostics.ReportWrongNumberOfArguments(
@@ -402,11 +432,12 @@ namespace Caique.Semantics
 
                 return _unknownType;
             }
+
             foreach (var (argument, i) in newExpression.Arguments.WithIndex())
             {
                 var argumentType = Next(argument);
                 var varDecl = classDecl!.Body.Environment.GetVariable(
-                    classDecl.ParameterRefTokens[i].Value
+                    classDecl.InitFunction!.Parameters[i].Identifier.Value
                 );
 
                 if (varDecl == null) continue;
@@ -414,8 +445,6 @@ namespace Caique.Semantics
 
                 CheckTypes(varDecl.DataType!, argumentType, argument.Span);
             }
-
-            newExpression.DataType = type;
 
             return type;
         }
@@ -551,7 +580,7 @@ namespace Caique.Semantics
                      arguments.Zip(functionDecl.Parameters))
             {
                 var argumentType = Next(argument);
-                var parameterType = Next(parameter.Type);
+                var parameterType = parameter.Type!.DataType ?? Next(parameter.Type!);
                 CheckTypes(parameterType, argumentType, argument.Span);
             }
 

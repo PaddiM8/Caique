@@ -198,7 +198,7 @@ namespace Caique.Parsing
                 body.Environment.Add(
                     new VariableDeclStatement(
                         parameter.Identifier,
-                        parameter.Type.Span.Add(parameter.Identifier.Span),
+                        parameter.Type!.Span.Add(parameter.Identifier.Span),
                         null,
                         parameter.Type
                     )
@@ -224,18 +224,6 @@ namespace Caique.Parsing
             Expect(TokenKind.Class, "class declaration");
             var identifier = Expect(TokenKind.Identifier);
 
-            // Parameter refs
-            var parameterRefs = new List<Token>();
-            Expect(TokenKind.OpenParenthesis);
-
-            if (Match(TokenKind.Identifier))
-            {
-                do parameterRefs.Add(Expect(TokenKind.Identifier));
-                while (Consume(TokenKind.Comma));
-            }
-
-            Expect(TokenKind.ClosedParenthesis);
-
             // Inheritance
             TypeExpression? ancestor = null;
             if (Consume(TokenKind.Colon))
@@ -244,7 +232,6 @@ namespace Caique.Parsing
             var (block, init) = ParseClassBlock();
             var statement = new ClassDeclStatement(
                 identifier,
-                parameterRefs,
                 block,
                 identifier.Span,
                 _moduleEnvironment,
@@ -329,10 +316,45 @@ namespace Caique.Parsing
         private FunctionDeclStatement ParseInit()
         {
             var keyword = Expect(TokenKind.Init);
+
+            // Parameters
+            Expect(TokenKind.OpenParenthesis);
+            var parameters = new List<Parameter>();
+            do
+            {
+                var identifier = Expect(TokenKind.Identifier);
+                TypeExpression? type = null;
+
+                if (Consume(TokenKind.Colon))
+                    type = ParseType();
+
+                parameters.Add(new Parameter(
+                    identifier,
+                    type
+                ));
+            }
+            while (Consume(TokenKind.Comma));
+
+            Expect(TokenKind.ClosedParenthesis);
+
+            var block = ParseBlock();
+
+            // Add parameters to symbol table
+            foreach (var parameter in parameters)
+            {
+                if (parameter.IsReference) continue;
+                block.Environment.Add(new VariableDeclStatement(
+                    parameter.Identifier,
+                    parameter.Identifier.Span,
+                    null,
+                    parameter.Type
+                ));
+            }
+
             return new FunctionDeclStatement(
                 keyword,
-                new List<Parameter>(),
-                ParseBlock(),
+                parameters,
+                block,
                 null,
                 true,
                 keyword.Span

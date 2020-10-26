@@ -41,6 +41,9 @@ namespace Caique.CodeGeneration
                 switch (statement)
                 {
                     case ClassDeclStatement classDeclStatement:
+                        if (classDeclStatement.InitFunction != null)
+                            functions.Add(classDeclStatement.InitFunction);
+
                         foreach (var function in classDeclStatement.Body.Environment.Functions)
                         {
                             Next(function);
@@ -208,7 +211,7 @@ namespace Caique.CodeGeneration
 
             // Add the parameter types to the parameter list
             parameterDataTypes.AddRange(
-                functionDeclStatement.Parameters.Select(x => x.Type.DataType!)
+                functionDeclStatement.Parameters.Select(x => x.DataType!)
             );
 
             LLVMTypeRef functionType = LLVM.FunctionType(
@@ -222,6 +225,35 @@ namespace Caique.CodeGeneration
                 identifier.ToCString(),
                 functionType
             );
+
+            LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
+                function,
+                "functionEntry".ToCString()
+            );
+            LLVM.PositionBuilderAtEnd(_builder, block);
+            functionDeclStatement.BlockLlvmValue = block;
+
+            // Assign reference parameters to object fields
+            // At the moment, this is only for constructors
+            foreach (var (parameter, i) in functionDeclStatement.Parameters.WithIndex())
+            {
+                if (!parameter.IsReference) continue;
+
+                var parameterValue = LLVM.GetParam(function, (uint)(i + 1));
+                var targetField = functionDeclStatement.ParentObject!.GetVariable(parameter.Identifier.Value);
+                var objectFieldValue = LLVM.BuildStructGEP(
+                    _builder,
+                    LLVM.GetParam(function, 0), // Reference to the object instnace
+                    (uint)targetField!.IndexInObject,
+                    "structField".ToCString()
+                );
+
+                LLVM.BuildStore(
+                    _builder,
+                    parameterValue,
+                    objectFieldValue
+                );
+            }
 
             functionDeclStatement.LlvmValue = function;
 
@@ -252,12 +284,18 @@ namespace Caique.CodeGeneration
             );
 
             classDeclStatement.LlvmType = namedStruct;
-            GenerateInitFunction(classDeclStatement);
+
+            if (classDeclStatement.InitFunction != null)
+            {
+                Next(classDeclStatement.InitFunction);
+            }
+            //GenerateInitFunction(classDeclStatement);
+
 
             return null!;
         }
 
-        private LLVMValueRef GenerateInitFunction(ClassDeclStatement classDeclStatement)
+        /*private LLVMValueRef GenerateInitFunction(ClassDeclStatement classDeclStatement)
         {
             // Constructor parameters
             var parameterDataTypes = new List<DataType>
@@ -323,7 +361,7 @@ namespace Caique.CodeGeneration
             classDeclStatement.InitLlvmValue = initFunction;
 
             return initFunction;
-        }
+        }*/
 
         public LLVMValueRef Visit(UseStatement useStatement)
         {
@@ -415,7 +453,17 @@ namespace Caique.CodeGeneration
         {
             var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
 
-            if (parentStatementValue != null)
+            // If the parent is a function declaration
+            FunctionDeclStatement? functionDeclStatement = null;
+            if (_current.Parent.Statement is FunctionDeclStatement decl)
+                functionDeclStatement = decl;
+
+            // Functions have their own block starts
+            if (functionDeclStatement != null)
+            {
+                LLVM.PositionBuilderAtEnd(_builder, functionDeclStatement.BlockLlvmValue!.Value);
+            }
+            else if (parentStatementValue != null) // Function
             {
                 LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
                     parentStatementValue!.Value,
@@ -454,7 +502,7 @@ namespace Caique.CodeGeneration
 
             // If it belongs to a function
             // Build the appropriate return statement for the function
-            if (_current.Parent.Statement is FunctionDeclStatement functionDeclStatement &&
+            if (functionDeclStatement != null &&
                 functionDeclStatement.Body.DataType?.Type != TypeKeyword.Void)
             {
                 LLVM.BuildRet(
@@ -593,26 +641,29 @@ namespace Caique.CodeGeneration
                 "new".ToCString()
             );
 
-            // Arguments
-            int argumentCount = newExpression.Arguments.Count + 1;
-            fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
+            if (objectDecl.InitFunction != null)
             {
-                // Generate all the arguments
-                foreach (var (argument, i) in newExpression.Arguments.WithIndex())
+                // Arguments
+                int argumentCount = newExpression.Arguments.Count + 1;
+                fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
                 {
-                    arguments[i + 1] = Next(argument);
+                    // Generate all the arguments
+                    foreach (var (argument, i) in newExpression.Arguments.WithIndex())
+                    {
+                        arguments[i + 1] = Next(argument);
+                    }
+
+                    // Call the constructor in this particular object
+                    arguments[0] = malloc;
+
+                    LLVM.BuildCall(
+                        _builder,
+                        objectDecl.InitFunction.LlvmValue!.Value,
+                        arguments,
+                        (uint)argumentCount,
+                        "".ToCString()
+                    );
                 }
-
-                // Call the constructor in this particular object
-                arguments[0] = malloc;
-
-                LLVM.BuildCall(
-                    _builder,
-                    objectDecl.InitLlvmValue!.Value,
-                    arguments,
-                    (uint)argumentCount,
-                    "".ToCString()
-                );
             }
 
             return malloc;

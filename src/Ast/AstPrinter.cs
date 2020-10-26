@@ -71,7 +71,7 @@ namespace Caique.Ast
             // Parameters
             PrintStart("Parameters: ", ConsoleColor.Magenta);
             foreach (var parameter in functionDeclStatement.Parameters)
-                Next(parameter.Type);
+                Next(parameter.Type!);
             _indentationLevel--;
 
             if (functionDeclStatement.ReturnType != null)
@@ -87,9 +87,12 @@ namespace Caique.Ast
         {
             PrintStart("Class: " + classDeclStatement.Identifier.Value, ConsoleColor.DarkGreen);
 
-            foreach (var parameter in classDeclStatement.ParameterRefTokens)
-                PrintMiddle(parameter.Value, ConsoleColor.Green);
-            _indentationLevel--;
+            if (classDeclStatement.InitFunction != null)
+            {
+                foreach (var parameter in classDeclStatement.InitFunction.Parameters)
+                    PrintMiddle(parameter.Identifier.Value, ConsoleColor.Green);
+                _indentationLevel--;
+            }
 
             Next(classDeclStatement.Body);
 
