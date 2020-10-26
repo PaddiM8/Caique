@@ -2,7 +2,7 @@ using System;
 
 namespace Caique.Parsing
 {
-    public struct TextSpan
+    public record TextSpan
     {
         public TextPosition Start { get; }
 
