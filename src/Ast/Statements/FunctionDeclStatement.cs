@@ -18,6 +18,8 @@ namespace Caique.Ast
 
         public bool IsInitFunction { get; set; }
 
+        public bool IsMethod { get => ParentObject != null; }
+
         public FunctionDeclStatement(Token identifier,
                                      List<Parameter> parameters,
                                      BlockExpression body,

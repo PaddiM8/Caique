@@ -200,7 +200,8 @@ namespace Caique.Parsing
                         parameter.Identifier,
                         parameter.Type!.Span.Add(parameter.Identifier.Span),
                         null,
-                        parameter.Type
+                        parameter.Type,
+                        VariableType.FunctionParameter
                     )
                 );
             }

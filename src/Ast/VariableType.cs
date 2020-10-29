@@ -1,5 +1,9 @@
-public enum VariableType
+namespace Caique.Ast
 {
-    Local,
-    Object
+    public enum VariableType
+    {
+        Local,
+        FunctionParameter,
+        Object,
+    }
 }

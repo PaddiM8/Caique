@@ -521,23 +521,38 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(VariableExpression variableExpression)
         {
             string identifier = variableExpression.Identifier.Value;
+            var variableDecl = variableExpression.VariableDecl!;
+            var functionDecl = _current.FunctionDecl!;
 
             // If it's an object field, get the pointer through the object,
+            // If it's a function parameter, get the pointer through the function,
             // otherwise get the variable declaration llvm value.
             LLVMValueRef loadPointer;
-            if (variableExpression.VariableDecl!.VariableType == VariableType.Object)
+            if (variableDecl.VariableType == VariableType.Object) // Object field
             {
-                var objectInstance = LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, 0);
+                var objectInstance = LLVM.GetParam(functionDecl.LlvmValue!.Value, 0);
                 loadPointer = LLVM.BuildStructGEP(
                     _builder,
                     objectInstance,
-                    0,
+                    (uint)variableDecl.IndexInObject,
                     "field".ToCString()
                 );
             }
-            else
+            else if (variableDecl.VariableType == VariableType.FunctionParameter) // Function parameter
             {
-                loadPointer = variableExpression.VariableDecl!.LlvmValue!.Value;
+                // Get the parameter index
+                int paramIndex = functionDecl.Parameters.FindIndex(x =>
+                    x.Identifier.Value == variableExpression.Identifier.Value
+                );
+
+                // The LLVM parameter index will be offset by one if the function belongs to an object.
+                uint paramOffset = functionDecl.IsMethod ? 1 : 0;
+
+                return LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, (uint)paramIndex + paramOffset);
+            }
+            else // Local variable
+            {
+                loadPointer = variableDecl.LlvmValue!.Value;
             }
 
             return LLVM.BuildLoad(
