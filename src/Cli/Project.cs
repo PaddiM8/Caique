@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Caique.Cli.Options;
@@ -16,6 +17,10 @@ namespace Caique.Cli
     public class Project
     {
         private FileInfo? _projectFile;
+        private readonly HashSet<string> _ignoredDirectories = new HashSet<string>
+        {
+            "target"
+        };
 
         public static Project Load(string projectFilePath)
         {
@@ -65,9 +70,8 @@ namespace Caique.Cli
         public void Build(BuildOptions buildOptions)
         {
             string projectPath = _projectFile!.Directory!.FullName;
-            string sourcePath = $"{projectPath}/src";
+            var (environment, sourcePath, targetPath) = PrepareBuild(projectPath);
 
-            var environment = CreateModuleEnvironment(sourcePath);
             var compilation = new Compilation(environment, sourcePath)
             {
                 PrintTokens = buildOptions.PrintTokens,
@@ -75,7 +79,56 @@ namespace Caique.Cli
                 PrintEnvironment = buildOptions.PrintEnvironment
             };
 
-            compilation.Compile();
+            compilation.Compile(targetPath);
+            LinkObjectFiles(targetPath);
+        }
+
+        /// <summary>
+        /// Run the project.
+        /// </summary>
+        public void Run(RunOptions _)
+        {
+            string projectPath = _projectFile!.Directory!.FullName;
+            var (environment, sourcePath, targetPath) = PrepareBuild(projectPath);
+            var compilation = new Compilation(environment, sourcePath);
+
+            compilation.Compile(targetPath);
+            LinkObjectFiles(targetPath);
+
+            // Run the generated executable
+            Process.Start(targetPath + "/main");
+        }
+
+        private static void LinkObjectFiles(string targetPath)
+        {
+            var objectFiles = Directory.GetFiles(targetPath, "*.o");
+            var process = new Process()
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "gcc",
+                    Arguments = "-o main " + string.Join(" ", objectFiles),
+                    WorkingDirectory = targetPath,
+                }
+            };
+            process.Start();
+            process.WaitForExit();
+        }
+
+        private (ModuleEnvironment, string sourcePath, string targetPath)
+            PrepareBuild(string projectPath)
+        {
+            string sourcePath = $"{projectPath}/src";
+            string targetPath = $"{projectPath}/target";
+
+            // TODO: Cache
+            foreach (var targetFile in Directory.GetFiles(targetPath))
+                File.Delete(targetFile);
+
+            if (!Directory.Exists(targetPath))
+                Directory.CreateDirectory(targetPath);
+
+            return (CreateModuleEnvironment(sourcePath), sourcePath, targetPath);
         }
 
         /// <summary>
@@ -99,20 +152,26 @@ namespace Caique.Cli
         private ModuleEnvironment CreateModuleEnvironment(string path, ModuleEnvironment environment)
         {
             var directories = Directory.GetDirectories(path);
+            bool hasSubDirectory = false;
             foreach (var directoryPath in directories)
             {
                 string identifier = Path.GetFileName(directoryPath)!;
+                if (identifier.StartsWith(".") ||
+                    _ignoredDirectories.Contains(identifier)) continue;
+
+                hasSubDirectory = true;
+
                 environment = CreateModuleEnvironment(
                     directoryPath,
                     environment.CreateChildModule(identifier)
                 );
             }
 
-            if (directories.Length > 0)
-                environment = environment.Parent!;
+            if (hasSubDirectory) environment = environment.Parent!;
 
             foreach (var filePath in Directory.GetFiles(path))
             {
+                if (!filePath.EndsWith(".cq")) continue;
                 string identifier = Path.GetFileNameWithoutExtension(filePath);
                 environment.CreateChildModule(identifier, filePath);
             }

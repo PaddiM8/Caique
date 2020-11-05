@@ -38,7 +38,7 @@ namespace Caique
             _rootPath = rootPath;
         }
 
-        public void Compile()
+        public void Compile(string targetPath)
         {
             // Parse everything first, so that classes and functions
             // are added to the symbol table before type checking.
@@ -49,6 +49,7 @@ namespace Caique
             // Only type check if the parsing didn't generate any errors
             if (!Diagnostics.Any())
             {
+                // Type checking
                 foreach (var ast in asts)
                 {
                     // Set up diagnostic bag
@@ -61,10 +62,18 @@ namespace Caique
                         Diagnostics
                     ).Analyse();
 
-                    if (!Diagnostics.Any())
-                        new LllvmGenerator(ast).Generate();
-
                     if (PrintAst) ast.Print();
+                }
+
+                // Code generation
+                    if (!Diagnostics.Any())
+                {
+                    foreach (var ast in asts)
+                    {
+                        using var generator = new LlvmGenerator(ast);
+                        generator.Generate();
+                        generator.GenerateObjectFile(targetPath);
+                    }
                 }
             }
 

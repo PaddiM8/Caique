@@ -37,6 +37,9 @@ namespace Caique
                 case BuildOptions options:
                     Project.Load(options.ProjectFilePath!).Build(options);
                     break;
+                case RunOptions options:
+                    Project.Load(options.ProjectFilePath!).Run(options);
+                    break;
                 case NewOptions options:
                     Project.Create(options.ProjectName!);
                     break;
