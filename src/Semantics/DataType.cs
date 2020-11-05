@@ -13,6 +13,30 @@ namespace Caique.Semantics
 
         public ClassDeclStatement? ObjectDecl { get; }
 
+        public bool IsNumber { get => IsInt || IsFloat; }
+
+        public bool IsInt
+        {
+            get => Type switch
+            {
+                TypeKeyword.i8 or
+                TypeKeyword.i32 or
+                TypeKeyword.i64 => true,
+                _ => false,
+            };
+        }
+
+        public bool IsFloat
+        {
+            get => Type switch
+            {
+                TypeKeyword.f8 or
+                TypeKeyword.f32 or
+                TypeKeyword.f64 => true,
+                _ => false,
+            };
+        }
+
         public DataType(TypeKeyword type, ClassDeclStatement? objectDecl = null)
         {
             Type = type;
@@ -35,33 +59,6 @@ namespace Caique.Semantics
             }
 
             return Type == expected.Type;
-        }
-
-        public bool IsNumber()
-        {
-            return IsInt() || IsFloat();
-        }
-
-        public bool IsInt()
-        {
-            return Type switch
-            {
-                TypeKeyword.i8 or
-                TypeKeyword.i32 or
-                TypeKeyword.i64 => true,
-                _ => false,
-            };
-        }
-
-        public bool IsFloat()
-        {
-            return Type switch
-            {
-                TypeKeyword.f8 or
-                TypeKeyword.f32 or
-                TypeKeyword.f64 => true,
-                _ => false,
-            };
         }
 
         public override string ToString()
