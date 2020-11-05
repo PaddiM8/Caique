@@ -16,6 +16,18 @@ namespace Caique.Ast
 
         public int IndexInObject { get; }
 
+        public override DataType? DataType
+        {
+            get => SpecifiedType == null ? _dataType : SpecifiedType.DataType;
+            set
+            {
+                if (SpecifiedType == null) _dataType = value;
+                else SpecifiedType.DataType = value;
+            }
+        }
+
+        private DataType? _dataType;
+
         public VariableDeclStatement(Token identifier,
                                      TextSpan span,
                                      Expression? value,

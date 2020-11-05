@@ -8,7 +8,7 @@ namespace Caique.Ast
     {
         public TextSpan Span { get; }
 
-        public DataType? DataType { get; set; }
+        public virtual DataType? DataType { get; set; }
 
         public Statement(TextSpan span)
         {

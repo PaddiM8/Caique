@@ -7,7 +7,7 @@ namespace Caique.Semantics
     /// <summary>
     /// Represents a Caique type.
     /// </summary>
-    public record DataType
+    public class DataType
     {
         public TypeKeyword Type { get; }
 

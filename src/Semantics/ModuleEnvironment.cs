@@ -83,11 +83,12 @@ namespace Caique.Semantics
         /// <param name="identifier">Name of the class.</param>
         /// <param name="lookInImports">Whether or not to try to find it in imported modules.</param>
         /// <returns>Null if none was found.</returns>
-        public ClassDeclStatement? GetClass(string identifier, bool lookInImports = true)
+        public (ClassDeclStatement? classDecl, ModuleEnvironment? importedModule)
+            GetClass(string identifier, bool lookInImports = true)
         {
             if (_classes.TryGetValue(identifier, out ClassDeclStatement? classDecl))
             {
-                return classDecl;
+                return (classDecl, null);
             }
             else if (lookInImports)
             {
@@ -95,11 +96,11 @@ namespace Caique.Semantics
                 foreach (var import in _importedModules)
                 {
                     var foundClass = import.GetClass(identifier, false);
-                    if (foundClass != null) return foundClass;
+                    if (foundClass.classDecl != null) return foundClass;
                 }
             }
 
-            return null;
+            return (null, null);
         }
 
         /// <summary>
@@ -107,13 +108,22 @@ namespace Caique.Semantics
         /// </summary>
         /// <param name="modulePath">Module path.</param>
         /// <returns>Null if none was found.</returns>
-        public ClassDeclStatement? GetClass(List<Token> modulePath)
+        public (ClassDeclStatement? classDecl, ModuleEnvironment? importedModule)
+            GetClass(List<Token> modulePath)
         {
             string identifier = modulePath[^1].Value;
 
-            return modulePath.Count > 1
-                ? FindByPath(modulePath)?.GetClass(identifier, false)
-                : GetClass(identifier);
+            if (modulePath.Count > 1)
+            {
+                var module = FindByPath(modulePath);
+                if (module == null) return (null, null);
+
+                return module.GetClass(identifier, false);
+            }
+            else
+            {
+                return GetClass(identifier);
+            }
         }
 
         /// <summary>

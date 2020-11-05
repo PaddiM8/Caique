@@ -10,7 +10,7 @@ using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
 {
-    public unsafe class LllvmGenerator : IAstTraverser<LLVMValueRef, LLVMValueRef>
+    public unsafe class LlvmGenerator : IAstTraverser<LLVMValueRef, LLVMValueRef>, IDisposable
     {
         private readonly AbstractSyntaxTree _ast;
         private readonly LLVMContextRef _context;
@@ -21,7 +21,7 @@ namespace Caique.CodeGeneration
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int Main();
 
-        public LllvmGenerator(AbstractSyntaxTree ast)
+        public LlvmGenerator(AbstractSyntaxTree ast)
         {
             _ast = ast;
             _context = LLVM.ContextCreate();
@@ -80,7 +80,7 @@ namespace Caique.CodeGeneration
             LLVM.DumpModule(_llvmModule);
 
             // Everything below is temporary code for testing purpsoes
-            LLVM.LinkInMCJIT();
+            /*LLVM.LinkInMCJIT();
 
             LLVM.InitializeX86TargetMC();
             LLVM.InitializeX86Target();
@@ -113,9 +113,49 @@ namespace Caique.CodeGeneration
             else
             {
                 Console.WriteLine("Couldn't find main function.");
-            }
+            }*/
+        }
 
+        public void Dispose()
+        {
             LLVM.ContextDispose(_context);
+            GC.SuppressFinalize(this);
+        }
+
+        public void GenerateObjectFile(string targetDirectory, bool isLinked = false)
+        {
+            LLVM.InitializeNativeTarget();
+            LLVM.InitializeNativeAsmPrinter();
+
+            sbyte* errorMessage;
+            LLVMTarget* target;
+            int _ = LLVM.GetTargetFromTriple(
+                LLVM.GetDefaultTargetTriple(),
+                &target,
+                &errorMessage
+            );
+
+            var targetMachine = LLVM.CreateTargetMachine(
+                target,
+                LLVM.GetDefaultTargetTriple(),
+                LLVM.GetHostCPUName(),
+                LLVM.GetHostCPUFeatures(),
+                LLVMCodeGenOptLevel.LLVMCodeGenLevelNone,
+                LLVMRelocMode.LLVMRelocDefault,
+                LLVMCodeModel.LLVMCodeModelDefault
+            );
+
+            string name = isLinked
+                ? "linked"
+                : _ast.ModuleEnvironment.Identifier;
+
+            _ = LLVM.TargetMachineEmitToFile(
+                targetMachine,
+                _llvmModule,
+                (targetDirectory + "/" + name + ".o").ToCString(),
+                LLVMCodeGenFileType.LLVMObjectFile,
+                &errorMessage
+            );
         }
 
         private LLVMValueRef Next(Statement statement)
@@ -146,7 +186,13 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(VariableDeclStatement variableDeclStatement)
         {
+            if (variableDeclStatement.SpecifiedType != null)
+                Next(variableDeclStatement.SpecifiedType);
+
             string identifier = variableDeclStatement.Identifier.Value;
+            LLVMValueRef initializer = variableDeclStatement.Value == null
+                ? null
+                : Next(variableDeclStatement.Value);
             LLVMTypeRef type = variableDeclStatement.DataType!.ToLlvmType();
 
             // Allocate variable
@@ -160,7 +206,6 @@ namespace Caique.CodeGeneration
 
             if (variableDeclStatement.Value != null)
             {
-                LLVMValueRef initializer = Next(variableDeclStatement.Value);
                 LLVM.BuildStore(_builder, initializer, alloca);
             }
 
@@ -192,6 +237,9 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(FunctionDeclStatement functionDeclStatement)
         {
+            if (functionDeclStatement.ReturnType != null)
+                Next(functionDeclStatement.ReturnType);
+
             var returnType = functionDeclStatement.ReturnType?.DataType
                 ?? new DataType(TypeKeyword.Void);
             string identifier = functionDeclStatement.Identifier.Value;
@@ -225,6 +273,15 @@ namespace Caique.CodeGeneration
                 identifier.ToCString(),
                 functionType
             );
+            functionDeclStatement.LlvmValue = function;
+
+            // If a call/new expression triggered this function,
+            // it just needs the declaration, not the body.
+            if (_current.Parent?.Expression is CallExpression ||
+                _current.Parent?.Expression is TypeExpression)
+            {
+                return function;
+            }
 
             LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
                 function,
@@ -255,8 +312,6 @@ namespace Caique.CodeGeneration
                 );
             }
 
-            functionDeclStatement.LlvmValue = function;
-
             return function;
         }
 
@@ -276,6 +331,12 @@ namespace Caique.CodeGeneration
                 .ToList()
                 .ToLlvmTypeArray();
 
+            foreach (var variableDecl in variableDecls)
+            {
+                if (variableDecl?.SpecifiedType != null)
+                    Next(variableDecl.SpecifiedType);
+            }
+
             LLVM.StructSetBody(
                 namedStruct,
                 fieldTypes,
@@ -285,83 +346,14 @@ namespace Caique.CodeGeneration
 
             classDeclStatement.LlvmType = namedStruct;
 
-            if (classDeclStatement.InitFunction != null)
+            if (classDeclStatement.InitFunction != null &&
+                !(_current.Parent?.Expression is TypeExpression))
             {
                 Next(classDeclStatement.InitFunction);
             }
-            //GenerateInitFunction(classDeclStatement);
-
 
             return null!;
         }
-
-        /*private LLVMValueRef GenerateInitFunction(ClassDeclStatement classDeclStatement)
-        {
-            // Constructor parameters
-            var parameterDataTypes = new List<DataType>
-            {
-                classDeclStatement.DataType!
-            };
-            parameterDataTypes.AddRange(
-                classDeclStatement.ParameterRefDecls!
-                    .Select(x => x.DataType!)
-            );
-
-            // Constructor function
-            LLVMTypeRef initFunctionType = LLVM.FunctionType(
-                LLVM.VoidType(),
-                parameterDataTypes.ToLlvmTypeArray(),
-                (uint)parameterDataTypes.Count,
-                0
-            );
-            string identifier = classDeclStatement.Identifier.Value;
-            LLVMValueRef initFunction = LLVM.AddFunction(
-                _llvmModule,
-                (identifier + "." + identifier).ToCString(),
-                initFunctionType
-            );
-
-            // Constructor content
-            LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
-                initFunction,
-                "entry".ToCString()
-            );
-            LLVM.PositionBuilderAtEnd(_builder, block);
-
-            // Class parameters
-            var firstParameter = LLVM.GetParam(initFunction, 0);
-            foreach (var (parameter, i) in classDeclStatement.ParameterRefDecls.WithIndex())
-            {
-                var parameterValue = LLVM.GetParam(initFunction, (uint)(i + 1));
-                var objectFieldValue = LLVM.BuildStructGEP(
-                    _builder,
-                    firstParameter,
-                    (uint)parameter.IndexInObject,
-                    "structField".ToCString()
-                );
-
-                LLVM.BuildStore(
-                    _builder,
-                    parameterValue,
-                    objectFieldValue
-                );
-            }
-
-            if (classDeclStatement.InitFunction != null)
-            {
-                classDeclStatement.InitFunction.LlvmValue = initFunction;
-                _current.FunctionDecl = classDeclStatement.InitFunction;
-                foreach (var initStatement in classDeclStatement.InitFunction.Body.Statements)
-                {
-                    Next(initStatement);
-                }
-            }
-
-            LLVM.BuildRetVoid(_builder);
-            classDeclStatement.InitLlvmValue = initFunction;
-
-            return initFunction;
-        }*/
 
         public LLVMValueRef Visit(UseStatement useStatement)
         {
@@ -548,7 +540,10 @@ namespace Caique.CodeGeneration
                 // The LLVM parameter index will be offset by one if the function belongs to an object.
                 uint paramOffset = functionDecl.IsMethod ? 1 : 0;
 
-                return LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, (uint)paramIndex + paramOffset);
+                return LLVM.GetParam(
+                    functionDecl.LlvmValue!.Value,
+                    (uint)paramIndex + paramOffset
+                );
             }
             else // Local variable
             {
@@ -564,6 +559,11 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(CallExpression callExpression)
         {
+            if (callExpression.FunctionDecl!.LlvmValue == null)
+            {
+                Next(callExpression.FunctionDecl!);
+            }
+
             var identifier = callExpression.ModulePath[^1].Value;
             var functionDecl = callExpression.FunctionDecl!;
 
@@ -597,7 +597,17 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(TypeExpression typeExpression)
         {
-            throw new InvalidOperationException();
+            var objectDecl = typeExpression.DataType!.ObjectDecl;
+            if (objectDecl == null) return null;
+
+            if (objectDecl!.LlvmType == null)
+            {
+                Next(objectDecl);
+                if (objectDecl.InitFunction != null)
+                    Next(objectDecl.InitFunction);
+            }
+
+            return null;
         }
 
         public LLVMValueRef Visit(IfExpression ifExpression)
@@ -648,6 +658,7 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(NewExpression newExpression)
         {
+            Next(newExpression.Type);
             var objectDecl = newExpression.DataType!.ObjectDecl!;
             var type = objectDecl.LlvmType!.Value;
             var malloc = LLVM.BuildMalloc(

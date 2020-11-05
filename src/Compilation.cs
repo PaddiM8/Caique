@@ -66,7 +66,7 @@ namespace Caique
                 }
 
                 // Code generation
-                    if (!Diagnostics.Any())
+                if (!Diagnostics.Any())
                 {
                     foreach (var ast in asts)
                     {
@@ -101,7 +101,7 @@ namespace Caique
         /// <param name="environment">Module tree.</param>
         /// <returns>List of abstract syntax trees.</returns>
         private List<AbstractSyntaxTree> ParseModuleEnvironment(ModuleEnvironment environment,
-                                                 List<AbstractSyntaxTree> asts)
+                                                                List<AbstractSyntaxTree> asts)
         {
             foreach (var (_, module) in environment.Modules)
             {
@@ -129,7 +129,15 @@ namespace Caique
                     Diagnostics,
                     module
                 ).Parse();
-                asts.Add(new AbstractSyntaxTree(ast, module));
+
+                if (module.Identifier == "main")
+                {
+                    asts.Insert(0, new AbstractSyntaxTree(ast, module));
+                }
+                else
+                {
+                    asts.Add(new AbstractSyntaxTree(ast, module));
+                }
 
                 ParseModuleEnvironment(module, asts);
             }

@@ -183,22 +183,6 @@ namespace Caique.Semantics
                 }
             }
 
-            // Parameters
-            /*classDeclStatement.ParameterRefDecls = new List<VariableDeclStatement>();
-            foreach (var parameterRef in classDeclStatement.ParameterRefTokens)
-            {
-                var parameterRefDecl = classDeclStatement.GetVariable(parameterRef.Value);
-                if (parameterRefDecl == null)
-                {
-                    _diagnostics.ReportSymbolDoesNotExist(parameterRef);
-                }
-                else
-                {
-                    // Add the declarations to the list
-                    classDeclStatement.ParameterRefDecls.Add(parameterRefDecl);
-                }
-            }*/
-
             Next(classDeclStatement.Body);
 
             // Constructor
@@ -396,7 +380,6 @@ namespace Caique.Semantics
         public DataType Visit(CallExpression callExpression)
         {
             var lastIdentifier = callExpression.ModulePath[^1];
-            var environment = _environment;
             if (callExpression.ModulePath.Count > 1)
             {
                 var module = GetModule(callExpression.ModulePath);
@@ -404,7 +387,7 @@ namespace Caique.Semantics
                 _environment = module.SymbolEnvironment;
             }
 
-            var functionDecl = environment.GetFunction(lastIdentifier.Value);
+            var functionDecl = _environment.GetFunction(lastIdentifier.Value);
             var type = CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
             callExpression.FunctionDecl = functionDecl;
             callExpression.DataType = type;
@@ -473,7 +456,10 @@ namespace Caique.Semantics
                 }
             }
 
-            var classDecl = _ast.ModuleEnvironment.GetClass(typeExpression.ModulePath);
+            var (classDecl, importedModule) = _ast.ModuleEnvironment.GetClass(
+                typeExpression.ModulePath
+            );
+            typeExpression.ImportedModule = importedModule;
             var lastIdentifier = typeExpression.ModulePath[^1];
 
             if (classDecl == null)
