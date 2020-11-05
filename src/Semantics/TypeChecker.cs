@@ -240,7 +240,7 @@ namespace Caique.Semantics
         {
             var valueType = Next(unaryExpression.Value);
             unaryExpression.DataType = valueType;
-            if (!valueType.IsNumber())
+            if (!valueType.IsNumber)
             {
                 _diagnostics.ReportUnexpectedType(
                     valueType,

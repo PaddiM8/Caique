@@ -367,7 +367,7 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(BinaryExpression binaryExpression)
         {
-            bool isFloat = binaryExpression.DataType!.IsFloat();
+            bool isFloat = binaryExpression.DataType!.IsFloat;
             LLVMValueRef leftValue = Next(binaryExpression.Left);
             LLVMValueRef rightValue = Next(binaryExpression.Right);
             if (binaryExpression.Operator.Kind.IsComparisonOperator())
@@ -410,12 +410,12 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(LiteralExpression literalExpression)
         {
             var dataType = literalExpression.DataType!;
-            if (dataType.IsNumber())
+            if (dataType.IsNumber)
             {
                 string tokenValue = literalExpression.Value.Value;
 
                 // Float
-                if (dataType.IsFloat())
+                if (dataType.IsFloat)
                 {
                     return LLVM.ConstReal(
                         LLVM.FloatType(),
