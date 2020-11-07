@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -93,16 +94,23 @@ namespace Caique.Cli
             var compilation = new Compilation(environment, sourcePath);
 
             compilation.Compile(targetPath);
-            LinkObjectFiles(targetPath, options.StdPath);
-
-            // Run the generated executable
-            Process.Start(targetPath + "/main");
+            if (LinkObjectFiles(targetPath, options.StdPath))
+                // Run the generated executable
+                Process.Start(targetPath + "/main");
         }
 
-        private static void LinkObjectFiles(string targetPath, string stdPath)
+        private static bool LinkObjectFiles(string targetPath, string stdPath)
         {
             var objectFiles = Directory.GetFiles(targetPath, "*.o").ToList();
-            objectFiles.AddRange(Directory.GetFiles(stdPath));
+
+            var absoluteStdPath = Path.Combine(Environment.CurrentDirectory, stdPath);
+            if (!Directory.Exists(absoluteStdPath))
+            {
+                Console.WriteLine("Standard library could not be found.");
+                return false;
+            }
+
+            objectFiles.AddRange(Directory.GetFiles(absoluteStdPath));
 
             var process = new Process()
             {
@@ -115,6 +123,8 @@ namespace Caique.Cli
             };
             process.Start();
             process.WaitForExit();
+
+            return process.ExitCode == 0;
         }
 
         private (ModuleEnvironment, string sourcePath, string targetPath)
