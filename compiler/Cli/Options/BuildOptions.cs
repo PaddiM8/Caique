@@ -15,6 +15,9 @@ namespace Caique.Cli.Options
         [Option("environment", Required = false, HelpText = "Print the module/symbol environment")]
         public bool PrintEnvironment { get; set; }
 
+        [Value("std-path", HelpText = "Path to the standard library object files.")]
+        public string? StdPath { get; set; }
+
         [Value(0, MetaName = "project file path", HelpText = "Path to the project.toml file")]
         public string? ProjectFilePath { get; set; }
     }

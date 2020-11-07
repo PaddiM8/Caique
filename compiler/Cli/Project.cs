@@ -67,41 +67,43 @@ namespace Caique.Cli
         /// <summary>
         /// Compile the project.
         /// </summary>
-        public void Build(BuildOptions buildOptions)
+        public void Build(BuildOptions options)
         {
             string projectPath = _projectFile!.Directory!.FullName;
             var (environment, sourcePath, targetPath) = PrepareBuild(projectPath);
 
             var compilation = new Compilation(environment, sourcePath)
             {
-                PrintTokens = buildOptions.PrintTokens,
-                PrintAst = buildOptions.PrintAst,
-                PrintEnvironment = buildOptions.PrintEnvironment
+                PrintTokens = options.PrintTokens,
+                PrintAst = options.PrintAst,
+                PrintEnvironment = options.PrintEnvironment
             };
 
             compilation.Compile(targetPath);
-            LinkObjectFiles(targetPath);
+            LinkObjectFiles(targetPath, options.StdPath);
         }
 
         /// <summary>
         /// Run the project.
         /// </summary>
-        public void Run(RunOptions _)
+        public void Run(RunOptions options)
         {
             string projectPath = _projectFile!.Directory!.FullName;
             var (environment, sourcePath, targetPath) = PrepareBuild(projectPath);
             var compilation = new Compilation(environment, sourcePath);
 
             compilation.Compile(targetPath);
-            LinkObjectFiles(targetPath);
+            LinkObjectFiles(targetPath, options.StdPath);
 
             // Run the generated executable
             Process.Start(targetPath + "/main");
         }
 
-        private static void LinkObjectFiles(string targetPath)
+        private static void LinkObjectFiles(string targetPath, string stdPath)
         {
-            var objectFiles = Directory.GetFiles(targetPath, "*.o");
+            var objectFiles = Directory.GetFiles(targetPath, "*.o").ToList();
+            objectFiles.AddRange(Directory.GetFiles(stdPath));
+
             var process = new Process()
             {
                 StartInfo = new ProcessStartInfo
