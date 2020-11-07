@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -421,7 +421,7 @@ namespace Caique.CodeGeneration
                 if (dataType.IsFloat)
                 {
                     return LLVM.ConstReal(
-                        LLVM.FloatType(),
+                        dataType.ToLlvmType(),
                         double.Parse(tokenValue)
                     );
                 }
@@ -429,7 +429,7 @@ namespace Caique.CodeGeneration
                 {
                     var value = ulong.Parse(tokenValue);
                     return LLVM.ConstInt(
-                        LLVM.Int32Type(),
+                        dataType.ToLlvmType(),
                         value,
                         value < 0 ? 0 : 1
                     );
