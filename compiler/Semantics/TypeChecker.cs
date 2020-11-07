@@ -327,6 +327,13 @@ namespace Caique.Semantics
 
                 return type;
             }
+            else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
+            {
+                var type = new DataType(TypeKeyword.StringConstant);
+                literalExpression.DataType = type;
+
+                return type;
+            }
 
             throw new NotImplementedException();
         }
@@ -452,7 +459,11 @@ namespace Caique.Semantics
 
                 if (keyword != TypeKeyword.Identifier)
                 {
-                    var dataType = new DataType(keyword);
+                    var dataType = new DataType(
+                        keyword,
+                        null,
+                        typeExpression.IsExplicitPointer
+                    );
                     typeExpression.DataType = dataType;
 
                     return dataType;
@@ -470,7 +481,11 @@ namespace Caique.Semantics
                 _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
             }
 
-            var type = new DataType(TypeKeyword.Identifier, classDecl);
+            var type = new DataType(
+                TypeKeyword.Identifier,
+                classDecl,
+                typeExpression.IsExplicitPointer
+            );
             typeExpression.DataType = type;
 
             return type;

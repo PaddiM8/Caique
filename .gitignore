@@ -1,4 +1,4 @@
 .*
 !.gitignore
 !.vscode
-std/bin
+std/llvm/bin

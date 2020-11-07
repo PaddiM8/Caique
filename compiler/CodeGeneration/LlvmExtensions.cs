@@ -13,7 +13,7 @@ namespace Caique.CodeGeneration
         {
             var keyword = dataType.Type;
 
-            return keyword switch
+            var type = keyword switch
             {
                 TypeKeyword.i8 => LLVM.Int8Type(),
                 TypeKeyword.i32 => LLVM.Int32Type(),
@@ -24,9 +24,14 @@ namespace Caique.CodeGeneration
                 TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Void => LLVM.VoidType(),
                 TypeKeyword.Identifier => LLVM.PointerType(dataType.ObjectDecl!.LlvmType!.Value, 0),
+                TypeKeyword.StringConstant => LLVM.PointerType(LLVM.Int8Type(), 0),
                 TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };
+
+            return dataType.IsExplicitPointer
+                ? LLVM.PointerType(type, 0)
+                : type;
         }
 
         public static unsafe LLVMOpaqueType** ToLlvmTypeArray(this ICollection<DataType> dataTypes)

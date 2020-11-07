@@ -103,14 +103,14 @@ namespace Caique.Cli
         {
             var objectFiles = Directory.GetFiles(targetPath, "*.o").ToList();
 
-            var absoluteStdPath = Path.Combine(Environment.CurrentDirectory, stdPath);
-            if (!Directory.Exists(absoluteStdPath))
+            var llvmStdPath = Path.Combine(Environment.CurrentDirectory, stdPath, "llvm/bin");
+            if (!Directory.Exists(llvmStdPath))
             {
                 Console.WriteLine("Standard library could not be found.");
                 return false;
             }
 
-            objectFiles.AddRange(Directory.GetFiles(absoluteStdPath));
+            objectFiles.AddRange(Directory.GetFiles(llvmStdPath));
 
             var process = new Process()
             {

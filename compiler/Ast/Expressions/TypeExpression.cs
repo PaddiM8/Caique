@@ -11,10 +11,13 @@ namespace Caique.Ast
 
         public ModuleEnvironment? ImportedModule { get; set; }
 
-        public TypeExpression(List<Token> modulePath)
+        public bool IsExplicitPointer { get; set; }
+
+        public TypeExpression(List<Token> modulePath, bool isExplicitPointer = false)
             : base(modulePath[0].Span.Add(modulePath[^1].Span))
         {
             ModulePath = modulePath;
+            IsExplicitPointer = isExplicitPointer;
         }
     }
 }

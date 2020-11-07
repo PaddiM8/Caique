@@ -607,14 +607,14 @@ namespace Caique.Parsing
         {
             if (Match(TokenKind.Identifier))
             {
-                return new TypeExpression(ParseModulePath());
+                return new TypeExpression(ParseModulePath(), Consume(TokenKind.Star));
             }
             else
             {
                 return new TypeExpression(new List<Token>()
                 {
                     Advance()
-                });
+                }, Consume(TokenKind.Star));
             }
         }
 

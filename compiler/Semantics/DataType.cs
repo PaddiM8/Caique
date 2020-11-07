@@ -13,6 +13,10 @@ namespace Caique.Semantics
 
         public ClassDeclStatement? ObjectDecl { get; }
 
+        public bool IsExplicitPointer { get; }
+
+        public bool Allocated { get; private set; }
+
         public bool IsNumber { get => IsInt || IsFloat; }
 
         public bool IsInt
@@ -37,10 +41,16 @@ namespace Caique.Semantics
             };
         }
 
-        public DataType(TypeKeyword type, ClassDeclStatement? objectDecl = null)
+        public bool IsString
+        {
+            get => Type == TypeKeyword.i8 && IsExplicitPointer;
+        }
+
+        public DataType(TypeKeyword type, ClassDeclStatement? objectDecl = null, bool isExplicitPointer = false)
         {
             Type = type;
             ObjectDecl = objectDecl;
+            IsExplicitPointer = isExplicitPointer;
         }
 
         /// <summary>
@@ -48,6 +58,12 @@ namespace Caique.Semantics
         /// </summary>
         public bool IsCompatible(DataType expected)
         {
+            // String
+            if (Type == TypeKeyword.StringConstant && expected.IsString ||
+                expected.Type == TypeKeyword.StringConstant && IsString)
+                return true;
+
+
             // Objects
             if (ObjectDecl != null && expected.ObjectDecl != null)
             {
@@ -63,9 +79,11 @@ namespace Caique.Semantics
 
         public override string ToString()
         {
-            return Type == TypeKeyword.Identifier
+            string baseType = Type == TypeKeyword.Identifier
                 ? ObjectDecl!.Identifier.Value
                 : Type.ToString().ToLower();
+
+            return baseType + (IsExplicitPointer ? "*" : "");
         }
     }
 }

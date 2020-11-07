@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -432,6 +432,31 @@ namespace Caique.CodeGeneration
                         dataType.ToLlvmType(),
                         value,
                         value < 0 ? 0 : 1
+                    );
+                }
+            }
+            else if (dataType.Type == TypeKeyword.StringConstant)
+            {
+                LLVMValueRef globalString = LLVM.BuildGlobalString(
+                    _builder,
+                    literalExpression.Value.Value.ToCString(),
+                    ".str".ToCString()
+                );
+
+                var indices = new LLVMOpaqueValue*[]
+                {
+                    LLVM.ConstInt(LLVM.Int64Type(), 0, 0),
+                    LLVM.ConstInt(LLVM.Int64Type(), 0, 0),
+                };
+
+                fixed (LLVMOpaqueValue** indicesRef = indices)
+                {
+                    return LLVM.BuildGEP(
+                        _builder,
+                        globalString,
+                        indicesRef,
+                        2,
+                        "str".ToCString()
                     );
                 }
             }
