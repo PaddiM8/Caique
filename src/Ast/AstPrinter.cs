@@ -77,7 +77,8 @@ namespace Caique.Ast
             if (functionDeclStatement.ReturnType != null)
                 Next(functionDeclStatement.ReturnType);
 
-            Next(functionDeclStatement.Body);
+            if (functionDeclStatement.Body != null)
+                Next(functionDeclStatement.Body);
             _indentationLevel--;
 
             return null!;

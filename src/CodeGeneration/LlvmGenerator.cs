@@ -47,11 +47,12 @@ namespace Caique.CodeGeneration
                         foreach (var function in classDeclStatement.Body.Environment.Functions)
                         {
                             Next(function);
-                            functions.Add(function);
+                            if (function.Body != null) functions.Add(function);
                         }
                         break;
                     case FunctionDeclStatement functionDeclStatement:
-                        functions.Add(functionDeclStatement);
+                        if (functionDeclStatement.Body != null)
+                            functions.Add(functionDeclStatement);
                         break;
                 }
             }
@@ -65,7 +66,7 @@ namespace Caique.CodeGeneration
                 };
 
                 _current.FunctionDecl = functionDeclStatement;
-                Next(functionDeclStatement.Body);
+                Next(functionDeclStatement.Body!);
             }
 
             sbyte* moduleError;
@@ -275,9 +276,11 @@ namespace Caique.CodeGeneration
             );
             functionDeclStatement.LlvmValue = function;
 
-            // If a call/new expression triggered this function,
+            // If the function doesn't have a body,
+            // or a call/new expression triggered this function,
             // it just needs the declaration, not the body.
-            if (_current.Parent?.Expression is CallExpression ||
+            if (functionDeclStatement.Body == null ||
+                _current.Parent?.Expression is CallExpression ||
                 _current.Parent?.Expression is TypeExpression)
             {
                 return function;
@@ -495,7 +498,7 @@ namespace Caique.CodeGeneration
             // If it belongs to a function
             // Build the appropriate return statement for the function
             if (functionDeclStatement != null &&
-                functionDeclStatement.Body.DataType?.Type != TypeKeyword.Void)
+                functionDeclStatement.Body!.DataType?.Type != TypeKeyword.Void)
             {
                 LLVM.BuildRet(
                     _builder,

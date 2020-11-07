@@ -10,7 +10,7 @@ namespace Caique.Ast
 
         public List<Parameter> Parameters { get; }
 
-        public BlockExpression Body { get; }
+        public BlockExpression? Body { get; }
 
         public TypeExpression? ReturnType { get; }
 
@@ -22,7 +22,7 @@ namespace Caique.Ast
 
         public FunctionDeclStatement(Token identifier,
                                      List<Parameter> parameters,
-                                     BlockExpression body,
+                                     BlockExpression? body,
                                      TypeExpression? returnType,
                                      bool isInitFunction,
                                      TextSpan span) : base(span)

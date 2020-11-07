@@ -190,20 +190,26 @@ namespace Caique.Parsing
             TypeExpression? returnType = Consume(TokenKind.Colon)
                 ? ParseType()
                 : null;
-            var body = ParseBlock();
+            BlockExpression? body = null;
 
-            // Add the parameters to the symbol table
-            foreach (var parameter in parameters)
+            // If it has a body
+            if (!Consume(TokenKind.Semicolon))
             {
-                body.Environment.Add(
-                    new VariableDeclStatement(
-                        parameter.Identifier,
-                        parameter.Type!.Span.Add(parameter.Identifier.Span),
-                        null,
-                        parameter.Type,
-                        VariableType.FunctionParameter
-                    )
-                );
+                body = ParseBlock();
+
+                // Add the parameters to the symbol table
+                foreach (var parameter in parameters)
+                {
+                    body.Environment.Add(
+                        new VariableDeclStatement(
+                            parameter.Identifier,
+                            parameter.Type!.Span.Add(parameter.Identifier.Span),
+                            null,
+                            parameter.Type,
+                            VariableType.FunctionParameter
+                        )
+                    );
+                }
             }
 
             var statement = new FunctionDeclStatement(
@@ -212,7 +218,7 @@ namespace Caique.Parsing
                 body,
                 returnType,
                 false,
-                start.Add(body.Span)
+                start.Add(start)
             );
 
             _symbolEnvironment.Add(statement);

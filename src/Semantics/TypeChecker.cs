@@ -153,12 +153,15 @@ namespace Caique.Semantics
                 parameter.DataType = parameter.Type!.DataType;
             }
 
-            var bodyType = Next(functionDeclStatement.Body);
-            CheckTypes(
-                _current.CurrentFunctionType!,
-                bodyType,
-                functionDeclStatement.Body.Span
-            );
+            if (functionDeclStatement.Body != null)
+            {
+                var bodyType = Next(functionDeclStatement.Body);
+                CheckTypes(
+                    _current.CurrentFunctionType!,
+                    bodyType,
+                    functionDeclStatement.Body.Span
+                );
+            }
 
             return null!;
         }
@@ -205,7 +208,7 @@ namespace Caique.Semantics
                     }
                 }
 
-                var initBodyType = Next(classDeclStatement.InitFunction.Body);
+                var initBodyType = Next(classDeclStatement.InitFunction.Body!);
                 CheckTypes(
                     initBodyType,
                     _voidType,
