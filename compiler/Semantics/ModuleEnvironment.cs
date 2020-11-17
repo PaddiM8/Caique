@@ -85,7 +85,7 @@ namespace Caique.Semantics
                 // Code generation
                 if (!Diagnostics.Any())
                 {
-                    using var generator = new LlvmGenerator(this);
+                    var generator = new LlvmGenerator(this);
                     generator.Generate();
                     generator.GenerateObjectFile(_outputDirectory);
                 }
