@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\Caique.csproj" />
+    <ProjectReference Include="..\compiler\Caique.csproj" />
   </ItemGroup>
 
 </Project>

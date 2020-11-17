@@ -10,12 +10,14 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/src/bin/Debug/netcoreapp5.0/Caique.dll",
+            "program": "${workspaceFolder}/compiler/bin/Debug/netcoreapp5.0/Caique.dll",
             "args": [
-                "build",
-                "experiments/two/project.toml"
+                "run",
+                "experiments/two/project.toml",
+                "--std-path",
+                "../std/"
             ],
-            "cwd": "${workspaceFolder}/src",
+            "cwd": "${workspaceFolder}/compiler",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
