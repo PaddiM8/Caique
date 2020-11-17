@@ -81,42 +81,6 @@ namespace Caique.CodeGeneration
 
             // Print out the LLVM IR
             LLVM.DumpModule(_llvmModule);
-
-            // Everything below is temporary code for testing purpsoes
-            /*LLVM.LinkInMCJIT();
-
-            LLVM.InitializeX86TargetMC();
-            LLVM.InitializeX86Target();
-            LLVM.InitializeX86TargetInfo();
-            LLVM.InitializeX86AsmParser();
-            LLVM.InitializeX86AsmPrinter();
-
-            var options = new LLVMMCJITCompilerOptions { NoFramePointerElim = 1 };
-            var optionsSize = new UIntPtr(1);
-            LLVM.InitializeMCJITCompilerOptions(&options, optionsSize);
-
-            LLVMOpaqueExecutionEngine* engine;
-            sbyte* error;
-            if (LLVM.CreateMCJITCompilerForModule(&engine, _llvmModule, &options, optionsSize, &error) != 0)
-            {
-                Console.WriteLine($"Error: {*error}");
-            }
-
-            LLVMOpaqueValue* mainFnValue;
-            if (LLVM.FindFunction(engine, "main".ToCString(), &mainFnValue) == 0)
-            {
-                var mainFn = (Main)Marshal.GetDelegateForFunctionPointer(
-                    (IntPtr)LLVM.GetPointerToGlobal(engine, mainFnValue),
-                    typeof(Main)
-                );
-                float result = mainFn();
-
-                Console.WriteLine("Result: " + result);
-            }
-            else
-            {
-                Console.WriteLine("Couldn't find main function.");
-            }*/
         }
 
         public void Dispose()
@@ -615,13 +579,14 @@ namespace Caique.CodeGeneration
                     arguments[0] = _current.DotExpressionObject!.Value;
                 }
 
-                return LLVM.BuildCall(
+                var call = LLVM.BuildCall(
                     _builder,
                     functionDecl.LlvmValue!.Value,
                     arguments,
                     (uint)argumentCount,
                     identifier.ToCString()
                 );
+                return call;
             }
         }
 

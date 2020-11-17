@@ -143,8 +143,9 @@ namespace Caique.Semantics
             }
             else if (_libraryPaths.TryGetValue(modulePath.First(), out string? libraryPath)) // Library
             {
-                filePath = libraryPath;
+                filePath = Path.Combine(libraryPath, "src");
                 module = Root;
+                modulePath = modulePath.Skip(1);
             }
             else // Normal, relative module
             {

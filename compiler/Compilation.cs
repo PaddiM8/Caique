@@ -29,10 +29,12 @@ namespace Caique
         public bool PrintEnvironment { get; set; }
 
         private readonly string _rootPath = "";
+        private readonly Dictionary<string, string> _libraryPaths;
 
-        public Compilation(string rootPath)
+        public Compilation(string rootPath, Dictionary<string, string> libraryPaths)
         {
             _rootPath = rootPath;
+            _libraryPaths = libraryPaths;
         }
 
         public void Compile(string targetPath)
@@ -47,7 +49,7 @@ namespace Caique
                 "root",
                 _rootPath,
                 targetPath,
-                new Dictionary<string, string>(),
+                _libraryPaths,
                 Diagnostics
             );
 
@@ -64,79 +66,7 @@ namespace Caique
                 diagnostic.Print();
         }
 
-        /// <summary>
-        /// Traverses a module tree and reads the files associated
-        /// with the different modules, and then parses the contents.
-        /// </summary>
-        /// <param name="environment">Module tree.</param>
-        /// <returns>List of abstract syntax trees.</returns>
-        private List<AbstractSyntaxTree> ParseModuleEnvironment(ModuleEnvironment environment)
-        {
-            return ParseModuleEnvironment(environment, new List<AbstractSyntaxTree>());
-        }
-
-        /// <summary>
-        /// Traverses a module tree and reads the files associated
-        /// with the different modules, and then parses the contents.
-        /// </summary>
-        /// <param name="environment">Module tree.</param>
-        /// <returns>List of abstract syntax trees.</returns>
-        private List<AbstractSyntaxTree> ParseModuleEnvironment(ModuleEnvironment environment,
-                                                                List<AbstractSyntaxTree> asts)
-        {
-            foreach (var (_, module) in environment.Modules)
-            {
-                // If the module is a directory, just parse its children and continue
-                if (module.FilePath == null)
-                {
-                    ParseModuleEnvironment(module, asts);
-                    continue;
-                }
-
-                // Set up diagnostic bag
-                Diagnostics.CurrentFile = RelativePath(module.FilePath);
-
-                // Lex
-                var tokens = new Lexer(
-                    File.ReadAllText(module.FilePath),
-                    Diagnostics)
-                .Lex();
-
-                if (PrintTokens) PrintTokenList(tokens);
-
-                // Parse
-                var ast = new Parser(
-                    tokens,
-                    Diagnostics,
-                    module
-                ).Parse();
-
-                if (module.Identifier == "main")
-                {
-                    asts.Insert(0, new AbstractSyntaxTree(ast, module));
-                }
-                else
-                {
-                    asts.Add(new AbstractSyntaxTree(ast, module));
-                }
-
-                ParseModuleEnvironment(module, asts);
-            }
-
-            return asts;
-        }
-
-        /// <summary>
-        /// Turn an absolute path of a file inside 
-        /// a Caique project, into a relative path.
-        /// </summary>
-        /// <param name="path">Absolute path</param>
-        /// <returns>Relative path starting at the root of the source folder.</returns>
-        private string RelativePath(string path)
-        {
-            return Path.GetRelativePath(_rootPath, path);
-        }
-
+        // TODO: Move this
         private static void PrintTokenList(List<Token> tokens)
         {
             foreach (var token in tokens)

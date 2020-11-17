@@ -17,17 +17,19 @@ namespace Caique.Cli
     /// </summary>
     public class Project
     {
-        private FileInfo? _projectFile;
-        private readonly HashSet<string> _ignoredDirectories = new HashSet<string>
-        {
-            "target"
-        };
+        private FileInfo? _projectFileInfo;
+        private ProjectFile? _projectFile;
 
         public static Project Load(string projectFilePath)
         {
+            var projectFile = Toml.ReadFile<ProjectFile>(projectFilePath);
+            string programPath = Process.GetCurrentProcess().MainModule!.FileName!;
+            projectFile.Dependencies.Add("core", Path.Combine(programPath, "std/caique"));
+
             return new Project
             {
-                _projectFile = new FileInfo(projectFilePath)
+                _projectFileInfo = new FileInfo(projectFilePath),
+                _projectFile = projectFile
             };
         }
 
@@ -61,7 +63,7 @@ namespace Caique.Cli
 
             return new Project
             {
-                _projectFile = new FileInfo(projectFilePath)
+                _projectFileInfo = new FileInfo(projectFilePath)
             };
         }
 
@@ -70,10 +72,10 @@ namespace Caique.Cli
         /// </summary>
         public void Build(BuildOptions options)
         {
-            string projectPath = _projectFile!.Directory!.FullName;
-            var (sourcePath, targetPath) = PrepareBuild(projectPath);
+            string projectPath = _projectFileInfo!.Directory!.FullName;
+            var (sourcePath, targetPath) = PrepareBuild(projectPath, options.StdPath);
 
-            var compilation = new Compilation(sourcePath)
+            var compilation = new Compilation(sourcePath, _projectFile!.Dependencies)
             {
                 PrintTokens = options.PrintTokens,
                 PrintAst = options.PrintAst,
@@ -89,9 +91,9 @@ namespace Caique.Cli
         /// </summary>
         public void Run(RunOptions options)
         {
-            string projectPath = _projectFile!.Directory!.FullName;
-            var (sourcePath, targetPath) = PrepareBuild(projectPath);
-            var compilation = new Compilation(sourcePath);
+            string projectPath = _projectFileInfo!.Directory!.FullName;
+            var (sourcePath, targetPath) = PrepareBuild(projectPath, options.StdPath);
+            var compilation = new Compilation(sourcePath, _projectFile!.Dependencies);
 
             compilation.Compile(targetPath);
             if (LinkObjectFiles(targetPath, options.StdPath))
@@ -128,10 +130,13 @@ namespace Caique.Cli
         }
 
         private (string sourcePath, string targetPath)
-            PrepareBuild(string projectPath)
+            PrepareBuild(string projectPath, string stdPath)
         {
             string sourcePath = $"{projectPath}/src";
             string targetPath = $"{projectPath}/target";
+
+            if (!string.IsNullOrEmpty(stdPath))
+                _projectFile!.Dependencies["core"] = Path.Combine(stdPath, "caique");
 
             // TODO: Cache
             if (Directory.Exists(targetPath))
@@ -146,56 +151,5 @@ namespace Caique.Cli
 
             return (sourcePath, targetPath);
         }
-
-        /// <summary>
-        /// Scan the directory structure and build a module tree based of it.
-        /// </summary>
-        /// <param name="path">Path to the soruce directory.</param>
-        /// <returns>Module tree.</returns>
-        /*private ModuleEnvironment CreateModuleEnvironment(string path)
-        {
-            var rootEnvironment = new ModuleEnvironment(
-                "root",
-                path
-           );
-            //CreateModuleEnvironment(path, rootEnvironment);
-
-            return rootEnvironment;
-        }*/
-
-        /// <summary>
-        /// Scan the directory structure and build a module tree based of it.
-        /// </summary>
-        /// <param name="path">Path to the soruce directory.</param>
-        /// <returns>Module tree.</returns>
-        /*private ModuleEnvironment CreateModuleEnvironment(string path, ModuleEnvironment environment)
-        {
-            var directories = Directory.GetDirectories(path);
-            bool hasSubDirectory = false;
-            foreach (var directoryPath in directories)
-            {
-                string identifier = Path.GetFileName(directoryPath)!;
-                if (identifier.StartsWith(".") ||
-                    _ignoredDirectories.Contains(identifier)) continue;
-
-                hasSubDirectory = true;
-
-                environment = CreateModuleEnvironment(
-                    directoryPath,
-                    environment.CreateChildModule(identifier)
-                );
-            }
-
-            if (hasSubDirectory) environment = environment.Parent!;
-
-            foreach (var filePath in Directory.GetFiles(path))
-            {
-                if (!filePath.EndsWith(".cq")) continue;
-                string identifier = Path.GetFileNameWithoutExtension(filePath);
-                environment.CreateChildModule(identifier, filePath);
-            }
-
-            return environment;
-        }*/
     }
 }

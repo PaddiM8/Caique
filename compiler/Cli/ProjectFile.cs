@@ -11,6 +11,7 @@ namespace Caique.Cli
 
         public string? Version { get; set; }
 
-        public Dictionary<string, string>? Dependencies { get; set; }
+        public Dictionary<string, string> Dependencies { get; set; } =
+            new Dictionary<string, string>();
     }
 }
