@@ -71,9 +71,9 @@ namespace Caique.Cli
         public void Build(BuildOptions options)
         {
             string projectPath = _projectFile!.Directory!.FullName;
-            var (environment, sourcePath, targetPath) = PrepareBuild(projectPath);
+            var (sourcePath, targetPath) = PrepareBuild(projectPath);
 
-            var compilation = new Compilation(environment, sourcePath)
+            var compilation = new Compilation(sourcePath)
             {
                 PrintTokens = options.PrintTokens,
                 PrintAst = options.PrintAst,
@@ -90,8 +90,8 @@ namespace Caique.Cli
         public void Run(RunOptions options)
         {
             string projectPath = _projectFile!.Directory!.FullName;
-            var (environment, sourcePath, targetPath) = PrepareBuild(projectPath);
-            var compilation = new Compilation(environment, sourcePath);
+            var (sourcePath, targetPath) = PrepareBuild(projectPath);
+            var compilation = new Compilation(sourcePath);
 
             compilation.Compile(targetPath);
             if (LinkObjectFiles(targetPath, options.StdPath))
@@ -127,20 +127,24 @@ namespace Caique.Cli
             return process.ExitCode == 0;
         }
 
-        private (ModuleEnvironment, string sourcePath, string targetPath)
+        private (string sourcePath, string targetPath)
             PrepareBuild(string projectPath)
         {
             string sourcePath = $"{projectPath}/src";
             string targetPath = $"{projectPath}/target";
 
             // TODO: Cache
-            foreach (var targetFile in Directory.GetFiles(targetPath))
-                File.Delete(targetFile);
-
-            if (!Directory.Exists(targetPath))
+            if (Directory.Exists(targetPath))
+            {
+                foreach (var targetFile in Directory.GetFiles(targetPath))
+                    File.Delete(targetFile);
+            }
+            else
+            {
                 Directory.CreateDirectory(targetPath);
+            }
 
-            return (CreateModuleEnvironment(sourcePath), sourcePath, targetPath);
+            return (sourcePath, targetPath);
         }
 
         /// <summary>
@@ -148,20 +152,23 @@ namespace Caique.Cli
         /// </summary>
         /// <param name="path">Path to the soruce directory.</param>
         /// <returns>Module tree.</returns>
-        private ModuleEnvironment CreateModuleEnvironment(string path)
+        /*private ModuleEnvironment CreateModuleEnvironment(string path)
         {
-            var rootEnvironment = new ModuleEnvironment("root");
-            CreateModuleEnvironment(path, rootEnvironment);
+            var rootEnvironment = new ModuleEnvironment(
+                "root",
+                path
+           );
+            //CreateModuleEnvironment(path, rootEnvironment);
 
             return rootEnvironment;
-        }
+        }*/
 
         /// <summary>
         /// Scan the directory structure and build a module tree based of it.
         /// </summary>
         /// <param name="path">Path to the soruce directory.</param>
         /// <returns>Module tree.</returns>
-        private ModuleEnvironment CreateModuleEnvironment(string path, ModuleEnvironment environment)
+        /*private ModuleEnvironment CreateModuleEnvironment(string path, ModuleEnvironment environment)
         {
             var directories = Directory.GetDirectories(path);
             bool hasSubDirectory = false;
@@ -189,6 +196,6 @@ namespace Caique.Cli
             }
 
             return environment;
-        }
+        }*/
     }
 }

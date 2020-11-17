@@ -12,7 +12,7 @@ namespace Caique.CodeGeneration
 {
     public unsafe class LlvmGenerator : IAstTraverser<LLVMValueRef, LLVMValueRef>, IDisposable
     {
-        private readonly AbstractSyntaxTree _ast;
+        private readonly ModuleEnvironment _module;
         private readonly LLVMContextRef _context;
         private readonly LLVMModuleRef _llvmModule;
         private readonly LLVMBuilderRef _builder;
@@ -21,12 +21,12 @@ namespace Caique.CodeGeneration
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int Main();
 
-        public LlvmGenerator(AbstractSyntaxTree ast)
+        public LlvmGenerator(ModuleEnvironment module)
         {
-            _ast = ast;
+            _module = module;
             _context = LLVM.ContextCreate();
             _llvmModule = LLVM.ModuleCreateWithName(
-                ast.ModuleEnvironment.Identifier.ToCString()
+                _module.Identifier.ToCString()
             );
             _builder = LLVM.CreateBuilderInContext(_context);
         }
@@ -34,13 +34,13 @@ namespace Caique.CodeGeneration
         public void Generate()
         {
             var functions = new List<FunctionDeclStatement>();
-            foreach (var statement in _ast.Statements)
+            foreach (var statement in _module.Ast!)
             {
-                Next(statement);
-
                 switch (statement)
                 {
                     case ClassDeclStatement classDeclStatement:
+                        Next(statement);
+
                         if (classDeclStatement.InitFunction != null)
                             functions.Add(classDeclStatement.InitFunction);
 
@@ -51,6 +51,8 @@ namespace Caique.CodeGeneration
                         }
                         break;
                     case FunctionDeclStatement functionDeclStatement:
+                        Next(statement);
+
                         if (functionDeclStatement.Body != null)
                             functions.Add(functionDeclStatement);
                         break;
@@ -148,7 +150,7 @@ namespace Caique.CodeGeneration
 
             string name = isLinked
                 ? "linked"
-                : _ast.ModuleEnvironment.Identifier;
+                : _module.Identifier;
 
             _ = LLVM.TargetMachineEmitToFile(
                 targetMachine,

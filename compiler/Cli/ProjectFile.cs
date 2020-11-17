@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Caique.Cli
 {
@@ -9,5 +10,7 @@ namespace Caique.Cli
         public string? Author { get; set; }
 
         public string? Version { get; set; }
+
+        public Dictionary<string, string>? Dependencies { get; set; }
     }
 }

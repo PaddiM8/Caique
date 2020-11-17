@@ -200,7 +200,7 @@ namespace Caique.Parsing
                 // Add the parameters to the symbol table
                 foreach (var parameter in parameters)
                 {
-                    body.Environment.Add(
+                    body.Environment.TryAdd(
                         new VariableDeclStatement(
                             parameter.Identifier,
                             parameter.Type!.Span.Add(parameter.Identifier.Span),
@@ -246,7 +246,7 @@ namespace Caique.Parsing
                 init
             );
 
-            _moduleEnvironment.Parent!.Add(statement);
+            _symbolEnvironment.Add(statement);
 
             return statement;
         }
@@ -315,7 +315,7 @@ namespace Caique.Parsing
                 index
             );
 
-            _symbolEnvironment.Add(statement);
+            _symbolEnvironment.TryAdd(statement);
 
             return statement;
         }
@@ -350,7 +350,7 @@ namespace Caique.Parsing
             foreach (var parameter in parameters)
             {
                 if (parameter.IsReference) continue;
-                block.Environment.Add(new VariableDeclStatement(
+                block.Environment.TryAdd(new VariableDeclStatement(
                     parameter.Identifier,
                     parameter.Identifier.Span,
                     null,

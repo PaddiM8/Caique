@@ -19,7 +19,7 @@ namespace Caique.Ast
             {
                 if (_ancestorType == null) return null;
 
-                return Module.GetClass(_ancestorType.ModulePath).classDecl;
+                return Module.GetClass(_ancestorType.ModulePath[^1].Value);
             }
         }
 

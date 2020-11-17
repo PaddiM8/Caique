@@ -10,7 +10,7 @@ namespace Caique.Semantics
 {
     class TypeChecker : IAstTraverser<object, DataType>
     {
-        private readonly AbstractSyntaxTree _ast;
+        private readonly ModuleEnvironment _module;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
         private TypeCheckerContext _current = new TypeCheckerContext();
@@ -18,11 +18,11 @@ namespace Caique.Semantics
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
         private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
 
-        public TypeChecker(AbstractSyntaxTree ast, DiagnosticBag diagnostics)
+        public TypeChecker(ModuleEnvironment module)
         {
-            _ast = ast;
-            _diagnostics = diagnostics;
-            _environment = ast.ModuleEnvironment.SymbolEnvironment;
+            _module = module;
+            _diagnostics = module.Diagnostics;
+            _environment = module.SymbolEnvironment;
         }
 
         private void Next(Statement statement)
@@ -44,7 +44,7 @@ namespace Caique.Semantics
 
         public void Analyse()
         {
-            foreach (var statement in _ast.Statements)
+            foreach (var statement in _module.Ast!)
                 Next(statement);
         }
 
@@ -82,14 +82,10 @@ namespace Caique.Semantics
                 variableDeclStatement.DataType = valueType;
             }
 
-            try
+            if (variableDeclStatement.VariableType == VariableType.Local)
             {
-                if (variableDeclStatement.VariableType == VariableType.Local)
-                    _environment.Add(variableDeclStatement);
-            }
-            catch (ArgumentException)
-            {
-                _diagnostics.ReportSymbolAlreadyExists(variableDeclStatement.Identifier);
+                if (!_environment.TryAdd(variableDeclStatement))
+                    _diagnostics.ReportSymbolAlreadyExists(variableDeclStatement.Identifier);
             }
 
             return null!;
@@ -221,15 +217,11 @@ namespace Caique.Semantics
 
         public object Visit(UseStatement useStatement)
         {
-            var module = _ast.ModuleEnvironment.FindByPath(
-                useStatement.ModulePath
-                    .Select(x => x.Value) // Convert Token into string
-                    .Prepend("root") // Start looking from the root
-            );
+            var module = _module.Parent!.FindByPath(useStatement.ModulePath);
 
             if (module != null)
             {
-                _ast.ModuleEnvironment.ImportModule(module);
+                _module.ImportModule(module);
             }
             else
             {
@@ -389,15 +381,35 @@ namespace Caique.Semantics
 
         public DataType Visit(CallExpression callExpression)
         {
-            var lastIdentifier = callExpression.ModulePath[^1];
-            if (callExpression.ModulePath.Count > 1)
+            var modulePath = callExpression.ModulePath;
+            var lastIdentifier = modulePath[^1];
+            var module = _module;
+            if (modulePath.Count > 1)
             {
-                var module = GetModule(callExpression.ModulePath);
+                var modulePathWithoutIdentifier = modulePath.GetRange(
+                    0,
+                    modulePath.Count - 1
+                );
+
+                // If it's a path like someModule->someFunction(),
+                // start by looking in the current module's imported modules.
+                if (modulePath.Count == 2)
+                {
+                    var importedModule = _module.ImportedModules
+                        .Where(x => x.Identifier == modulePath[0].Value)
+                        .FirstOrDefault();
+                    module = importedModule ?? GetModule(modulePathWithoutIdentifier);
+                }
+                else module = GetModule(modulePathWithoutIdentifier);
+
                 if (module == null) return _unknownType;
                 _environment = module.SymbolEnvironment;
             }
 
-            var functionDecl = _environment.GetFunction(lastIdentifier.Value);
+            var functionDecl = module.GetFunction(
+                lastIdentifier.Value,
+                modulePath.Count > 1 // Look in imports if a proper module path is specified
+            );
             var type = CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
             callExpression.FunctionDecl = functionDecl;
             callExpression.DataType = type;
@@ -470,12 +482,16 @@ namespace Caique.Semantics
                 }
             }
 
-            var (classDecl, importedModule) = _ast.ModuleEnvironment.GetClass(
-                typeExpression.ModulePath
-            );
-            typeExpression.ImportedModule = importedModule;
             var lastIdentifier = typeExpression.ModulePath[^1];
+            var module = _module;
+            if (typeExpression.ModulePath.Count > 1)
+            {
+                module = GetModule(typeExpression.ModulePath);
+                if (module == null) return _unknownType;
+                _environment = module.SymbolEnvironment;
+            }
 
+            var classDecl = module.GetClass(lastIdentifier.Value);
             if (classDecl == null)
             {
                 _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
@@ -514,7 +530,7 @@ namespace Caique.Semantics
 
         private ModuleEnvironment? GetModule(List<Token> modulePath)
         {
-            var module = _ast.ModuleEnvironment.FindByPath(modulePath);
+            var module = _module.Parent!.FindByPath(modulePath);
 
             if (module == null)
             {
@@ -566,7 +582,7 @@ namespace Caique.Semantics
 
             var returnType = functionDecl.ReturnType == null
                 ? _voidType
-                : Next(functionDecl.ReturnType);
+                : functionDecl.ReturnType.DataType!;
 
             // If wrong number of arguments
             if (arguments.Count != functionDecl.Parameters.Count)

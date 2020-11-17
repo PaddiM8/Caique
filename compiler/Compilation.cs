@@ -22,8 +22,6 @@ namespace Caique
     {
         public DiagnosticBag Diagnostics { get; private set; } = new DiagnosticBag();
 
-        public ModuleEnvironment Environment { get; private set; }
-
         public bool PrintTokens { get; set; }
 
         public bool PrintAst { get; set; }
@@ -32,9 +30,8 @@ namespace Caique
 
         private readonly string _rootPath = "";
 
-        public Compilation(ModuleEnvironment environment, string rootPath)
+        public Compilation(string rootPath)
         {
-            Environment = environment;
             _rootPath = rootPath;
         }
 
@@ -44,40 +41,24 @@ namespace Caique
             // are added to the symbol table before type checking.
             // The ParseModuleEnvironment traverses the ModuleEnvironment
             // tree and reads the file specified in the specific ModuleEnvironment.
-            var asts = ParseModuleEnvironment(Environment);
+            //var asts = ParseModuleEnvironment(Environment);
 
-            // Only type check if the parsing didn't generate any errors
-            if (!Diagnostics.Any())
-            {
-                // Type checking
-                foreach (var ast in asts)
-                {
-                    // Set up diagnostic bag
-                    Diagnostics.CurrentFile = RelativePath(
-                        ast.ModuleEnvironment.FilePath!
-                    );
+            var rootModule = new ModuleEnvironment(
+                "root",
+                _rootPath,
+                targetPath,
+                new Dictionary<string, string>(),
+                Diagnostics
+            );
 
-                    new TypeChecker(
-                        ast,
-                        Diagnostics
-                    ).Analyse();
+            // Parsing, type checking, and code generation is done on the fly
+            // in ModuleEnvironment
+            rootModule.CreateChildModule(
+                "main",
+                Path.Combine(_rootPath, "main.cq")
+            );
 
-                    if (PrintAst) ast.Print();
-                }
-
-                // Code generation
-                if (!Diagnostics.Any())
-                {
-                    foreach (var ast in asts)
-                    {
-                        using var generator = new LlvmGenerator(ast);
-                        generator.Generate();
-                        generator.GenerateObjectFile(targetPath);
-                    }
-                }
-            }
-
-            if (PrintEnvironment) Environment.Print();
+            if (PrintEnvironment) rootModule.Print();
 
             foreach (var diagnostic in Diagnostics)
                 diagnostic.Print();

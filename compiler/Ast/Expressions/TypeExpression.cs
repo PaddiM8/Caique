@@ -9,8 +9,6 @@ namespace Caique.Ast
     {
         public List<Token> ModulePath { get; }
 
-        public ModuleEnvironment? ImportedModule { get; set; }
-
         public bool IsExplicitPointer { get; set; }
 
         public TypeExpression(List<Token> modulePath, bool isExplicitPointer = false)

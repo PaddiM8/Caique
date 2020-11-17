@@ -12,22 +12,23 @@ namespace Caique.Semantics
     {
         public SymbolEnvironment? Parent { get; }
 
+        public ICollection<ClassDeclStatement> Classes
+        {
+            get => _classes.Values;
+        }
+
         public ICollection<FunctionDeclStatement> Functions
         {
-            get
-            {
-                return _functions.Values;
-            }
+            get => _functions.Values;
         }
 
         public ICollection<VariableDeclStatement?> Variables
         {
-            get
-            {
-                return _variables.Values;
-            }
+            get => _variables.Values;
         }
 
+        private readonly Dictionary<string, ClassDeclStatement> _classes =
+            new Dictionary<string, ClassDeclStatement>();
         private readonly Dictionary<string, FunctionDeclStatement> _functions =
             new Dictionary<string, FunctionDeclStatement>();
         private readonly Dictionary<string, VariableDeclStatement?> _variables =
@@ -47,19 +48,37 @@ namespace Caique.Semantics
             return new SymbolEnvironment(this);
         }
 
+        public void Add(ClassDeclStatement classDecl)
+        {
+            _classes.Add(classDecl.Identifier.Value, classDecl);
+        }
+
         public void Add(FunctionDeclStatement function)
         {
             _functions.Add(function.Identifier.Value, function);
         }
 
-        public void Add(VariableDeclStatement variable)
+        public bool TryAdd(VariableDeclStatement variable)
         {
-            if (ContainsVariable(variable.Identifier.Value))
-            {
-                throw new ArgumentException("Symbol already exists.");
-            }
+            if (ContainsVariable(variable.Identifier.Value)) return false;
 
             _variables.Add(variable.Identifier.Value, variable);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Get a class
+        /// </summary>
+        /// <param name="identifier">The name of the class.</param>
+        /// <returns>Null if none was found.</returns>
+        public ClassDeclStatement? GetClass(string identifier)
+        {
+            _classes.TryGetValue(identifier, out ClassDeclStatement? classDecl);
+
+            if (classDecl != null) return classDecl;
+            else if (Parent != null) return Parent.GetClass(identifier);
+            else return null;
         }
 
         /// <summary>
@@ -71,18 +90,9 @@ namespace Caique.Semantics
         {
             _functions.TryGetValue(identifier, out FunctionDeclStatement? function);
 
-            if (function != null)
-            {
-                return function;
-            }
-            else if (Parent != null)
-            {
-                return Parent.GetFunction(identifier);
-            }
-            else
-            {
-                return null;
-            }
+            if (function != null) return function;
+            else if (Parent != null) return Parent.GetFunction(identifier);
+            else return null;
         }
 
         /// <summary>
@@ -106,6 +116,11 @@ namespace Caique.Semantics
             {
                 return null;
             }
+        }
+
+        public bool ContainsClass(string identifier)
+        {
+            return _classes.ContainsKey(identifier);
         }
 
         public bool ContainsFunction(string identifier)
