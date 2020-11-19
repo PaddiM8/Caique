@@ -1,0 +1,5 @@
+Name = "prelude"
+Author = "Anonymous"
+Version = "1.0.0"
+
+[Dependencies]

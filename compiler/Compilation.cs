@@ -39,18 +39,28 @@ namespace Caique
 
         public void Compile(string targetPath)
         {
-            // Parse everything first, so that classes and functions
-            // are added to the symbol table before type checking.
-            // The ParseModuleEnvironment traverses the ModuleEnvironment
-            // tree and reads the file specified in the specific ModuleEnvironment.
-            //var asts = ParseModuleEnvironment(Environment);
+            string preludePath = Path.Combine(_libraryPaths["core"], "../prelude/src");
+            var prelude = new ModuleEnvironment(
+                "prelude",
+                preludePath,
+                targetPath,
+                new Dictionary<string, string>(),
+                Diagnostics,
+                null
+            );
+
+            prelude.CreateChildModule(
+                "lib",
+                Path.Combine(preludePath, "lib.cq")
+            );
 
             var rootModule = new ModuleEnvironment(
                 "root",
                 _rootPath,
                 targetPath,
                 _libraryPaths,
-                Diagnostics
+                Diagnostics,
+                prelude
             );
 
             // Parsing, type checking, and code generation is done on the fly

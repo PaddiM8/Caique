@@ -48,6 +48,8 @@ namespace Caique.Semantics
         public List<ModuleEnvironment> ImportedModules { get; private set; }
             = new List<ModuleEnvironment>();
 
+        public ModuleEnvironment? Prelude { get; }
+
         private readonly string _outputDirectory;
         private readonly Dictionary<string, string> _libraryPaths;
         public readonly Dictionary<string, ModuleEnvironment> Modules =
@@ -68,10 +70,17 @@ namespace Caique.Semantics
             _outputDirectory = Parent._outputDirectory;
             _libraryPaths = Root._libraryPaths;
             Diagnostics = Root.Diagnostics;
-            ImportModule(Parent);
+            Prelude = Parent.Prelude;
 
             if (IsCodeModule)
             {
+                ImportModule(Parent);
+
+                if (Prelude != null)
+                {
+                    ImportedModules.AddRange(Prelude.Modules.Values);
+                }
+
                 string previousDiagnosticsFile = Diagnostics.CurrentFile;
                 Diagnostics.CurrentFile = FilePath!;
 
@@ -101,7 +110,8 @@ namespace Caique.Semantics
                                  string filePath,
                                  string outputDirectory,
                                  Dictionary<string, string> libraryPaths,
-                                 DiagnosticBag diagnostics)
+                                 DiagnosticBag diagnostics,
+                                 ModuleEnvironment? prelude)
         {
             Identifier = identifier;
             FilePath = filePath;
@@ -110,6 +120,7 @@ namespace Caique.Semantics
             _outputDirectory = outputDirectory;
             _libraryPaths = libraryPaths;
             Diagnostics = diagnostics;
+            Prelude = prelude;
         }
 
         /// <summary>

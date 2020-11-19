@@ -14,6 +14,7 @@ namespace Caique.Semantics
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
         private TypeCheckerContext _current = new TypeCheckerContext();
+        private readonly ClassDeclStatement? _stringObj;
         private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
         private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
@@ -23,6 +24,11 @@ namespace Caique.Semantics
             _module = module;
             _diagnostics = module.Diagnostics;
             _environment = module.SymbolEnvironment;
+
+            if (module.Prelude != null)
+            {
+                _stringObj = module.Prelude.Modules["string"].GetClass("String")!;
+            }
         }
 
         private void Next(Statement statement)
@@ -321,7 +327,7 @@ namespace Caique.Semantics
             }
             else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
             {
-                var type = new DataType(TypeKeyword.StringConstant);
+                var type = new DataType(TypeKeyword.Identifier, _stringObj);
                 literalExpression.DataType = type;
 
                 return type;

@@ -24,7 +24,7 @@ namespace Caique.Cli
         {
             var projectFile = Toml.ReadFile<ProjectFile>(projectFilePath);
             string programPath = Process.GetCurrentProcess().MainModule!.FileName!;
-            projectFile.Dependencies.Add("core", Path.Combine(programPath, "std/caique"));
+            projectFile.Dependencies.Add("core", Path.Combine(programPath, "std/core"));
 
             return new Project
             {
@@ -136,7 +136,7 @@ namespace Caique.Cli
             string targetPath = $"{projectPath}/target";
 
             if (!string.IsNullOrEmpty(stdPath))
-                _projectFile!.Dependencies["core"] = Path.Combine(stdPath, "caique");
+                _projectFile!.Dependencies["core"] = Path.Combine(stdPath, "core");
 
             // TODO: Cache
             if (Directory.Exists(targetPath))

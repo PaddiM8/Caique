@@ -160,7 +160,7 @@ namespace Caique.CodeGeneration
             LLVMValueRef initializer = variableDeclStatement.Value == null
                 ? null
                 : Next(variableDeclStatement.Value);
-            LLVMTypeRef type = variableDeclStatement.DataType!.ToLlvmType();
+            LLVMTypeRef type = variableDeclStatement.DataType!.ToLlvmType(_module.Prelude);
 
             // Allocate variable
             LLVMValueRef alloca = LLVM.BuildAlloca(
@@ -230,8 +230,8 @@ namespace Caique.CodeGeneration
             );
 
             LLVMTypeRef functionType = LLVM.FunctionType(
-                returnType.ToLlvmType(),
-                parameterDataTypes.ToLlvmTypeArray(),
+                returnType.ToLlvmType(_module.Prelude),
+                parameterDataTypes.ToLlvmTypeArray(_module.Prelude),
                 (uint)parameterDataTypes.Count,
                 0
             );
@@ -298,7 +298,7 @@ namespace Caique.CodeGeneration
             var fieldTypes = variableDecls
                 .Select(x => x!.DataType!)
                 .ToList()
-                .ToLlvmTypeArray();
+                .ToLlvmTypeArray(_module.Prelude);
 
             foreach (var variableDecl in variableDecls)
             {
@@ -387,7 +387,7 @@ namespace Caique.CodeGeneration
                 if (dataType.IsFloat)
                 {
                     return LLVM.ConstReal(
-                        dataType.ToLlvmType(),
+                        dataType.ToLlvmType(_module.Prelude),
                         double.Parse(tokenValue)
                     );
                 }
@@ -395,13 +395,13 @@ namespace Caique.CodeGeneration
                 {
                     var value = ulong.Parse(tokenValue);
                     return LLVM.ConstInt(
-                        dataType.ToLlvmType(),
+                        dataType.ToLlvmType(_module.Prelude),
                         value,
                         value < 0 ? 0 : 1
                     );
                 }
             }
-            else if (dataType.Type == TypeKeyword.StringConstant)
+            else if (dataType.ObjectDecl?.Identifier.Value == "String")
             {
                 LLVMValueRef globalString = LLVM.BuildGlobalString(
                     _builder,
@@ -417,14 +417,37 @@ namespace Caique.CodeGeneration
 
                 fixed (LLVMOpaqueValue** indicesRef = indices)
                 {
-                    return LLVM.BuildGEP(
+                    var stringPtr = LLVM.BuildGEP(
                         _builder,
                         globalString,
                         indicesRef,
                         2,
                         "str".ToCString()
                     );
+
+                    var stringClass = _module.Prelude!.Modules["string"].GetClass("String")!;
+                    var alloca = LLVM.BuildAlloca(
+                        _builder,
+                        stringClass.LlvmType!.Value,
+                        "newString".ToCString()
+                    );
+
+                    fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[2])
+                    {
+                        arguments[0] = alloca;
+                        arguments[1] = stringPtr;
+                        LLVM.BuildCall(
+                            _builder,
+                            stringClass.InitFunction!.LlvmValue!.Value,
+                            arguments,
+                            2,
+                            "".ToCString()
+                        );
+                    }
+
+                    return alloca;
                 }
+
             }
 
             throw new NotImplementedException();
@@ -622,7 +645,7 @@ namespace Caique.CodeGeneration
                 // The block expression will use this alloca and give it a value.
                 _current.BlockReturnValueAlloca = LLVM.BuildAlloca(
                     _builder,
-                    ifExpression.DataType!.ToLlvmType(),
+                    ifExpression.DataType!.ToLlvmType(_module.Prelude),
                     "retVal".ToCString()
                 );
             }
@@ -694,6 +717,7 @@ namespace Caique.CodeGeneration
         {
             if (dotExpression.Right is CallExpression _)
             {
+                Console.WriteLine("call");
                 _current.DotExpressionObject = Next(dotExpression.Left);
                 var value = Next(dotExpression.Right);
                 _current.DotExpressionObject = null;
@@ -702,14 +726,11 @@ namespace Caique.CodeGeneration
             }
             else if (dotExpression.Right is VariableExpression variableExpression)
             {
-                var left = (VariableExpression)dotExpression.Left;
-                var variableDecl = left.VariableDecl!;
-
                 // Get the pointer of the field in the struct
                 var elementPointer = LLVM.BuildStructGEP(
                     _builder,
                     Next(dotExpression.Left),
-                    (uint)variableDecl.IndexInObject,
+                    (uint)variableExpression.VariableDecl!.IndexInObject,
                     variableExpression.Identifier.Value.ToCString()
                 );
 
