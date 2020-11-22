@@ -75,10 +75,16 @@ namespace Caique.Semantics
         public ClassDeclStatement? GetClass(string identifier)
         {
             _classes.TryGetValue(identifier, out ClassDeclStatement? classDecl);
-
             if (classDecl != null) return classDecl;
-            else if (Parent != null) return Parent.GetClass(identifier);
-            else return null;
+
+            SymbolEnvironment? parent = Parent;
+            while (parent != null)
+            {
+                if (Parent!._classes.TryGetValue(identifier, out ClassDeclStatement? parentClassDecl))
+                    return parentClassDecl;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -89,10 +95,16 @@ namespace Caique.Semantics
         public FunctionDeclStatement? GetFunction(string identifier)
         {
             _functions.TryGetValue(identifier, out FunctionDeclStatement? function);
-
             if (function != null) return function;
-            else if (Parent != null) return Parent.GetFunction(identifier);
-            else return null;
+
+            SymbolEnvironment? parent = Parent;
+            while (parent != null)
+            {
+                if (Parent!._functions.TryGetValue(identifier, out FunctionDeclStatement? parentFunction))
+                    return parentFunction;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -103,19 +115,16 @@ namespace Caique.Semantics
         public VariableDeclStatement? GetVariable(string identifier)
         {
             _variables.TryGetValue(identifier, out VariableDeclStatement? variable);
+            if (variable != null) return variable;
 
-            if (variable != null)
+            SymbolEnvironment? parent = Parent;
+            while (parent != null)
             {
-                return variable;
+                if (Parent!._variables.TryGetValue(identifier, out VariableDeclStatement? parentVariable))
+                    return parentVariable;
             }
-            else if (Parent != null)
-            {
-                return Parent.GetVariable(identifier);
-            }
-            else
-            {
-                return null;
-            }
+
+            return null;
         }
 
         public bool ContainsClass(string identifier)
