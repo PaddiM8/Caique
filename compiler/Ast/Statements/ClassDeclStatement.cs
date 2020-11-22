@@ -43,7 +43,7 @@ namespace Caique.Ast
             // but if it is not found there, try call this method
             // from the ancestor instead (if there is one),
             // in order to try to find it there.
-            return Body.Environment.GetVariable(identifier)
+            return Body.Environment.GetVariable(identifier, false)
                 ?? Inherited?.GetVariable(identifier);
         }
 
@@ -57,7 +57,7 @@ namespace Caique.Ast
             // but if it is not found there, try call this method
             // from the ancestor instead (if there is one),
             // in order to try to find it there.
-            return Body.Environment.GetFunction(identifier)
+            return Body.Environment.GetFunction(identifier, false)
                 ?? Inherited?.GetFunction(identifier);
         }
 

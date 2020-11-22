@@ -12,6 +12,11 @@ namespace Caique.Semantics
     {
         public SymbolEnvironment? Parent { get; }
 
+        public ClassDeclStatement? ParentObject
+        {
+            get => _parentObject ?? Parent?.ParentObject;
+        }
+
         public ICollection<ClassDeclStatement> Classes
         {
             get => _classes.Values;
@@ -26,6 +31,8 @@ namespace Caique.Semantics
         {
             get => _variables.Values;
         }
+
+        private ClassDeclStatement? _parentObject;
 
         private readonly Dictionary<string, ClassDeclStatement> _classes =
             new Dictionary<string, ClassDeclStatement>();
@@ -51,6 +58,7 @@ namespace Caique.Semantics
         public void Add(ClassDeclStatement classDecl)
         {
             _classes.Add(classDecl.Identifier.Value, classDecl);
+            classDecl.Body.Environment._parentObject = classDecl;
         }
 
         public void Add(FunctionDeclStatement function)
@@ -91,17 +99,22 @@ namespace Caique.Semantics
         /// Get a function in the current scope.
         /// </summary>
         /// <param name="identifier">The name of the function.</param>
+        /// <param name="lookInParentScopes">If this is false, it will only look in the current SymbolEnvironment.</param>
         /// <returns>Null if none was found.</returns>
-        public FunctionDeclStatement? GetFunction(string identifier)
+        public FunctionDeclStatement? GetFunction(string identifier, bool lookInParentScopes = true)
         {
             _functions.TryGetValue(identifier, out FunctionDeclStatement? function);
             if (function != null) return function;
+            if (!lookInParentScopes) return null;
+
+            var fromAncestor = ParentObject?.Inherited?.GetFunction(identifier);
+            if (fromAncestor != null) return fromAncestor;
 
             SymbolEnvironment? parent = Parent;
             while (parent != null)
             {
-                if (Parent!._functions.TryGetValue(identifier, out FunctionDeclStatement? parentFunction))
-                    return parentFunction;
+                var parentFunction = Parent!.GetFunction(identifier);
+                if (parentFunction != null) return parentFunction;
             }
 
             return null;
@@ -111,11 +124,16 @@ namespace Caique.Semantics
         /// Get a variable in the current scope.
         /// </summary>
         /// <param name="identifier">The name of the variable.</param>
+        /// <param name="lookInParentScopes">If this is false, it will only look in the current SymbolEnvironment.</param>
         /// <returns>Null if none was found.</returns>
-        public VariableDeclStatement? GetVariable(string identifier)
+        public VariableDeclStatement? GetVariable(string identifier, bool lookInParentScopes = true)
         {
             _variables.TryGetValue(identifier, out VariableDeclStatement? variable);
             if (variable != null) return variable;
+            if (!lookInParentScopes) return null;
+
+            var fromAncestor = ParentObject?.Inherited?.GetVariable(identifier);
+            if (fromAncestor != null) return fromAncestor;
 
             SymbolEnvironment? parent = Parent;
             while (parent != null)

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Caique.Ast;
+using Caique.Semantics;
 using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
@@ -19,6 +20,8 @@ namespace Caique.CodeGeneration
 
         public FunctionDeclStatement? FunctionDecl { get; set; }
 
+        public SymbolEnvironment? SymbolEnvironment { get; set; }
+
         public LlvmGeneratorContext CreateChild(Statement statement)
         {
             return new LlvmGeneratorContext
@@ -27,6 +30,7 @@ namespace Caique.CodeGeneration
                 Statement = statement,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
                 FunctionDecl = FunctionDecl,
+                SymbolEnvironment = SymbolEnvironment,
             };
         }
 
@@ -39,6 +43,7 @@ namespace Caique.CodeGeneration
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
                 DotExpressionObject = DotExpressionObject,
                 FunctionDecl = FunctionDecl,
+                SymbolEnvironment = SymbolEnvironment,
             };
         }
     }

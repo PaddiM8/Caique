@@ -193,9 +193,23 @@ namespace Caique.CodeGeneration
         {
             // If it's a normal variable, get the LLVM value of its declaration,
             // otherwise just get its pointer.
-            LLVMValueRef assignee = assignmentStatement.Assignee is VariableExpression variableExpression
-                ? variableExpression.VariableDecl!.LlvmValue!.Value
-                : Next(assignmentStatement.Assignee);
+            LLVMValueRef assignee;
+            if (assignmentStatement.Assignee is VariableExpression variableExpression)
+            {
+                // If the VariableDecl doesn't have a value, it's an object field,
+                // and the pointer needs to be gotten manually
+                assignee = variableExpression.VariableDecl!.LlvmValue ??
+                    LLVM.BuildStructGEP(
+                        _builder,
+                        LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, 0),
+                        (uint)variableExpression.VariableDecl!.IndexInObject,
+                        "field".ToCString()
+                    );
+            }
+            else
+            {
+                assignee = Next(assignmentStatement.Assignee);
+            }
             LLVMValueRef value = Next(assignmentStatement.Value);
             LLVM.BuildStore(_builder, value, assignee);
 
@@ -293,6 +307,8 @@ namespace Caique.CodeGeneration
                 ("class." + identifier).ToCString()
             );
 
+            classDeclStatement.LlvmType = namedStruct;
+
             // Set the struct field types
             var variableDecls = classDeclStatement.Body.Environment.Variables;
             var fieldTypes = new List<DataType>();
@@ -326,8 +342,6 @@ namespace Caique.CodeGeneration
                 (uint)fieldTypes.Count,
                 0
             );
-
-            classDeclStatement.LlvmType = namedStruct;
 
             if (classDeclStatement.InitFunction != null &&
                 !(_current.Parent?.Expression is TypeExpression))
@@ -475,6 +489,8 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
             var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
+            var previousEnvironment = _current.SymbolEnvironment;
+            _current.SymbolEnvironment = blockExpression.Environment;
 
             // If the parent is a function declaration
             FunctionDeclStatement? functionDeclStatement = null;
@@ -537,6 +553,8 @@ namespace Caique.CodeGeneration
             {
                 LLVM.BuildRetVoid(_builder);
             }
+
+            _current.SymbolEnvironment = previousEnvironment;
 
             return returnValue ?? null;
         }
@@ -613,7 +631,28 @@ namespace Caique.CodeGeneration
                 // which should be set already in the context.
                 if (functionDecl.ParentObject != null)
                 {
-                    arguments[0] = _current.DotExpressionObject!.Value;
+                    // If it's on a dot expression, use the object instance from that
+                    if (_current.DotExpressionObject != null)
+                    {
+                        arguments[0] = _current.DotExpressionObject!.Value;
+                    }
+                    else
+                    {
+                        // Otherwise use `this`, so the first parameter in the current LLVM function
+                        var objectInstance = LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, 0);
+
+                        // If the object types are different due to inheritance, cast the object instance
+                        var currentObject = _current.SymbolEnvironment!.ParentObject;
+                        if (currentObject != functionDecl.ParentObject)
+                        {
+                            arguments[0] = LLVM.BuildBitCast(_builder,
+                                objectInstance,
+                                LLVM.PointerType(functionDecl.ParentObject.LlvmType!.Value, 0),
+                                "".ToCString()
+                            );
+                        }
+                        else arguments[0] = objectInstance;
+                    }
                 }
 
                 var call = LLVM.BuildCall(

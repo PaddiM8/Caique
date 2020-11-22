@@ -415,10 +415,20 @@ namespace Caique.Semantics
                 _environment = module.SymbolEnvironment;
             }
 
-            var functionDecl = module.GetFunction(
-                lastIdentifier.Value,
-                modulePath.Count > 1 // Look in imports if a proper module path is specified
-            );
+            FunctionDeclStatement? functionDecl;
+            if (_environment.ParentObject != null &&
+                modulePath.Count == 1)
+            {
+                functionDecl = _environment.ParentObject.GetFunction(lastIdentifier.Value);
+            }
+            else
+            {
+                functionDecl = module.GetFunction(
+                    lastIdentifier.Value,
+                    modulePath.Count > 1 // Look in imports if a proper module path is specified
+                );
+            }
+
             var type = CheckCall(lastIdentifier, functionDecl, callExpression.Arguments);
             callExpression.FunctionDecl = functionDecl;
             callExpression.DataType = type;
