@@ -14,7 +14,7 @@ namespace Caique.Ast
 
         public VariableType VariableType { get; }
 
-        public int IndexInObject { get; }
+        public int IndexInObject { get; set; }
 
         public override DataType? DataType
         {

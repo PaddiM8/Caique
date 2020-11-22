@@ -176,6 +176,9 @@ namespace Caique.Semantics
                 classDeclStatement
             );
 
+            if (classDeclStatement.InheritedType != null)
+                Next(classDeclStatement.InheritedType);
+
             var ancestor = classDeclStatement.Inherited;
             if (ancestor != null)
             {

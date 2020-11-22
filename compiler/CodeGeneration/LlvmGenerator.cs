@@ -293,23 +293,37 @@ namespace Caique.CodeGeneration
                 ("class." + identifier).ToCString()
             );
 
-            // Set the structure field types
+            // Set the struct field types
             var variableDecls = classDeclStatement.Body.Environment.Variables;
-            var fieldTypes = variableDecls
-                .Select(x => x!.DataType!)
-                .ToList()
-                .ToLlvmTypeArray(_module.Prelude);
+            var fieldTypes = new List<DataType>();
 
+            ClassDeclStatement? ancestor = classDeclStatement.Inherited;
+            while (ancestor != null)
+            {
+                fieldTypes.AddRange(
+                    ancestor.Body.Environment.Variables.Select(x => x!.DataType!)
+                );
+
+                ancestor = ancestor.Inherited;
+            }
+
+            int inheritedFieldCount = fieldTypes.Count;
             foreach (var variableDecl in variableDecls)
             {
+                fieldTypes.Add(variableDecl!.DataType!);
+
+                // The first items in the struct will be the inherited ones,
+                // so the IndexInObject value needs to be offset.
+                variableDecl.IndexInObject += inheritedFieldCount;
+
                 if (variableDecl?.SpecifiedType != null)
                     Next(variableDecl.SpecifiedType);
             }
 
             LLVM.StructSetBody(
                 namedStruct,
-                fieldTypes,
-                (uint)variableDecls.Count,
+                fieldTypes.ToLlvmTypeArray(_module.Prelude),
+                (uint)fieldTypes.Count,
                 0
             );
 

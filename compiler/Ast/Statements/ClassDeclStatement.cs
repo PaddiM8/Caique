@@ -13,19 +13,11 @@ namespace Caique.Ast
 
         public FunctionDeclStatement? InitFunction { get; set; }
 
-        public ClassDeclStatement? Inherited
-        {
-            get
-            {
-                if (_ancestorType == null) return null;
-
-                return Module.GetClass(_ancestorType.ModulePath[^1].Value);
-            }
-        }
+        public ClassDeclStatement? Inherited => InheritedType?.DataType?.ObjectDecl;
 
         public ModuleEnvironment Module { get; }
 
-        private readonly TypeExpression? _ancestorType;
+        public TypeExpression? InheritedType { get; set; }
 
         public ClassDeclStatement(Token identifier,
                                   BlockExpression body,
@@ -36,7 +28,7 @@ namespace Caique.Ast
         {
             Identifier = identifier;
             Body = body;
-            _ancestorType = ancestor;
+            InheritedType = ancestor;
             Module = module;
             InitFunction = initFunction;
         }
