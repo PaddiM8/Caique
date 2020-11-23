@@ -660,7 +660,7 @@ namespace Caique.CodeGeneration
                     functionDecl.LlvmValue!.Value,
                     arguments,
                     (uint)argumentCount,
-                    identifier.ToCString()
+                    (functionDecl.DataType == null ? "" : identifier).ToCString()
                 );
                 return call;
             }
@@ -770,7 +770,6 @@ namespace Caique.CodeGeneration
         {
             if (dotExpression.Right is CallExpression _)
             {
-                Console.WriteLine("call");
                 _current.DotExpressionObject = Next(dotExpression.Left);
                 var value = Next(dotExpression.Right);
                 _current.DotExpressionObject = null;
