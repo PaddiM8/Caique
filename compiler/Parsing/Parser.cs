@@ -38,6 +38,14 @@ namespace Caique.Parsing
         private readonly ModuleEnvironment _moduleEnvironment;
         private SymbolEnvironment _symbolEnvironment;
         private int _index;
+        private static readonly TypeExpression _objectTypeExpression = new TypeExpression(new List<Token>
+            {
+                new Token(
+                    TokenKind.Identifier,
+                    "object",
+                    new TextSpan(new TextPosition(0, 0), new TextPosition(0, 0))
+                )
+            });
 
         public Parser(List<Token> tokens, DiagnosticBag diagnostics,
                       ModuleEnvironment moduleEnvironment)
@@ -232,9 +240,9 @@ namespace Caique.Parsing
             var identifier = Expect(TokenKind.Identifier);
 
             // Inheritance
-            TypeExpression? ancestor = null;
-            if (Consume(TokenKind.Colon))
-                ancestor = ParseType();
+            TypeExpression? ancestor;
+            if (Consume(TokenKind.Colon)) ancestor = ParseType();
+            else ancestor = identifier.Value == "object" ? null : _objectTypeExpression;
 
             var (block, init) = ParseClassBlock();
             var statement = new ClassDeclStatement(
