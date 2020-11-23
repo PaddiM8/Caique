@@ -608,11 +608,6 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(CallExpression callExpression)
         {
-            if (callExpression.FunctionDecl!.LlvmValue == null)
-            {
-                Next(callExpression.FunctionDecl!);
-            }
-
             var identifier = callExpression.ModulePath[^1].Value;
             var functionDecl = callExpression.FunctionDecl!;
 
