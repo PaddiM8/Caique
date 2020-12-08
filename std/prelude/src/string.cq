@@ -1,3 +1,5 @@
+use object;
+
 class String
 {
     Bytes: i8*;
