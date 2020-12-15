@@ -112,7 +112,7 @@ namespace Caique.Parsing
             {
                 return ParseReturn();
             }
-            else if (Match(TokenKind.Fn))
+            else if (Match(TokenKind.Fn, TokenKind.Ext))
             {
                 return ParseFunctionDecl();
             }
@@ -192,7 +192,18 @@ namespace Caique.Parsing
 
         private FunctionDeclStatement ParseFunctionDecl()
         {
-            var start = Expect(TokenKind.Fn, "function declaration").Span;
+            TypeExpression? extensionOf = null;
+            TextSpan? start = null;
+            if (Consume(TokenKind.Fn))
+            {
+                start = Previous.Span;
+            }
+            else if (Consume(TokenKind.Ext))
+            {
+                start = Previous.Span;
+                extensionOf = ParseType();
+            }
+
             var identifier = Expect(TokenKind.Identifier);
             var parameters = ParseParameters();
             TypeExpression? returnType = Consume(TokenKind.Colon)
@@ -226,8 +237,11 @@ namespace Caique.Parsing
                 body,
                 returnType,
                 false,
-                start.Add(start)
-            );
+                start!.Add(start)
+            )
+            {
+                ExtensionOf = extensionOf
+            };
 
             _symbolEnvironment.Add(statement);
 

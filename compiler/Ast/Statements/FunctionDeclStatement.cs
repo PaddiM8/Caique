@@ -20,6 +20,10 @@ namespace Caique.Ast
 
         public bool IsMethod { get => ParentObject != null; }
 
+        public TypeExpression? ExtensionOf { get; set; }
+
+        public bool IsExtensionFunction => ExtensionOf != null;
+
         public FunctionDeclStatement(Token identifier,
                                      List<Parameter> parameters,
                                      BlockExpression? body,

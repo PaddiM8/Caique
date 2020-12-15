@@ -612,7 +612,8 @@ namespace Caique.CodeGeneration
             var functionDecl = callExpression.FunctionDecl!;
 
             // If the function belongs to an object, reserve the first spot for the object
-            int argumentOffset = functionDecl.ParentObject == null ? 0 : 1;
+            int argumentOffset = functionDecl.ParentObject == null &&
+                functionDecl.ExtensionOf == null ? 0 : 1;
             int argumentCount = callExpression.Arguments.Count + argumentOffset;
             fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
             {
@@ -624,7 +625,7 @@ namespace Caique.CodeGeneration
 
                 // If the function belongs to an object, set the first argument to the object,
                 // which should be set already in the context.
-                if (functionDecl.ParentObject != null)
+                if (functionDecl.ParentObject != null || functionDecl.IsExtensionFunction)
                 {
                     // If it's on a dot expression, use the object instance from that
                     if (_current.DotExpressionObject != null)

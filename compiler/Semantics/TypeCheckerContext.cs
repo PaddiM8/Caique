@@ -13,6 +13,8 @@ namespace Caique.Semantics
 
         public ClassDeclStatement? CurrentObject { get; set; }
 
+        public Expression? Expression { get; set; }
+
         public TypeCheckerContext CreateChild()
         {
             return new TypeCheckerContext
@@ -20,6 +22,17 @@ namespace Caique.Semantics
                 Parent = this,
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentObject = CurrentObject,
+            };
+        }
+
+        public TypeCheckerContext CreateChild(Expression expression)
+        {
+            return new TypeCheckerContext
+            {
+                Parent = this,
+                CurrentFunctionType = CurrentFunctionType,
+                CurrentObject = CurrentObject,
+                Expression = expression,
             };
         }
     }

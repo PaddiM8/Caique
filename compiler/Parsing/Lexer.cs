@@ -12,13 +12,7 @@ namespace Caique.Parsing
         /// <summary>
         /// Whether or not the index is outside the bounds of the source.
         /// </summary>
-        private bool IsAtEnd
-        {
-            get
-            {
-                return _position.index >= _source.Length;
-            }
-        }
+        private bool IsAtEnd => _position.index >= _source.Length;
 
         private char Current
         {
@@ -27,6 +21,16 @@ namespace Caique.Parsing
                 if (IsAtEnd) return '\0';
 
                 return _source[_position.index];
+            }
+        }
+
+        private char Previous
+        {
+            get
+            {
+                if (_position.index == 0) return '\0';
+
+                return _source[_position.index - 1];
             }
         }
 
@@ -44,13 +48,7 @@ namespace Caique.Parsing
             }
         }
 
-        private TextPosition CurrentTextPosition
-        {
-            get
-            {
-                return new TextPosition(_position.line, _position.column);
-            }
-        }
+        private TextPosition CurrentTextPosition => new TextPosition(_position.line, _position.column);
 
         private readonly string _source;
         private (int index, int line, int column) _position = (0, 1, 1);
@@ -266,6 +264,14 @@ namespace Caique.Parsing
                 length++;
             }
 
+            // If it ended with a dot, the dot wasn't a part of the number,
+            // so don't include that.
+            if (Previous == '.')
+            {
+                Retreat();
+                length--;
+            }
+
             // The position should be at the last character in the literal
             // before returning. This is to make sure the eventual token
             // will have a correct TextSpan.
@@ -356,6 +362,7 @@ namespace Caique.Parsing
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
                 "init" => TokenKind.Init,
+                "ext" => TokenKind.Ext,
                 "new" => TokenKind.New,
                 "use" => TokenKind.Use,
                 "void" => TokenKind.Void,
