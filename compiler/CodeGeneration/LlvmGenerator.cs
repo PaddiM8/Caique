@@ -230,12 +230,20 @@ namespace Caique.CodeGeneration
             int parameterOffset = 0;
             if (functionDeclStatement.ParentObject != null)
             {
-                identifier = identifier + "." + functionDeclStatement
-                    .ParentObject.Identifier.Value;
+                identifier = identifier + "." + functionDeclStatement.ParentObject.Identifier.Value;
                 parameterOffset++;
 
                 // Add the parent object type as the first parameter
                 parameterDataTypes.Add(functionDeclStatement.ParentObject.DataType!);
+            }
+
+            if (functionDeclStatement.IsExtensionFunction)
+            {
+                identifier = identifier + "." + functionDeclStatement.ExtensionOf!.DataType;
+                parameterOffset++;
+
+                // Add the extended type as the first parameter
+                parameterDataTypes.Add(functionDeclStatement.ExtensionOf.DataType!);
             }
 
             // Add the parameter types to the parameter list
@@ -453,27 +461,26 @@ namespace Caique.CodeGeneration
                         "str".ToCString()
                     );
 
-                    var stringClass = _module.Prelude!.Modules["string"].GetClass("String")!;
-                    var alloca = LLVM.BuildAlloca(
+                    var malloc = LLVM.BuildMalloc(
                         _builder,
-                        stringClass.LlvmType!.Value,
+                        dataType.ObjectDecl!.LlvmType!.Value,
                         "newString".ToCString()
                     );
 
                     fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[2])
                     {
-                        arguments[0] = alloca;
+                        arguments[0] = malloc;
                         arguments[1] = stringPtr;
                         LLVM.BuildCall(
                             _builder,
-                            stringClass.InitFunction!.LlvmValue!.Value,
+                            dataType.ObjectDecl!.InitFunction!.LlvmValue!.Value,
                             arguments,
                             2,
                             "".ToCString()
                         );
                     }
 
-                    return alloca;
+                    return malloc;
                 }
 
             }
@@ -643,7 +650,7 @@ namespace Caique.CodeGeneration
                         {
                             arguments[0] = LLVM.BuildBitCast(_builder,
                                 objectInstance,
-                                LLVM.PointerType(functionDecl.ParentObject.LlvmType!.Value, 0),
+                                LLVM.PointerType(functionDecl.ParentObject!.LlvmType!.Value, 0),
                                 "".ToCString()
                             );
                         }
@@ -799,6 +806,13 @@ namespace Caique.CodeGeneration
             }
 
             throw new InvalidOperationException();
+        }
+
+        public LLVMValueRef Visit(SelfExpression selfExpression)
+        {
+            var function = _current.FunctionDecl!.LlvmValue!.Value;
+
+            return LLVM.GetParam(function, 0);
         }
     }
 }

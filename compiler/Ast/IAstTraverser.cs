@@ -23,6 +23,7 @@ namespace Caique.Ast
         U Visit(IfExpression ifExpression);
         U Visit(NewExpression newExpression);
         U Visit(DotExpression dotExpression);
+        U Visit(SelfExpression selfExpression);
 
         public T Next(Statement statement)
         {
@@ -55,6 +56,7 @@ namespace Caique.Ast
                 NewExpression toVisit => Visit(toVisit),
                 TypeExpression toVisit => Visit(toVisit),
                 IfExpression toVisit => Visit(toVisit),
+                SelfExpression toVisit => Visit(toVisit),
                 _ => throw new Exception(),
             };
         }

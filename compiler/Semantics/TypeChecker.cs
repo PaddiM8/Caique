@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Caique.Ast;
 using Caique.Diagnostics;
@@ -14,7 +15,7 @@ namespace Caique.Semantics
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
         private TypeCheckerContext _current = new TypeCheckerContext();
-        private readonly ClassDeclStatement? _stringObj;
+        private ClassDeclStatement? _stringObj;
         private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
         private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
@@ -139,6 +140,11 @@ namespace Caique.Semantics
                 : Next(functionDeclStatement.ReturnType);
             _current.DataType = _current.CurrentFunctionType;
 
+            if (functionDeclStatement.IsExtensionFunction)
+            {
+                _current.CurrentExtendedType = Next(functionDeclStatement.ExtensionOf!);
+            }
+
             if (_current.CurrentObject != null)
             {
                 functionDeclStatement.ParentObject = _current.CurrentObject;
@@ -231,6 +237,10 @@ namespace Caique.Semantics
             if (module != null)
             {
                 _module.ImportModule(module);
+                if (_module.Root.Identifier == "prelude" && module.Identifier == "string")
+                {
+                    _stringObj = module.GetClass("String");
+                }
             }
             else
             {
@@ -347,6 +357,7 @@ namespace Caique.Semantics
             else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
             {
                 var type = new DataType(TypeKeyword.Identifier, _stringObj);
+                Console.WriteLine(type);
                 literalExpression.DataType = type;
 
                 return type;
@@ -568,6 +579,19 @@ namespace Caique.Semantics
             }
 
             return _voidType;
+        }
+
+        public DataType Visit(SelfExpression selfExpression)
+        {
+            if (_current.CurrentObject?.DataType != null)
+                return _current.CurrentObject.DataType;
+
+            if (_current.CurrentExtendedType != null)
+                return _current.CurrentExtendedType;
+
+            _diagnostics.ReportMisplacedSelfKeyword(selfExpression.Span);
+
+            return _unknownType;
         }
 
         private ModuleEnvironment? GetModule(List<Token> modulePath)

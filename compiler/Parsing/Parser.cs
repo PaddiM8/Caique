@@ -473,6 +473,10 @@ namespace Caique.Parsing
             {
                 return ParseNew();
             }
+            else if (Match(TokenKind.Self))
+            {
+                return new SelfExpression(Advance());
+            }
             else if (Match(TokenKind.Identifier))
             {
                 return ParseIdentifier();

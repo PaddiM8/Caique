@@ -11,6 +11,8 @@ namespace Caique.Semantics
 
         public DataType? CurrentFunctionType { get; set; }
 
+        public DataType? CurrentExtendedType { get; set; }
+
         public ClassDeclStatement? CurrentObject { get; set; }
 
         public Expression? Expression { get; set; }
@@ -21,6 +23,7 @@ namespace Caique.Semantics
             {
                 Parent = this,
                 CurrentFunctionType = CurrentFunctionType,
+                CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
             };
         }
@@ -31,6 +34,7 @@ namespace Caique.Semantics
             {
                 Parent = this,
                 CurrentFunctionType = CurrentFunctionType,
+                CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
                 Expression = expression,
             };

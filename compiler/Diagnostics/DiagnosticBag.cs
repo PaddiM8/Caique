@@ -58,6 +58,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportMisplacedSelfKeyword(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.MisplacedAssignmentOperator,
+                $"Misplaced 'self' keyword. The 'self' keyword can only be used inside objects and extension functions.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportSymbolAlreadyExists(Token identifier)
         {
             Report(

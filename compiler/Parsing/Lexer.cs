@@ -363,6 +363,7 @@ namespace Caique.Parsing
                 "class" => TokenKind.Class,
                 "init" => TokenKind.Init,
                 "ext" => TokenKind.Ext,
+                "self" => TokenKind.Self,
                 "new" => TokenKind.New,
                 "use" => TokenKind.Use,
                 "void" => TokenKind.Void,

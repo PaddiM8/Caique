@@ -245,6 +245,13 @@ namespace Caique.Ast
             return null!;
         }
 
+        public object Visit(SelfExpression selfExpression)
+        {
+            PrintStart("self", ConsoleColor.Blue);
+
+            return null!;
+        }
+
         private void PrintStart(string value, ConsoleColor color)
         {
             PrintSection(value, color, "┣━ ");
