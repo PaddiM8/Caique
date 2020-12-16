@@ -36,7 +36,7 @@ namespace Caique.Ast
                 FunctionDeclStatement toVisit => Visit(toVisit),
                 ClassDeclStatement toVisit => Visit(toVisit),
                 UseStatement toVisit => Visit(toVisit),
-                _ => throw new Exception(),
+                _ => throw new Exception(statement.ToString()),
             };
             ;
         }
@@ -57,7 +57,7 @@ namespace Caique.Ast
                 TypeExpression toVisit => Visit(toVisit),
                 IfExpression toVisit => Visit(toVisit),
                 SelfExpression toVisit => Visit(toVisit),
-                _ => throw new Exception(),
+                _ => throw new Exception(expression.ToString()),
             };
         }
     }

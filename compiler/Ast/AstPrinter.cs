@@ -8,9 +8,9 @@ namespace Caique.Ast
     class AstPrinter : IAstTraverser<object, object>
     {
         private int _indentationLevel = 1;
-        private readonly AbstractSyntaxTree _ast;
+        private readonly List<Statement> _ast;
 
-        public AstPrinter(AbstractSyntaxTree ast)
+        public AstPrinter(List<Statement> ast)
         {
             _ast = ast;
         }
@@ -27,7 +27,7 @@ namespace Caique.Ast
 
         public void Print()
         {
-            foreach (var statement in _ast.Statements)
+            foreach (var statement in _ast)
             {
                 Next(statement);
             }
@@ -49,7 +49,11 @@ namespace Caique.Ast
                 Next(variableDeclStatement.SpecifiedType);
             }
 
-            Next(variableDeclStatement.Value!);
+            if (variableDeclStatement.Value != null)
+            {
+                Next(variableDeclStatement.Value);
+            }
+
             _indentationLevel--;
 
             return null!;
