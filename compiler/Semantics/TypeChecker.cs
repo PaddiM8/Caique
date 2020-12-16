@@ -347,25 +347,30 @@ namespace Caique.Semantics
 
         public DataType Visit(LiteralExpression literalExpression)
         {
+            DataType type;
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
             {
                 bool isFloat = literalExpression.Value.Value.Contains(".");
-                var type = _current.Parent!.DataType ?? new DataType(
+                type = _current.Parent!.DataType ?? new DataType(
                     isFloat ? TypeKeyword.f32 : TypeKeyword.i32
                 );
-                literalExpression.DataType = type;
-
-                return type;
             }
             else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
             {
-                var type = new DataType(TypeKeyword.Identifier, _stringObj);
-                literalExpression.DataType = type;
-
-                return type;
+                type = new DataType(TypeKeyword.Identifier, _stringObj);
+            }
+            else if (literalExpression.Value.Kind == TokenKind.CharLiteral)
+            {
+                type = new DataType(TypeKeyword.i8);
+            }
+            else
+            {
+                throw new NotImplementedException();
             }
 
-            throw new NotImplementedException();
+            literalExpression.DataType = type;
+
+            return type;
         }
 
         public DataType Visit(GroupExpression groupExpression)

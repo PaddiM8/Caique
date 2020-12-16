@@ -233,6 +233,11 @@ namespace Caique.Parsing
                         value = NextStringLiteral();
                         kind = TokenKind.StringLiteral;
                     }
+                    else if (Current == '\'')
+                    {
+                        value = NextCharLiteral();
+                        kind = TokenKind.CharLiteral;
+                    }
                     else if (char.IsLetterOrDigit(Current) || Current == '_')
                     {
                         (value, kind) = NextIdentifier();
@@ -290,30 +295,7 @@ namespace Caique.Parsing
                 if (Current == '\\')
                 {
                     if (IsAtEnd) break;
-                    Advance();
-
-                    char? escaped = Current switch
-                    {
-                        'n' => '\n',
-                        't' => '\t',
-                        'r' => '\r',
-                        '"' => '"',
-                        '\\' => '\\',
-                        _ => null,
-                    };
-
-                    if (escaped != null)
-                    {
-                        value.Append(escaped);
-                    }
-                    else
-                    {
-                        _diagnostics.ReportUnknownEscapeSequence(
-                            Current.ToString(),
-                            CurrentTextPosition
-                        );
-                    }
-
+                    value.Append(NextEscapeSequence());
                     Advance();
 
                     continue;
@@ -332,6 +314,50 @@ namespace Caique.Parsing
             }
 
             return value.ToString();
+        }
+
+        private string NextCharLiteral()
+        {
+            Advance(); // '
+            char value = Current == '\\'
+                ? NextEscapeSequence()
+                : Current;
+
+            Advance();
+
+            if (Current != '\'')
+            {
+                _diagnostics.ReportInvalidCharacterLiteral(CurrentTextPosition);
+            }
+
+            return value.ToString();
+        }
+
+        private char NextEscapeSequence()
+        {
+            Advance(); // \
+            char? escaped = Current switch
+            {
+                'n' => '\n',
+                't' => '\t',
+                'r' => '\r',
+                '0' => '\0',
+                '"' => '"',
+                '\\' => '\\',
+                _ => null,
+            };
+
+            if (escaped == null)
+            {
+                _diagnostics.ReportUnknownEscapeSequence(
+                    Current.ToString(),
+                    CurrentTextPosition
+                );
+
+                return '\0';
+            }
+
+            return escaped!.Value;
         }
 
         private (string, TokenKind) NextIdentifier()

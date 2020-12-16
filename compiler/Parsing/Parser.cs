@@ -461,7 +461,7 @@ namespace Caique.Parsing
 
                 return new GroupExpression(expression, start.Add(end));
             }
-            else if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral))
+            else if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral, TokenKind.CharLiteral))
             {
                 return new LiteralExpression(Advance());
             }

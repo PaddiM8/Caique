@@ -19,7 +19,7 @@ namespace Caique.Parsing
         If, Else, Fn, Let, Class, New, Use, Ret, Init, Ext, Self,
 
         // Variable length
-        Identifier, NumberLiteral, StringLiteral,
+        Identifier, NumberLiteral, StringLiteral, CharLiteral,
 
         // Punctuation
         Dot, Comma, Colon, Semicolon, Arrow,

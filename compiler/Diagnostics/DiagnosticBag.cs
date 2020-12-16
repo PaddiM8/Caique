@@ -48,6 +48,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportInvalidCharacterLiteral(TextPosition position)
+        {
+            Report(
+                DiagnosticIdentifier.InvalidCharacterLiteral,
+                $"Invalid character literal. A character literal may only contain one character.",
+                new TextSpan(position, position),
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportMisplacedAssignmentOperator(TextSpan span)
         {
             Report(

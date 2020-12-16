@@ -419,6 +419,15 @@ namespace Caique.CodeGeneration
             {
                 string tokenValue = literalExpression.Value.Value;
 
+                if (literalExpression.Value.Kind == TokenKind.CharLiteral)
+                {
+                    return LLVM.ConstInt(
+                        dataType.ToLlvmType(_module.Prelude),
+                        (ulong)tokenValue[0],
+                        1
+                    );
+                }
+
                 // Float
                 if (dataType.IsFloat)
                 {
@@ -429,7 +438,7 @@ namespace Caique.CodeGeneration
                 }
                 else // Int
                 {
-                    var value = ulong.Parse(tokenValue);
+                    ulong value = ulong.Parse(tokenValue);
                     return LLVM.ConstInt(
                         dataType.ToLlvmType(_module.Prelude),
                         value,

@@ -6,6 +6,7 @@ namespace Caique.Diagnostics
     public enum DiagnosticIdentifier
     {
         CanOnlyHaveOneConstructor,
+        InvalidCharacterLiteral,
         InvalidModulePath,
         MisplacedAssignmentOperator,
         MisplacedSelfKeyword,
