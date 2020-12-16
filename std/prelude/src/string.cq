@@ -3,6 +3,7 @@ use object;
 class String
 {
     Bytes: i8*;
+    Length: i32;
 
-    init(Bytes) {}
+    init(Bytes, Length) {}
 }

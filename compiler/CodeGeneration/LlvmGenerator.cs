@@ -476,10 +476,17 @@ namespace Caique.CodeGeneration
                         "newString".ToCString()
                     );
 
+                    var length = LLVM.ConstInt(
+                        LLVM.Int32Type(),
+                        (ulong)literalExpression.Value.Value.Length,
+                        1
+                    );
+
                     fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[2])
                     {
                         arguments[0] = malloc;
                         arguments[1] = stringPtr;
+                        arguments[2] = length;
                         LLVM.BuildCall(
                             _builder,
                             dataType.ObjectDecl!.InitFunction!.LlvmValue!.Value,
