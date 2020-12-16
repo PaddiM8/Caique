@@ -247,7 +247,7 @@ namespace Caique.Ast
 
         public object Visit(SelfExpression selfExpression)
         {
-            PrintStart("self", ConsoleColor.Blue);
+            PrintMiddle("self", ConsoleColor.Blue);
 
             return null!;
         }

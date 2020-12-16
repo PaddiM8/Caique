@@ -254,6 +254,7 @@ namespace Caique.Semantics
         {
             var valueType = Next(unaryExpression.Value);
             unaryExpression.DataType = valueType;
+
             if (!valueType.IsNumber)
             {
                 _diagnostics.ReportUnexpectedType(
@@ -334,6 +335,8 @@ namespace Caique.Semantics
                 return type;
             }
 
+            Console.WriteLine(dotExpression.Right.GetType());
+
             _diagnostics.ReportUnexpectedToken(
                 new Token(TokenKind.Identifier, dotExpression.Right.GetType().Name, dotExpression.Right.Span),
                 "call expression or variable expression"
@@ -357,7 +360,6 @@ namespace Caique.Semantics
             else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
             {
                 var type = new DataType(TypeKeyword.Identifier, _stringObj);
-                Console.WriteLine(type);
                 literalExpression.DataType = type;
 
                 return type;
@@ -439,11 +441,12 @@ namespace Caique.Semantics
                 else module = GetModule(modulePathWithoutIdentifier);
 
                 if (module == null) return _unknownType;
-                _environment = module.SymbolEnvironment;
             }
 
             FunctionDeclStatement? functionDecl;
-            if ((_environment.ParentObject != null || _current.Parent?.Expression is DotExpression) &&
+            bool isInDotExpression = _current.Parent?.Expression is DotExpression dotExpression &&
+                dotExpression.Right == callExpression;
+            if ((_environment.ParentObject != null || isInDotExpression) &&
                 modulePath.Count == 1)
             {
                 functionDecl = _environment.ParentObject?.GetFunction(lastIdentifier.Value);
@@ -541,7 +544,6 @@ namespace Caique.Semantics
             {
                 module = GetModule(typeExpression.ModulePath);
                 if (module == null) return _unknownType;
-                _environment = module.SymbolEnvironment;
             }
 
             var classDecl = module.GetClass(lastIdentifier.Value);

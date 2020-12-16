@@ -13,7 +13,7 @@ namespace Caique.Semantics
 
         public ClassDeclStatement? ObjectDecl { get; }
 
-        public bool IsExplicitPointer { get; }
+        public bool IsExplicitPointer { get; set; }
 
         public bool Allocated { get; private set; }
 
