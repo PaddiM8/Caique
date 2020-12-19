@@ -14,4 +14,9 @@ namespace Caique.Ast
     {
         public LLVMBasicBlockRef? BlockLlvmValue { get; set; }
     }
+
+    public partial class BlockExpression
+    {
+        public LLVMBasicBlockRef? LlvmValue { get; set; }
+    }
 }

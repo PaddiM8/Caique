@@ -163,11 +163,21 @@ namespace Caique.CodeGeneration
             LLVMTypeRef type = variableDeclStatement.DataType!.ToLlvmType(_module.Prelude);
 
             // Allocate variable
+            var firstBlockValue = _current.Block!.Statements.First().LlvmValue;
+            if (firstBlockValue != null)
+            {
+                // Add allocas to the top
+                LLVM.PositionBuilderBefore(_builder, firstBlockValue!.Value);
+            }
+
             LLVMValueRef alloca = LLVM.BuildAlloca(
                 _builder,
                 type,
                 identifier.ToCString()
             );
+
+            // Put the builder back where it should be
+            LLVM.PositionBuilderAtEnd(_builder, _current.Block!.LlvmValue!.Value);
 
             variableDeclStatement.LlvmValue = alloca;
 
@@ -498,6 +508,7 @@ namespace Caique.CodeGeneration
             var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
             var previousEnvironment = _current.SymbolEnvironment;
             _current.SymbolEnvironment = blockExpression.Environment;
+            _current.Block = blockExpression;
 
             // If the parent is a function declaration
             FunctionDeclStatement? functionDeclStatement = null;
@@ -507,6 +518,7 @@ namespace Caique.CodeGeneration
             // Functions have their own block starts
             if (functionDeclStatement != null)
             {
+                blockExpression.LlvmValue = functionDeclStatement.BlockLlvmValue;
                 LLVM.PositionBuilderAtEnd(_builder, functionDeclStatement.BlockLlvmValue!.Value);
             }
             else if (parentStatementValue != null) // Function
@@ -515,6 +527,7 @@ namespace Caique.CodeGeneration
                     parentStatementValue!.Value,
                     "entry".ToCString()
                 );
+                blockExpression.LlvmValue = block;
                 LLVM.PositionBuilderAtEnd(_builder, block);
             }
 
@@ -562,6 +575,7 @@ namespace Caique.CodeGeneration
             }
 
             _current.SymbolEnvironment = previousEnvironment;
+            _current.Block = null;
 
             return returnValue ?? null;
         }

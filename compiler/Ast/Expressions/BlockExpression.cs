@@ -5,7 +5,7 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class BlockExpression : Expression
+    public partial class BlockExpression : Expression
     {
         public List<Statement> Statements { get; set; }
 

@@ -24,6 +24,8 @@ namespace Caique.CodeGeneration
 
         public bool ShouldBeLoaded { get; set; } = true;
 
+        public BlockExpression? Block { get; set; }
+
         public LlvmGeneratorContext CreateChild(Statement statement)
         {
             return new LlvmGeneratorContext
@@ -33,6 +35,7 @@ namespace Caique.CodeGeneration
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
                 FunctionDecl = FunctionDecl,
                 SymbolEnvironment = SymbolEnvironment,
+                Block = Block,
             };
         }
 
@@ -47,6 +50,7 @@ namespace Caique.CodeGeneration
                 FunctionDecl = FunctionDecl,
                 SymbolEnvironment = SymbolEnvironment,
                 ShouldBeLoaded = ShouldBeLoaded,
+                Block = Block,
             };
         }
     }
