@@ -48,12 +48,12 @@ namespace Caique.Semantics
         public List<ModuleEnvironment> ImportedModules { get; private set; }
             = new List<ModuleEnvironment>();
 
+        public Dictionary<string, ModuleEnvironment> Modules { get; } = new();
+
         public ModuleEnvironment? Prelude { get; }
 
         private readonly string _outputDirectory;
         private readonly Dictionary<string, string> _libraryPaths;
-        public readonly Dictionary<string, ModuleEnvironment> Modules =
-            new Dictionary<string, ModuleEnvironment>();
 
         /// <summary>
         /// Create a child module
@@ -87,6 +87,7 @@ namespace Caique.Semantics
                 // Lexing and parsing
                 var tokens = new Lexer(File.ReadAllText(filePath), Diagnostics).Lex();
                 Ast = new Parser(tokens, Diagnostics, this).Parse();
+                new AstPrinter(Ast).Print();
 
                 // Type checking
                 new TypeChecker(this).Analyse();
