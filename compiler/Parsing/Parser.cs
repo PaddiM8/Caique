@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Caique.Ast;
 using Caique.Diagnostics;
 using Caique.Semantics;
@@ -157,7 +158,15 @@ namespace Caique.Parsing
                 );
             }
 
-            return new AssignmentStatement(expression, value);
+            if (expression is DotExpression dotExpression)
+            {
+                return new AssignmentStatement(dotExpression, value);
+            }
+            else
+            {
+                return new AssignmentStatement(new DotExpression(new() { expression }), value);
+            }
+
         }
 
         private VariableDeclStatement ParseVariableDecl()
@@ -437,14 +446,20 @@ namespace Caique.Parsing
 
         private Expression ParseDot()
         {
-            var left = ParsePrimary();
-
-            if (Consume(TokenKind.Dot))
+            var expressions = new List<Expression>()
             {
-                return new DotExpression(left, ParseDot());
+                ParsePrimary()
+            };
+
+
+            while (Consume(TokenKind.Dot))
+            {
+                expressions.Add(ParsePrimary());
             }
 
-            return left;
+            return expressions.Count > 1
+                ? new DotExpression(expressions)
+                : expressions.First();
         }
 
         private Expression ParsePrimary()

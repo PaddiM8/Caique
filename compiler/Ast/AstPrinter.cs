@@ -152,8 +152,8 @@ namespace Caique.Ast
         public object Visit(DotExpression dotExpression)
         {
             PrintStart(".", ConsoleColor.Magenta);
-            Next(dotExpression.Left);
-            Next(dotExpression.Right);
+            foreach (var expression in dotExpression.Expressions)
+                Next(expression);
             _indentationLevel--;
 
             return null!;

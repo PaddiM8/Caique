@@ -6,11 +6,11 @@ namespace Caique.Ast
 {
     public class AssignmentStatement : Statement
     {
-        public Expression Assignee { get; }
+        public DotExpression Assignee { get; }
 
         public Expression Value { get; }
 
-        public AssignmentStatement(Expression left,
+        public AssignmentStatement(DotExpression left,
                                    Expression value)
                                    : base(left.Span.Add(value.Span))
         {

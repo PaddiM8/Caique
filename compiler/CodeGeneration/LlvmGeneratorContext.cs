@@ -22,6 +22,8 @@ namespace Caique.CodeGeneration
 
         public SymbolEnvironment? SymbolEnvironment { get; set; }
 
+        public bool ShouldBeLoaded { get; set; } = true;
+
         public LlvmGeneratorContext CreateChild(Statement statement)
         {
             return new LlvmGeneratorContext
@@ -44,6 +46,7 @@ namespace Caique.CodeGeneration
                 DotExpressionObject = DotExpressionObject,
                 FunctionDecl = FunctionDecl,
                 SymbolEnvironment = SymbolEnvironment,
+                ShouldBeLoaded = ShouldBeLoaded,
             };
         }
     }

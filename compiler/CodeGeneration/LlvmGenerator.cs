@@ -193,23 +193,7 @@ namespace Caique.CodeGeneration
         {
             // If it's a normal variable, get the LLVM value of its declaration,
             // otherwise just get its pointer.
-            LLVMValueRef assignee;
-            if (assignmentStatement.Assignee is VariableExpression variableExpression)
-            {
-                // If the VariableDecl doesn't have a value, it's an object field,
-                // and the pointer needs to be gotten manually
-                assignee = variableExpression.VariableDecl!.LlvmValue ??
-                    LLVM.BuildStructGEP(
-                        _builder,
-                        LLVM.GetParam(_current.FunctionDecl!.LlvmValue!.Value, 0),
-                        (uint)variableExpression.VariableDecl!.IndexInObject,
-                        "field".ToCString()
-                    );
-            }
-            else
-            {
-                assignee = Next(assignmentStatement.Assignee);
-            }
+            LLVMValueRef assignee = Next(assignmentStatement.Assignee);
             LLVMValueRef value = Next(assignmentStatement.Value);
             LLVM.BuildStore(_builder, value, assignee);
 
@@ -594,7 +578,8 @@ namespace Caique.CodeGeneration
             LLVMValueRef loadPointer;
             if (variableDecl.VariableType == VariableType.Object) // Object field
             {
-                var objectInstance = LLVM.GetParam(functionDecl.LlvmValue!.Value, 0);
+                var objectInstance = _current.DotExpressionObject ??
+                    LLVM.GetParam(functionDecl.LlvmValue!.Value, 0);
                 loadPointer = LLVM.BuildStructGEP(
                     _builder,
                     objectInstance,
@@ -622,11 +607,13 @@ namespace Caique.CodeGeneration
                 loadPointer = variableDecl.LlvmValue!.Value;
             }
 
-            return LLVM.BuildLoad(
-                _builder,
-                loadPointer,
-                ("l" + identifier).ToCString()
-            );
+            return _current.ShouldBeLoaded
+                ? LLVM.BuildLoad(
+                    _builder,
+                    loadPointer,
+                    ("l" + identifier).ToCString()
+                )
+                : loadPointer;
         }
 
         public LLVMValueRef Visit(CallExpression callExpression)
@@ -787,41 +774,28 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(DotExpression dotExpression)
         {
-            if (dotExpression.Right is CallExpression _)
+            var leftValue = Next(dotExpression.Expressions.First());
+            foreach (var right in dotExpression.Expressions.Skip(1))
             {
-                _current.DotExpressionObject = Next(dotExpression.Left);
-                var value = Next(dotExpression.Right);
-                _current.DotExpressionObject = null;
-
-                return value;
-            }
-            else if (dotExpression.Right is VariableExpression variableExpression)
-            {
-                // Get the pointer of the field in the struct
-                var elementPointer = LLVM.BuildStructGEP(
-                    _builder,
-                    Next(dotExpression.Left),
-                    (uint)variableExpression.VariableDecl!.IndexInObject,
-                    variableExpression.Identifier.Value.ToCString()
-                );
-
-                // If it's for an assignment statement, it shouldn't be loaded,
-                // since it's just going to be assigned to.
-                if (_current.Parent?.Statement is AssignmentStatement)
+                if (right is CallExpression _)
                 {
-                    return elementPointer;
+                    _current.DotExpressionObject = leftValue;
+                    leftValue = Next(right);
+                    _current.DotExpressionObject = null;
                 }
-                else
+                else if (right is VariableExpression variableExpression)
                 {
-                    return LLVM.BuildLoad(
-                        _builder,
-                        elementPointer,
-                        "load".ToCString()
-                    );
+                    // Get the pointer of the field in the struct
+                    _current.DotExpressionObject = leftValue;
+                    _current.ShouldBeLoaded = !(_current.Parent?.Statement is AssignmentStatement);
+                    var elementPointer = Next(variableExpression);
+                    _current.DotExpressionObject = null;
+                    _current.ShouldBeLoaded = true;
+                    leftValue = elementPointer;
                 }
             }
 
-            throw new InvalidOperationException();
+            return leftValue;
         }
 
         public LLVMValueRef Visit(SelfExpression selfExpression)

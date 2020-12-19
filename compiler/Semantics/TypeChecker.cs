@@ -116,14 +116,9 @@ namespace Caique.Semantics
             CheckTypes(variableType, valueType, assignmentStatement.Span);
 
             // Go through the asignee and make sure it can be assigned to
-            var statement = assignmentStatement.Assignee;
-            while (!(statement is VariableExpression))
+            foreach (var expression in assignmentStatement.Assignee.Expressions)
             {
-                if (statement is DotExpression dotExpression)
-                {
-                    statement = dotExpression.Right;
-                }
-                else
+                if (!(expression is VariableExpression))
                 {
                     _diagnostics.ReportMisplacedAssignmentOperator(assignmentStatement.Span);
                     break;
@@ -281,68 +276,70 @@ namespace Caique.Semantics
 
         public DataType Visit(DotExpression dotExpression)
         {
-            var leftType = Next(dotExpression.Left);
-
-            if (dotExpression.Right is CallExpression extensionFunctionCall)
+            var leftType = Next(dotExpression.Expressions.First());
+            foreach (var right in dotExpression.Expressions.Skip(1))
             {
-                var identifier = extensionFunctionCall.ModulePath[^1];
-                var extensionFunction = _module.GetFunction(identifier.Value);
-                if (extensionFunction != null &&
-                    extensionFunction.IsExtensionFunction &&
-                    leftType.IsCompatible(Next(extensionFunction.ExtensionOf!)))
+                if (right is CallExpression extensionFunctionCall)
                 {
-                    var type = CheckCall(identifier, extensionFunction, extensionFunctionCall.Arguments);
-                    extensionFunctionCall.DataType = type;
-                    extensionFunctionCall.FunctionDecl = extensionFunction;
+                    var identifier = extensionFunctionCall.ModulePath[^1];
+                    var extensionFunction = _module.GetFunction(identifier.Value);
+                    if (extensionFunction != null &&
+                        extensionFunction.IsExtensionFunction &&
+                        leftType.IsCompatible(Next(extensionFunction.ExtensionOf!)))
+                    {
+                        var type = CheckCall(identifier, extensionFunction, extensionFunctionCall.Arguments);
+                        extensionFunctionCall.DataType = type;
+                        extensionFunctionCall.FunctionDecl = extensionFunction;
 
-                    return type;
+                        return type;
+                    }
+                }
+
+                // If it's not an object
+                if (leftType.Type != TypeKeyword.Identifier)
+                {
+                    _diagnostics.ReportUnexpectedType(leftType, "object", right.Span);
+                    return _unknownType;
+                }
+
+                var classDecl = leftType.ObjectDecl!;
+
+                // Can't continue if the class couldn't be found.
+                // This will probably mostly happen due to other user-errors,
+                // which will reported where relevant instead.
+                if (classDecl == null) return _unknownType;
+
+                // Check if the variable/function exists in the class
+                if (right is CallExpression callExpression)
+                {
+                    var identifier = callExpression.ModulePath[^1];
+                    var function = classDecl.GetFunction(identifier.Value);
+                    var type = CheckCall(identifier, function, callExpression.Arguments);
+                    callExpression.DataType = type;
+                    callExpression.FunctionDecl = function;
+                    leftType = type;
+                }
+                else if (right is VariableExpression variableExpression)
+                {
+                    var identifier = variableExpression.Identifier;
+                    var variable = classDecl.GetVariable(identifier.Value);
+                    var type = CheckVariableDecl(identifier, variable);
+                    variableExpression.DataType = type;
+                    variableExpression.VariableDecl = variable;
+                    leftType = type;
+                }
+                else
+                {
+                    _diagnostics.ReportUnexpectedToken(
+                        new Token(TokenKind.Identifier, right.GetType().Name, right.Span),
+                        "call expression or variable expression"
+                    );
+
+                    return _unknownType;
                 }
             }
 
-            // If it's not an object
-            if (leftType.Type != TypeKeyword.Identifier)
-            {
-                _diagnostics.ReportUnexpectedType(leftType, "object", dotExpression.Left.Span);
-                return _unknownType;
-            }
-
-            var classDecl = leftType.ObjectDecl!;
-
-            // Can't continue if the class couldn't be found.
-            // This will probably mostly happen due to other user-errors,
-            // which will reported where relevant instead.
-            if (classDecl == null) return _unknownType;
-
-            // Check if the variable/function exists in the class
-            if (dotExpression.Right is CallExpression callExpression)
-            {
-                var identifier = callExpression.ModulePath[^1];
-                var function = classDecl.GetFunction(identifier.Value);
-                var type = CheckCall(identifier, function, callExpression.Arguments);
-                callExpression.DataType = type;
-                callExpression.FunctionDecl = function;
-
-                return type;
-            }
-            else if (dotExpression.Right is VariableExpression variableExpression)
-            {
-                var identifier = variableExpression.Identifier;
-                var variable = classDecl.GetVariable(identifier.Value);
-                var type = CheckVariableDecl(identifier, variable);
-                variableExpression.DataType = type;
-                variableExpression.VariableDecl = variable;
-
-                return type;
-            }
-
-            Console.WriteLine(dotExpression.Right.GetType());
-
-            _diagnostics.ReportUnexpectedToken(
-                new Token(TokenKind.Identifier, dotExpression.Right.GetType().Name, dotExpression.Right.Span),
-                "call expression or variable expression"
-            );
-
-            return _unknownType;
+            return leftType;
         }
 
         public DataType Visit(LiteralExpression literalExpression)
@@ -450,7 +447,7 @@ namespace Caique.Semantics
 
             FunctionDeclStatement? functionDecl;
             bool isInDotExpression = _current.Parent?.Expression is DotExpression dotExpression &&
-                dotExpression.Right == callExpression;
+                dotExpression.Expressions.First() != callExpression;
             if ((_environment.ParentObject != null || isInDotExpression) &&
                 modulePath.Count == 1)
             {
