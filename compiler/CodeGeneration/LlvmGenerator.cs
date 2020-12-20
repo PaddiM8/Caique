@@ -16,7 +16,7 @@ namespace Caique.CodeGeneration
         private readonly LLVMContextRef _context;
         private readonly LLVMModuleRef _llvmModule;
         private readonly LLVMBuilderRef _builder;
-        private LlvmGeneratorContext _current = new LlvmGeneratorContext();
+        private LlvmGeneratorContext _current = new();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int Main();
@@ -81,6 +81,7 @@ namespace Caique.CodeGeneration
 
             // Print out the LLVM IR
             LLVM.DumpModule(_llvmModule);
+            int _2 = LLVM.PrintModuleToFile(_llvmModule, ("experiments/ll/" + _module.Identifier + ".ll").ToCString(), &moduleError);
         }
 
         public void Dispose()
@@ -186,6 +187,12 @@ namespace Caique.CodeGeneration
                 LLVM.BuildStore(_builder, initializer, alloca);
             }
 
+            if (variableDeclStatement.DataType!.IsObject)
+            {
+                ArcRetain(alloca);
+                _current.Block!.VariablesToArcUpdate.Add(variableDeclStatement);
+            }
+
             return null!;
         }
 
@@ -201,11 +208,17 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(AssignmentStatement assignmentStatement)
         {
-            // If it's a normal variable, get the LLVM value of its declaration,
-            // otherwise just get its pointer.
+            // ARC decrement the previous reference
+            if (assignmentStatement.Assignee.DataType!.IsObject)
+                ArcRelease(assignmentStatement.Assignee.LlvmValue!.Value);
+
             LLVMValueRef assignee = Next(assignmentStatement.Assignee);
             LLVMValueRef value = Next(assignmentStatement.Value);
             LLVM.BuildStore(_builder, value, assignee);
+
+            // ARC increment the new reference
+            if (assignmentStatement.Assignee.DataType!.IsObject)
+                ArcRetain(assignee);
 
             return null!;
         }
@@ -548,6 +561,12 @@ namespace Caique.CodeGeneration
                 }
             }
 
+            // Arc decrement
+            foreach (var variable in blockExpression.VariablesToArcUpdate)
+            {
+                ArcRelease(variable.LlvmValue!.Value);
+            }
+
             // If the parent expects the block expression to
             // assign the return value to an alloca (which is outside of the block).
             if (_current.Parent!.BlockReturnValueAlloca != null)
@@ -788,8 +807,10 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(DotExpression dotExpression)
         {
-            var leftValue = Next(dotExpression.Expressions.First());
-            foreach (var right in dotExpression.Expressions.Skip(1))
+            bool isSingle = dotExpression.Expressions.Count == 1;
+            LLVMValueRef? leftValue = isSingle ? null : Next(dotExpression.Expressions.First());
+            var skip = isSingle ? 0 : 1;
+            foreach (var right in dotExpression.Expressions.Skip(skip))
             {
                 if (right is CallExpression _)
                 {
@@ -800,7 +821,7 @@ namespace Caique.CodeGeneration
                 else if (right is VariableExpression variableExpression)
                 {
                     // Get the pointer of the field in the struct
-                    _current.DotExpressionObject = leftValue;
+                    if (!isSingle) _current.DotExpressionObject = leftValue;
                     _current.ShouldBeLoaded = !(_current.Parent?.Statement is AssignmentStatement);
                     var elementPointer = Next(variableExpression);
                     _current.DotExpressionObject = null;
@@ -809,7 +830,9 @@ namespace Caique.CodeGeneration
                 }
             }
 
-            return leftValue;
+            dotExpression.LlvmValue = leftValue;
+
+            return leftValue!.Value;
         }
 
         public LLVMValueRef Visit(SelfExpression selfExpression)
@@ -817,6 +840,54 @@ namespace Caique.CodeGeneration
             var function = _current.FunctionDecl!.LlvmValue!.Value;
 
             return LLVM.GetParam(function, 0);
+        }
+
+        private void ArcRetain(LLVMValueRef objectPointer)
+        {
+            var obj = _module.Prelude?.Modules["object"].GetClass("object") ??
+                _module.Root.Modules["object"].GetClass("object");
+            var retain = obj!.GetFunction("retain")!.LlvmValue;
+
+            fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[1])
+            {
+                args[0] = LLVM.BuildBitCast(
+                    _builder,
+                    LLVM.BuildLoad(_builder, objectPointer, "".ToCString()),
+                    LLVM.PointerType(obj.LlvmType!.Value, 0),
+                    "toObj".ToCString()
+                );
+                LLVM.BuildCall(
+                    _builder,
+                    retain!.Value,
+                    args,
+                    1,
+                    "".ToCString()
+                );
+            }
+        }
+
+        private void ArcRelease(LLVMValueRef objectPointer)
+        {
+            var obj = _module.Prelude?.Modules["object"].GetClass("object") ??
+                _module.Root.Modules["object"].GetClass("object");
+            var release = obj!.GetFunction("release")!.LlvmValue;
+
+            fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[1])
+            {
+                args[0] = LLVM.BuildBitCast(
+                    _builder,
+                    LLVM.BuildLoad(_builder, objectPointer, "".ToCString()),
+                    LLVM.PointerType(obj.LlvmType!.Value, 0),
+                    "toObj".ToCString()
+                );
+                LLVM.BuildCall(
+                    _builder,
+                    release!.Value,
+                    args,
+                    1,
+                    "".ToCString()
+                );
+            }
         }
     }
 }

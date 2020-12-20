@@ -1,3 +1,18 @@
 class object
 {
+    ReferenceCount: i64;
+
+    fn retain() {
+        ReferenceCount = ReferenceCount + 1;
+    }
+
+    fn release() {
+        ReferenceCount = ReferenceCount - 1;
+
+        if ReferenceCount == 0 {
+            free(self);
+        }
+    }
 }
+
+fn free(ptr: object*);

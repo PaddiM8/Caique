@@ -19,32 +19,29 @@ namespace Caique.Semantics
 
         public bool IsNumber { get => IsInt || IsFloat; }
 
-        public bool IsInt
-        {
-            get => Type switch
+        public bool IsInt =>
+            Type switch
             {
                 TypeKeyword.i8 or
                 TypeKeyword.i32 or
                 TypeKeyword.i64 => true,
                 _ => false,
             };
-        }
 
-        public bool IsFloat
-        {
-            get => Type switch
+        public bool IsFloat =>
+            Type switch
             {
                 TypeKeyword.f8 or
                 TypeKeyword.f32 or
                 TypeKeyword.f64 => true,
                 _ => false,
             };
-        }
 
-        public bool IsString
-        {
-            get => Type == TypeKeyword.i8 && IsExplicitPointer;
-        }
+        public bool IsString =>
+            Type == TypeKeyword.i8 && IsExplicitPointer;
+
+        public bool IsObject =>
+            ObjectDecl != null;
 
         public DataType(TypeKeyword type, ClassDeclStatement? objectDecl = null, bool isExplicitPointer = false)
         {

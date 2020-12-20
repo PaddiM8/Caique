@@ -6,7 +6,7 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public class DotExpression : Expression
+    public partial class DotExpression : Expression
     {
         public List<Expression> Expressions { get; }
 

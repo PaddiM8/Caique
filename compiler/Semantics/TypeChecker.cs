@@ -115,6 +115,9 @@ namespace Caique.Semantics
 
             CheckTypes(variableType, valueType, assignmentStatement.Span);
 
+            assignmentStatement.Assignee.DataType = variableType;
+            assignmentStatement.Value.DataType = variableType;
+
             // Go through the asignee and make sure it can be assigned to
             foreach (var expression in assignmentStatement.Assignee.Expressions)
             {
@@ -265,8 +268,9 @@ namespace Caique.Semantics
         public DataType Visit(BinaryExpression binaryExpression)
         {
             var leftType = Next(binaryExpression.Left);
-            var rightType = Next(binaryExpression.Right);
             binaryExpression.DataType = leftType;
+            _current.DataType = leftType;
+            var rightType = Next(binaryExpression.Right);
             CheckTypes(leftType, rightType, binaryExpression.Span);
 
             return binaryExpression.Operator.Kind.IsComparisonOperator()
@@ -456,7 +460,7 @@ namespace Caique.Semantics
                 if (functionDecl == null)
                 {
                     var extensionFunction = module.GetFunction(lastIdentifier.Value);
-                    if (extensionFunction?.IsExtensionFunction ?? false)
+                    if (!isInDotExpression || (extensionFunction?.IsExtensionFunction ?? false))
                         functionDecl = extensionFunction;
                 }
             }
@@ -568,16 +572,16 @@ namespace Caique.Semantics
         {
             var conditionType = Next(ifExpression.Condition);
             CheckTypes(_boolType, conditionType, ifExpression.Condition.Span);
+            var branchExprStmt = (ExpressionStatement)ifExpression.Branch;
+            var branchBlock = (BlockExpression)branchExprStmt.Expression;
+            var branchType = Next(branchBlock);
+            ifExpression.DataType = branchType;
 
-            if (ifExpression.Branch is ExpressionStatement branchExprStmt &&
-                branchExprStmt.Expression is BlockExpression branchBlock &&
-                ifExpression.ElseBranch is ExpressionStatement elseBranchExprStmt &&
+            if (ifExpression.ElseBranch is ExpressionStatement elseBranchExprStmt &&
                 elseBranchExprStmt.Expression is BlockExpression elseBranchBlock)
             {
-                var branchType = Next(branchBlock);
                 var elseBranchType = Next(elseBranchBlock);
                 CheckTypes(branchType, elseBranchType, ifExpression.Span);
-                ifExpression.DataType = branchType;
 
                 return branchType;
             }
