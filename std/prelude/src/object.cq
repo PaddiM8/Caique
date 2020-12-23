@@ -15,4 +15,4 @@ class object
     }
 }
 
-fn free(ptr: object*);
+fn free(ptr: object);

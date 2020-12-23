@@ -18,9 +18,6 @@ namespace Caique.CodeGeneration
         private readonly LLVMBuilderRef _builder;
         private LlvmGeneratorContext _current = new();
 
-        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate int Main();
-
         public LlvmGenerator(ModuleEnvironment module)
         {
             _module = module;
@@ -270,6 +267,7 @@ namespace Caique.CodeGeneration
                 functionType
             );
             functionDeclStatement.LlvmValue = function;
+            functionDeclStatement.LlvmType = functionType;
 
             // If the function doesn't have a body,
             // or a call/new expression triggered this function,
@@ -489,7 +487,7 @@ namespace Caique.CodeGeneration
                         1
                     );
 
-                    fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[2])
+                    fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[3])
                     {
                         arguments[0] = malloc;
                         arguments[1] = stringPtr;
@@ -498,7 +496,7 @@ namespace Caique.CodeGeneration
                             _builder,
                             dataType.ObjectDecl!.InitFunction!.LlvmValue!.Value,
                             arguments,
-                            2,
+                            3,
                             "".ToCString()
                         );
                     }
@@ -588,7 +586,7 @@ namespace Caique.CodeGeneration
                     returnValue!.Value
                 );
             }
-            else
+            else if (functionDeclStatement != null)
             {
                 LLVM.BuildRetVoid(_builder);
             }
@@ -691,6 +689,55 @@ namespace Caique.CodeGeneration
                             );
                         }
                         else arguments[0] = objectInstance;
+                    }
+                }
+
+                if (_module.Root.Identifier == "prelude" &&
+                    _module.Identifier == "object"
+                    && callExpression.ModulePath[^1].Value == "free")
+                {
+                    var printfType = LLVM.FunctionType(
+                        LLVM.VoidType(),
+                        new List<DataType>
+                            {
+                                new DataType(TypeKeyword.i8, null, true)
+                            }.ToLlvmTypeArray(_module.Prelude),
+                        1,
+                        0
+                    );
+                    var printf = LLVM.AddFunction(_llvmModule, "printf".ToCString(), printfType);
+                    fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[2])
+                    {
+                        LLVMValueRef printfConst = LLVM.BuildGlobalString(
+                            _builder,
+                            "Destructing\n".ToCString(),
+                            ".str".ToCString()
+                        );
+
+                        var indices = new LLVMOpaqueValue*[]
+                        {
+                            LLVM.ConstInt(LLVM.Int64Type(), 0, 0),
+                            LLVM.ConstInt(LLVM.Int64Type(), 0, 0),
+                        };
+
+                        fixed (LLVMOpaqueValue** indicesRef = indices)
+                        {
+                            args[0] = LLVM.BuildGEP(
+                                _builder,
+                                printfConst,
+                                indicesRef,
+                                2,
+                                "str".ToCString()
+                            );
+
+                            LLVM.BuildCall(
+                                _builder,
+                                printf,
+                                args,
+                                1,
+                                "".ToCString()
+                            );
+                        }
                     }
                 }
 
