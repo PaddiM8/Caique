@@ -36,10 +36,16 @@ namespace Caique.CodeGeneration
                 switch (statement)
                 {
                     case ClassDeclStatement classDeclStatement:
-                        Next(statement);
+                        if (classDeclStatement.LlvmType == null)
+                            Next(statement);
 
                         if (classDeclStatement.InitFunction != null)
+                        {
+                            if (classDeclStatement.InitFunction.LlvmValue == null)
+                                Next(classDeclStatement.InitFunction);
+
                             functions.Add(classDeclStatement.InitFunction);
+                        }
 
                         foreach (var function in classDeclStatement.Body.Environment.Functions)
                         {
@@ -692,6 +698,7 @@ namespace Caique.CodeGeneration
                     }
                 }
 
+                // Temporary
                 if (_module.Root.Identifier == "prelude" &&
                     _module.Identifier == "object"
                     && callExpression.ModulePath[^1].Value == "free")
@@ -756,13 +763,7 @@ namespace Caique.CodeGeneration
         {
             var objectDecl = typeExpression.DataType!.ObjectDecl;
             if (objectDecl == null) return null;
-
-            if (objectDecl!.LlvmType == null)
-            {
-                Next(objectDecl);
-                if (objectDecl.InitFunction != null)
-                    Next(objectDecl.InitFunction);
-            }
+            if (objectDecl!.LlvmType == null) Next(objectDecl);
 
             return null;
         }
