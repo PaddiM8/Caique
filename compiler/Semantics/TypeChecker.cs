@@ -14,7 +14,7 @@ namespace Caique.Semantics
         private readonly ModuleEnvironment _module;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
-        private TypeCheckerContext _current = new TypeCheckerContext();
+        private TypeCheckerContext _current = new();
         private ClassDeclStatement? _stringObj;
         private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
         private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
@@ -39,9 +39,10 @@ namespace Caique.Semantics
             _current = _current.Parent!;
         }
 
-        private DataType Next(Expression expression)
+        private DataType Next(Expression expression, DataType? expectedType = null)
         {
             _current = _current.CreateChild(expression);
+            _current.ExpectedType = expectedType ?? _current.Parent!.Expression?.DataType;
             _current.DataType = _current.Parent!.DataType; // Expressions should carry on the infer-type
             var value = ((IAstTraverser<object, DataType>)this).Next(expression);
             _current = _current.Parent!;
@@ -75,7 +76,7 @@ namespace Caique.Semantics
                 // if there is a value
                 if (variableDeclStatement.Value != null)
                 {
-                    var valueType = Next(variableDeclStatement.Value!);
+                    var valueType = Next(variableDeclStatement.Value!, specifiedType);
                     CheckTypes(
                         specifiedType,
                         valueType,
@@ -101,7 +102,7 @@ namespace Caique.Semantics
         public object Visit(ReturnStatement returnStatement)
         {
             _current.DataType = _current.CurrentFunctionType;
-            var type = Next(returnStatement.Expression);
+            var type = Next(returnStatement.Expression, _current.CurrentFunctionType);
             CheckTypes(_current.CurrentFunctionType!, type, returnStatement.Span);
 
             return null!;
@@ -111,7 +112,7 @@ namespace Caique.Semantics
         {
             var variableType = Next(assignmentStatement.Assignee);
             _current.DataType = variableType;
-            var valueType = Next(assignmentStatement.Value);
+            var valueType = Next(assignmentStatement.Value, variableType);
 
             CheckTypes(variableType, valueType, assignmentStatement.Span);
 
@@ -352,13 +353,15 @@ namespace Caique.Semantics
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
             {
                 bool isFloat = literalExpression.Value.Value.Contains(".");
-                type = _current.Parent!.DataType ?? new DataType(
+                type = _current.ExpectedType ?? new DataType(
                     isFloat ? TypeKeyword.f32 : TypeKeyword.i32
                 );
             }
             else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
             {
-                type = new DataType(TypeKeyword.Identifier, _stringObj);
+                type = _current.ExpectedType?.Type == TypeKeyword.i8 && _current.ExpectedType.IsExplicitPointer
+                    ? new DataType(TypeKeyword.i8, null, true)
+                    : new DataType(TypeKeyword.Identifier, _stringObj);
             }
             else if (literalExpression.Value.Kind == TokenKind.CharLiteral)
             {
@@ -502,13 +505,13 @@ namespace Caique.Semantics
 
             foreach (var (argument, i) in newExpression.Arguments.WithIndex())
             {
-                var argumentType = Next(argument);
                 var varDecl = classDecl!.Body.Environment.GetVariable(
                     classDecl.InitFunction!.Parameters[i].Identifier.Value
                 );
 
                 if (varDecl == null) continue;
                 if (varDecl.DataType == null) Next(varDecl);
+                var argumentType = Next(argument, varDecl.DataType!);
 
                 CheckTypes(varDecl.DataType!, argumentType, argument.Span);
             }
@@ -672,8 +675,8 @@ namespace Caique.Semantics
             foreach (var (argument, parameter) in
                      arguments.Zip(functionDecl.Parameters))
             {
-                var argumentType = Next(argument);
                 var parameterType = parameter.Type!.DataType ?? Next(parameter.Type!);
+                var argumentType = Next(argument, parameterType);
                 CheckTypes(parameterType, argumentType, argument.Span);
             }
 
