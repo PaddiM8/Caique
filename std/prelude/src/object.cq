@@ -4,15 +4,19 @@ class object
 
     fn retain() {
         ReferenceCount = ReferenceCount + 1;
+        printf("Retain -> %d\n", ReferenceCount);
     }
 
     fn release() {
         ReferenceCount = ReferenceCount - 1;
+        printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {
+            printf("Destructing. %d\n", 0);
             free(self);
         }
     }
 }
 
 fn free(ptr: object);
+fn printf(x: i8*, y: i64): i32;

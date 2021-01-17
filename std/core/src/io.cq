@@ -1,9 +1,9 @@
 fn printf(x: i8*, y: i8*): i32;
 
 fn print(input: String) {
-    printf("%s".Bytes, input.Bytes);
+    printf("%s", input.Bytes);
 }
 
 fn println(input: String) {
-    printf("%s\n".Bytes, input.Bytes);
+    printf("%s\n", input.Bytes);
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -426,7 +426,7 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(LiteralExpression literalExpression)
         {
             var dataType = literalExpression.DataType!;
-            if (dataType.IsNumber)
+            if (dataType.IsNumber && !dataType.IsExplicitPointer)
             {
                 string tokenValue = literalExpression.Value.Value;
 
@@ -457,7 +457,8 @@ namespace Caique.CodeGeneration
                     );
                 }
             }
-            else if (dataType.ObjectDecl?.Identifier.Value == "String")
+            else if (dataType.Type == TypeKeyword.i8 ||
+                     dataType.ObjectDecl?.Identifier.Value == "String")
             {
                 LLVMValueRef globalString = LLVM.BuildGlobalString(
                     _builder,
@@ -480,6 +481,11 @@ namespace Caique.CodeGeneration
                         2,
                         "str".ToCString()
                     );
+
+                    if (literalExpression.DataType!.Type == TypeKeyword.i8)
+                    {
+                        return stringPtr;
+                    }
 
                     var malloc = LLVM.BuildMalloc(
                         _builder,
@@ -695,56 +701,6 @@ namespace Caique.CodeGeneration
                             );
                         }
                         else arguments[0] = objectInstance;
-                    }
-                }
-
-                // Temporary
-                if (_module.Root.Identifier == "prelude" &&
-                    _module.Identifier == "object"
-                    && callExpression.ModulePath[^1].Value == "free")
-                {
-                    var printfType = LLVM.FunctionType(
-                        LLVM.VoidType(),
-                        new List<DataType>
-                            {
-                                new DataType(TypeKeyword.i8, null, true)
-                            }.ToLlvmTypeArray(_module.Prelude),
-                        1,
-                        0
-                    );
-                    var printf = LLVM.AddFunction(_llvmModule, "printf".ToCString(), printfType);
-                    fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[2])
-                    {
-                        LLVMValueRef printfConst = LLVM.BuildGlobalString(
-                            _builder,
-                            "Destructing\n".ToCString(),
-                            ".str".ToCString()
-                        );
-
-                        var indices = new LLVMOpaqueValue*[]
-                        {
-                            LLVM.ConstInt(LLVM.Int64Type(), 0, 0),
-                            LLVM.ConstInt(LLVM.Int64Type(), 0, 0),
-                        };
-
-                        fixed (LLVMOpaqueValue** indicesRef = indices)
-                        {
-                            args[0] = LLVM.BuildGEP(
-                                _builder,
-                                printfConst,
-                                indicesRef,
-                                2,
-                                "str".ToCString()
-                            );
-
-                            LLVM.BuildCall(
-                                _builder,
-                                printf,
-                                args,
-                                1,
-                                "".ToCString()
-                            );
-                        }
                     }
                 }
 
