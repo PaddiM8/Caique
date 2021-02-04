@@ -384,12 +384,12 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(WhileStatement whileStatement)
         {
-            var func = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(_builder));
+            var basicBlockParent = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(_builder));
 
             // Blocks
-            LLVMBasicBlockRef conditionBasicBlock = LLVM.AppendBasicBlock(func, "cond".ToCString());
-            LLVMBasicBlockRef branchBasicBlock = LLVM.AppendBasicBlock(func, "branch".ToCString());
-            LLVMBasicBlockRef mergeBasicBlock = LLVM.AppendBasicBlock(func, "cont".ToCString());
+            LLVMBasicBlockRef conditionBasicBlock = LLVM.AppendBasicBlock(basicBlockParent, "cond".ToCString());
+            LLVMBasicBlockRef branchBasicBlock = LLVM.AppendBasicBlock(basicBlockParent, "branch".ToCString());
+            LLVMBasicBlockRef mergeBasicBlock = LLVM.AppendBasicBlock(basicBlockParent, "cont".ToCString());
 
             // Build condition
             LLVM.BuildBr(_builder, conditionBasicBlock);
@@ -398,6 +398,7 @@ namespace Caique.CodeGeneration
             LLVM.BuildCondBr(_builder, condition, branchBasicBlock, mergeBasicBlock);
 
             // Body
+            whileStatement.Body.LlvmValue = branchBasicBlock;
             LLVM.PositionBuilderAtEnd(_builder, branchBasicBlock); // Position builder at block
             Next(whileStatement.Body);
             LLVM.BuildBr(_builder, conditionBasicBlock);
@@ -567,7 +568,7 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(BlockExpression blockExpression)
         {
-            var parentStatementValue = _current.Parent!.Statement!.LlvmValue;
+            var parentStatementValue = _current.Parent!.Statement?.LlvmValue;
             var previousEnvironment = _current.SymbolEnvironment;
             _current.SymbolEnvironment = blockExpression.Environment;
             _current.Block = blockExpression;
@@ -583,10 +584,10 @@ namespace Caique.CodeGeneration
                 blockExpression.LlvmValue = functionDeclStatement.BlockLlvmValue;
                 LLVM.PositionBuilderAtEnd(_builder, functionDeclStatement.BlockLlvmValue!.Value);
             }
-            else if (parentStatementValue != null) // Function
+            else if (parentStatementValue != null)
             {
                 LLVMBasicBlockRef block = LLVM.AppendBasicBlock(
-                    parentStatementValue!.Value,
+                    parentStatementValue!.Value, // Parent function
                     "entry".ToCString()
                 );
                 blockExpression.LlvmValue = block;
@@ -838,7 +839,6 @@ namespace Caique.CodeGeneration
                     "retVal".ToCString()
                 )
                 : null;
-
         }
 
         public LLVMValueRef Visit(NewExpression newExpression)
