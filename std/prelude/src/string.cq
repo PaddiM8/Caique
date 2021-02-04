@@ -6,4 +6,17 @@ class String
     Length: i32;
 
     init(Bytes, Length) {}
+
+    fn concat(str: String): String {
+        Length = Length + str.Length;
+        let newStr = malloc(Length);
+        strcat(newStr, Bytes);
+        strcat(newStr, str.Bytes);
+
+        new String(newStr, Length)
+    }
 }
+
+fn strcat(a: i8*, b: i8*);
+fn printf(a: i8*, b: i8*);
+fn malloc(size: i32): i8*;
