@@ -121,6 +121,10 @@ namespace Caique.Parsing
             {
                 return ParseClassDecl();
             }
+            else if (Match(TokenKind.While))
+            {
+                return ParseWhile();
+            }
 
             var expressionStatement = ParseExpressionStatement();
 
@@ -349,6 +353,15 @@ namespace Caique.Parsing
             _symbolEnvironment.TryAdd(statement);
 
             return statement;
+        }
+
+        private WhileStatement ParseWhile()
+        {
+            Expect(TokenKind.While);
+            var condition = ParseExpression();
+            var body = ParseBlock();
+
+            return new WhileStatement(condition, body);
         }
 
         private FunctionDeclStatement ParseInit()

@@ -231,6 +231,19 @@ namespace Caique.Semantics
             return null!;
         }
 
+        public object Visit(WhileStatement whileStatement)
+        {
+            CheckTypes(
+                Next(whileStatement.Condition),
+                _boolType,
+                whileStatement.Condition.Span
+            );
+
+            Next(whileStatement.Body);
+
+            return null!;
+        }
+
         public object Visit(UseStatement useStatement)
         {
             var module = _module.Parent!.FindByPath(useStatement.ModulePath);

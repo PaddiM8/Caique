@@ -111,6 +111,16 @@ namespace Caique.Ast
             return null!;
         }
 
+        public object Visit(WhileStatement whileStatement)
+        {
+            PrintStart("while", ConsoleColor.DarkGreen);
+            Next(whileStatement.Condition);
+            Next(whileStatement.Body);
+            _indentationLevel--;
+
+            return null!;
+        }
+
         public object Visit(AssignmentStatement assignmentStatement)
         {
             PrintStart("=", ConsoleColor.Green);

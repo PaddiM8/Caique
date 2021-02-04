@@ -5,17 +5,17 @@ class object
 
     fn retain() {
         ReferenceCount = ReferenceCount + 1;
-        printf("[%d] ", Id);
-        printf("Retain -> %d\n", ReferenceCount);
+        //printf("[%d] ", Id);
+        //printf("Retain -> %d\n", ReferenceCount);
     }
 
     fn release() {
         ReferenceCount = ReferenceCount - 1;
-        printf("[%d] ", Id);
-        printf("Release -> %d\n", ReferenceCount);
+        //printf("[%d] ", Id);
+        //printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {
-            printf("Destructing. %d\n", 0);
+            //printf("Destructing. %d\n", 0);
             free(self);
         }
     }

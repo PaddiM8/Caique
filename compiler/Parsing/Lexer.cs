@@ -392,6 +392,7 @@ namespace Caique.Parsing
                 "self" => TokenKind.Self,
                 "new" => TokenKind.New,
                 "use" => TokenKind.Use,
+                "while" => TokenKind.While,
                 "void" => TokenKind.Void,
                 "i8" => TokenKind.i8,
                 "i32" => TokenKind.i32,

@@ -10,6 +10,7 @@ namespace Caique.Ast
         T Visit(AssignmentStatement assignmentStatement);
         T Visit(FunctionDeclStatement functionDeclStatement);
         T Visit(ClassDeclStatement classDeclStatement);
+        T Visit(WhileStatement whileStatement);
         T Visit(UseStatement useStatement);
 
         U Visit(UnaryExpression unaryExpression);
@@ -35,6 +36,7 @@ namespace Caique.Ast
                 AssignmentStatement toVisit => Visit(toVisit),
                 FunctionDeclStatement toVisit => Visit(toVisit),
                 ClassDeclStatement toVisit => Visit(toVisit),
+                WhileStatement toVisit => Visit(toVisit),
                 UseStatement toVisit => Visit(toVisit),
                 _ => throw new Exception(statement.ToString()),
             };

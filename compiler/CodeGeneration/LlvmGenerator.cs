@@ -382,6 +382,31 @@ namespace Caique.CodeGeneration
             return null!;
         }
 
+        public LLVMValueRef Visit(WhileStatement whileStatement)
+        {
+            var func = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(_builder));
+
+            // Blocks
+            LLVMBasicBlockRef conditionBasicBlock = LLVM.AppendBasicBlock(func, "cond".ToCString());
+            LLVMBasicBlockRef branchBasicBlock = LLVM.AppendBasicBlock(func, "branch".ToCString());
+            LLVMBasicBlockRef mergeBasicBlock = LLVM.AppendBasicBlock(func, "cont".ToCString());
+
+            // Build condition
+            LLVM.BuildBr(_builder, conditionBasicBlock);
+            LLVM.PositionBuilderAtEnd(_builder, conditionBasicBlock);
+            var condition = Next(whileStatement.Condition);
+            LLVM.BuildCondBr(_builder, condition, branchBasicBlock, mergeBasicBlock);
+
+            // Body
+            LLVM.PositionBuilderAtEnd(_builder, branchBasicBlock); // Position builder at block
+            Next(whileStatement.Body);
+            LLVM.BuildBr(_builder, conditionBasicBlock);
+
+            LLVM.PositionBuilderAtEnd(_builder, mergeBasicBlock);
+
+            return null!;
+        }
+
         public LLVMValueRef Visit(UseStatement useStatement)
         {
             throw new NotImplementedException();
