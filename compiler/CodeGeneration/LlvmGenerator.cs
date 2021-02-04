@@ -204,6 +204,14 @@ namespace Caique.CodeGeneration
             if (returnStatement.DataType!.IsObject)
                 ArcRetain(value);
 
+            // Arc release the values that should be released,
+            // since the block won't do it automatically if you don't
+            // reach the end of the scope.
+            foreach (var valueToRelease in _current.Block!.ValuesToArcUpdate)
+            {
+                ArcRelease(valueToRelease);
+            }
+
             LLVM.BuildRet(
                 _builder,
                 value
@@ -561,6 +569,7 @@ namespace Caique.CodeGeneration
             }
 
             LLVMValueRef? returnValue = null;
+            bool manualReturn = false;
             foreach (var (statement, i) in blockExpression.Statements.WithIndex())
             {
                 bool isLast = i == blockExpression.Statements.Count - 1;
@@ -574,6 +583,11 @@ namespace Caique.CodeGeneration
                 else
                 {
                     Next(statement);
+                    if (statement is ReturnStatement)
+                    {
+                        manualReturn = true;
+                        break;
+                    }
                 }
             }
 
@@ -587,10 +601,12 @@ namespace Caique.CodeGeneration
                 ArcRetain(returnValue!.Value);
             }
 
-            // Arc release
-            foreach (var value in blockExpression.ValuesToArcUpdate)
+            // Arc release if the return isn't done manually,
+            // since return statements deal with this themselves.
+            if (!manualReturn)
             {
-                ArcRelease(value);
+                foreach (var value in blockExpression.ValuesToArcUpdate)
+                    ArcRelease(value);
             }
 
             // If the parent expects the block expression to
@@ -609,10 +625,13 @@ namespace Caique.CodeGeneration
             if (functionDeclStatement != null &&
                 functionDeclStatement.Body!.DataType?.Type != TypeKeyword.Void)
             {
-                LLVM.BuildRet(
-                    _builder,
-                    returnValue!.Value
-                );
+                if (functionDeclStatement.Body!.ReturnsLastExpression)
+                {
+                    LLVM.BuildRet(
+                        _builder,
+                        returnValue!.Value
+                    );
+                }
             }
             else if (functionDeclStatement != null)
             {

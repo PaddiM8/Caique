@@ -103,7 +103,9 @@ namespace Caique.Semantics
         {
             _current.DataType = _current.CurrentFunctionType;
             var type = Next(returnStatement.Expression, _current.CurrentFunctionType);
-            CheckTypes(_current.CurrentFunctionType!, type, returnStatement.Span);
+            returnStatement.DataType = CheckTypes(_current.CurrentFunctionType!, type, returnStatement.Span)
+                ? type
+                : _unknownType;
 
             return null!;
         }
@@ -400,8 +402,16 @@ namespace Caique.Semantics
                     statement is ExpressionStatement expressionStatement &&
                     !expressionStatement.TrailingSemicolon)
                 {
+                    blockExpression.ReturnsLastExpression = true;
                     _current.DataType = _current.Parent!.DataType;
                     returnType = Next(expressionStatement.Expression);
+                }
+                else if (statement is ReturnStatement returnStatement)
+                {
+                    Next(returnStatement);
+                    returnType = returnStatement.DataType!;
+                    _current.DataType = returnType;
+                    break;
                 }
                 else
                 {
