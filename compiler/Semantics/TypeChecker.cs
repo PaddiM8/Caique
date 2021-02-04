@@ -289,7 +289,7 @@ namespace Caique.Semantics
                 if (right is CallExpression extensionFunctionCall)
                 {
                     var identifier = extensionFunctionCall.ModulePath[^1];
-                    var extensionFunction = _module.GetFunction(identifier.Value);
+                    var extensionFunction = _module.GetFunction($"{leftType}.{identifier.Value}");
                     if (extensionFunction != null &&
                         extensionFunction.IsExtensionFunction &&
                         leftType.IsCompatible(Next(extensionFunction.ExtensionOf!)))
@@ -463,19 +463,10 @@ namespace Caique.Semantics
             }
 
             FunctionDeclStatement? functionDecl;
-            bool isInDotExpression = _current.Parent?.Expression is DotExpression dotExpression &&
-                dotExpression.Expressions.First() != callExpression;
-            if ((_environment.ParentObject != null || isInDotExpression) &&
-                modulePath.Count == 1)
+            if (_environment.ParentObject != null && modulePath.Count == 1)
             {
-                functionDecl = _environment.ParentObject?.GetFunction(lastIdentifier.Value);
-
-                if (functionDecl == null)
-                {
-                    var extensionFunction = module.GetFunction(lastIdentifier.Value);
-                    if (!isInDotExpression || (extensionFunction?.IsExtensionFunction ?? false))
-                        functionDecl = extensionFunction;
-                }
+                functionDecl = _environment.ParentObject?.GetFunction(lastIdentifier.Value) ??
+                    module.GetFunction(lastIdentifier.Value, false);
             }
             else
             {

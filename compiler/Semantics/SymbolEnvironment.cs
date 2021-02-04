@@ -34,12 +34,9 @@ namespace Caique.Semantics
 
         private ClassDeclStatement? _parentObject;
 
-        private readonly Dictionary<string, ClassDeclStatement> _classes =
-            new Dictionary<string, ClassDeclStatement>();
-        private readonly Dictionary<string, FunctionDeclStatement> _functions =
-            new Dictionary<string, FunctionDeclStatement>();
-        private readonly Dictionary<string, VariableDeclStatement?> _variables =
-            new Dictionary<string, VariableDeclStatement?>();
+        private readonly Dictionary<string, ClassDeclStatement> _classes = new();
+        private readonly Dictionary<string, FunctionDeclStatement> _functions = new();
+        private readonly Dictionary<string, VariableDeclStatement?> _variables = new();
 
         public SymbolEnvironment(SymbolEnvironment? parent = null)
         {
@@ -63,6 +60,17 @@ namespace Caique.Semantics
 
         public void Add(FunctionDeclStatement function)
         {
+            if (function.IsExtensionFunction)
+            {
+                string extensionTypeName = function.ExtensionOf!.ModulePath[^1].Value;
+                _functions.Add(
+                    $"{extensionTypeName}.{function.Identifier.Value}",
+                    function
+                );
+
+                return;
+            }
+
             _functions.Add(function.Identifier.Value, function);
         }
 
