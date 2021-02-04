@@ -13,6 +13,8 @@ namespace Caique.Semantics
 
         public DataType? CurrentExtendedType { get; set; }
 
+        public DataType? ExpectedType { get; set; }
+
         public ClassDeclStatement? CurrentObject { get; set; }
 
         public Expression? Expression { get; set; }

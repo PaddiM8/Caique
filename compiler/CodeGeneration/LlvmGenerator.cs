@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -36,6 +36,7 @@ namespace Caique.CodeGeneration
                 switch (statement)
                 {
                     case ClassDeclStatement classDeclStatement:
+                        // May already have been done by TypeExpression.
                         if (classDeclStatement.LlvmType == null)
                             Next(statement);
 
@@ -188,12 +189,9 @@ namespace Caique.CodeGeneration
             if (variableDeclStatement.Value != null)
             {
                 LLVM.BuildStore(_builder, initializer, alloca);
-            }
 
-            if (variableDeclStatement.DataType!.IsObject)
-            {
-                ArcRetain(alloca);
-                _current.Block!.VariablesToArcUpdate.Add(variableDeclStatement);
+                //if (variableDeclStatement.Value.DataType!.IsObject)
+                //    ArcRetain(initializer);
             }
 
             return null!;
@@ -201,9 +199,14 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(ReturnStatement returnStatement)
         {
+            var value = Next(returnStatement.Expression);
+
+            if (returnStatement.DataType!.IsObject)
+                ArcRetain(value);
+
             LLVM.BuildRet(
                 _builder,
-                Next(returnStatement.Expression)
+                value
             );
 
             return null!;
@@ -211,9 +214,9 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(AssignmentStatement assignmentStatement)
         {
-            // ARC decrement the previous reference
+            // ARC release the previous reference
             if (assignmentStatement.Assignee.DataType!.IsObject)
-                ArcRelease(assignmentStatement.Assignee.LlvmValue!.Value);
+                ArcRelease(LLVM.BuildLoad(_builder, assignmentStatement.Assignee.LlvmValue!.Value, "".ToCString()));
 
             LLVMValueRef assignee = Next(assignmentStatement.Assignee);
             LLVMValueRef value = Next(assignmentStatement.Value);
@@ -221,7 +224,7 @@ namespace Caique.CodeGeneration
 
             // ARC increment the new reference
             if (assignmentStatement.Assignee.DataType!.IsObject)
-                ArcRetain(assignee);
+                ArcRetain(LLVM.BuildLoad(_builder, assignee, "".ToCString()));
 
             return null!;
         }
@@ -513,6 +516,9 @@ namespace Caique.CodeGeneration
                         );
                     }
 
+                    ArcRetain(malloc);
+                    _current.Block!.ValuesToArcUpdate.Add(malloc);
+
                     return malloc;
                 }
 
@@ -571,10 +577,20 @@ namespace Caique.CodeGeneration
                 }
             }
 
-            // Arc decrement
-            foreach (var variable in blockExpression.VariablesToArcUpdate)
+            // If there is a value to be returned,
+            // and the block belongs to a function,
+            // and it's returning an object
+            if (returnValue != null &&
+                functionDeclStatement != null &&
+                functionDeclStatement.Body!.DataType!.IsObject)
             {
-                ArcRelease(variable.LlvmValue!.Value);
+                ArcRetain(returnValue!.Value);
+            }
+
+            // Arc release
+            foreach (var value in blockExpression.ValuesToArcUpdate)
+            {
+                ArcRelease(value);
             }
 
             // If the parent expects the block expression to
@@ -711,6 +727,13 @@ namespace Caique.CodeGeneration
                     (uint)argumentCount,
                     (functionDecl.DataType == null ? "" : identifier).ToCString()
                 );
+
+                if (functionDecl.ReturnType?.DataType?.IsObject ?? false)
+                {
+                    //ArcRetain(call);
+                    _current.Block!.ValuesToArcUpdate.Add(call);
+                }
+
                 return call;
             }
         }
@@ -719,6 +742,9 @@ namespace Caique.CodeGeneration
         {
             var objectDecl = typeExpression.DataType!.ObjectDecl;
             if (objectDecl == null) return null;
+
+            // If a type is being used before the object has been emitted,
+            // generate the object first.
             if (objectDecl!.LlvmType == null) Next(objectDecl);
 
             return null;
@@ -768,6 +794,7 @@ namespace Caique.CodeGeneration
                     "retVal".ToCString()
                 )
                 : null;
+
         }
 
         public LLVMValueRef Visit(NewExpression newExpression)
@@ -805,6 +832,9 @@ namespace Caique.CodeGeneration
                     );
                 }
             }
+
+            ArcRetain(malloc);
+            _current.Block!.ValuesToArcUpdate.Add(malloc);
 
             return malloc;
         }
@@ -856,7 +886,7 @@ namespace Caique.CodeGeneration
             {
                 args[0] = LLVM.BuildBitCast(
                     _builder,
-                    LLVM.BuildLoad(_builder, objectPointer, "".ToCString()),
+                    objectPointer,
                     LLVM.PointerType(obj.LlvmType!.Value, 0),
                     "toObj".ToCString()
                 );
@@ -880,7 +910,7 @@ namespace Caique.CodeGeneration
             {
                 args[0] = LLVM.BuildBitCast(
                     _builder,
-                    LLVM.BuildLoad(_builder, objectPointer, "".ToCString()),
+                    objectPointer,
                     LLVM.PointerType(obj.LlvmType!.Value, 0),
                     "toObj".ToCString()
                 );

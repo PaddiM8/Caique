@@ -1,14 +1,17 @@
 class object
 {
-    ReferenceCount: i64;
+    ReferenceCount: i64 = 0;
+    Id: i64 = 0; // For development purposes, remove this later on
 
     fn retain() {
         ReferenceCount = ReferenceCount + 1;
+        printf("[%d] ", Id);
         printf("Retain -> %d\n", ReferenceCount);
     }
 
     fn release() {
         ReferenceCount = ReferenceCount - 1;
+        printf("[%d] ", Id);
         printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {

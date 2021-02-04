@@ -20,7 +20,7 @@ namespace Caique.Ast
     {
         public LLVMBasicBlockRef? LlvmValue { get; set; }
 
-        public List<VariableDeclStatement> VariablesToArcUpdate { get; set; } = new();
+        public List<LLVMValueRef> ValuesToArcUpdate { get; set; } = new();
     }
 
     public partial class DotExpression

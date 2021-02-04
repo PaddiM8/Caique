@@ -119,7 +119,7 @@ namespace Caique.Cli
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "gcc",
-                    Arguments = "-o main " + string.Join(" ", objectFiles),
+                    Arguments = "-no-pie -o main " + string.Join(" ", objectFiles),
                     WorkingDirectory = targetPath,
                 }
             };
