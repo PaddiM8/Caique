@@ -359,9 +359,10 @@ namespace Caique.Parsing
         {
             Expect(TokenKind.While);
             var condition = ParseExpression();
-            var body = ParseBlock();
+            Consume(TokenKind.Colon); // Consume a colon if there is one.
+            var body = ParseStatement();
 
-            return new WhileStatement(condition, body);
+            return new WhileStatement(condition, AddBlockToBranchIfNeeded(body));
         }
 
         private FunctionDeclStatement ParseInit()
@@ -529,41 +530,38 @@ namespace Caique.Parsing
                 end = elseBranch.Span;
             }
 
-            AddBlockToBranchIfNeeded(branch);
-            if (elseBranch != null) AddBlockToBranchIfNeeded(elseBranch);
 
             return new IfExpression(
                 condition,
-                (ExpressionStatement)branch,
-                (ExpressionStatement?)elseBranch,
+                AddBlockToBranchIfNeeded(branch),
+                elseBranch == null ? null : AddBlockToBranchIfNeeded(elseBranch),
                 start.Add(end)
             );
         }
 
-        private ExpressionStatement AddBlockToBranchIfNeeded(Statement branch)
+        private BlockExpression AddBlockToBranchIfNeeded(Statement branch)
         {
             if (branch is ExpressionStatement exprStmt)
             {
-                if (!(exprStmt.Expression is BlockExpression))
+                if (exprStmt.Expression is BlockExpression blockExpr)
                 {
-                    exprStmt.Expression = new BlockExpression(
+                    return blockExpr;
+                }
+                else
+                {
+                    return new BlockExpression(
                         new() { new ExpressionStatement(exprStmt.Expression, false) },
                         _symbolEnvironment.CreateChildEnvironment(),
                         branch.Span
                     );
                 }
-
-                return exprStmt;
             }
             else
             {
-                return new ExpressionStatement(
-                    new BlockExpression(
-                        new() { branch },
-                        _symbolEnvironment.CreateChildEnvironment(),
-                        branch.Span
-                    ),
-                    true
+                return new BlockExpression(
+                    new() { branch },
+                    _symbolEnvironment.CreateChildEnvironment(),
+                    branch.Span
                 );
             }
         }

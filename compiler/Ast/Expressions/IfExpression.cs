@@ -8,12 +8,12 @@ namespace Caique.Ast
     {
         public Expression Condition { get; }
 
-        public ExpressionStatement Branch { get; }
+        public BlockExpression Branch { get; }
 
-        public ExpressionStatement? ElseBranch { get; }
+        public BlockExpression? ElseBranch { get; }
 
-        public IfExpression(Expression condition, ExpressionStatement branch,
-                            ExpressionStatement? elseBranch, TextSpan span) : base(span)
+        public IfExpression(Expression condition, BlockExpression branch,
+                            BlockExpression? elseBranch, TextSpan span) : base(span)
         {
             Condition = condition;
             Branch = branch;
