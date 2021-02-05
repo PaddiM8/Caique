@@ -501,9 +501,9 @@ namespace Caique.Parsing
             {
                 return ParseNew();
             }
-            else if (Match(TokenKind.Self))
+            else if (Match(TokenKind.Self, TokenKind.True, TokenKind.False))
             {
-                return new SelfExpression(Advance());
+                return new KeywordValueExpression(Advance());
             }
             else if (Match(TokenKind.Identifier))
             {

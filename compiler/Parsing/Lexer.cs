@@ -400,6 +400,8 @@ namespace Caique.Parsing
                 "f8" => TokenKind.f8,
                 "f32" => TokenKind.f32,
                 "f64" => TokenKind.f64,
+                "true" => TokenKind.True,
+                "false" => TokenKind.False,
                 _ => TokenKind.Identifier,
             };
 

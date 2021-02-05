@@ -16,7 +16,7 @@ namespace Caique.Parsing
         OpenBrace, ClosedBrace, OpenAngleBracket, ClosedAngleBracket,
 
         // Keywords
-        If, Else, Fn, Let, Class, New, Use, Ret, Init, Ext, Self, While,
+        If, Else, Fn, Let, Class, New, Use, Ret, Init, Ext, Self, While, True, False,
 
         // Variable length
         Identifier, NumberLiteral, StringLiteral, CharLiteral,

@@ -259,7 +259,7 @@ namespace Caique.Ast
             return null!;
         }
 
-        public object Visit(SelfExpression selfExpression)
+        public object Visit(KeywordValueExpression keywordValueExpression)
         {
             PrintMiddle("self", ConsoleColor.Blue);
 

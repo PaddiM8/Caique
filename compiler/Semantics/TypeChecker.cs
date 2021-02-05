@@ -16,9 +16,9 @@ namespace Caique.Semantics
         private SymbolEnvironment _environment;
         private TypeCheckerContext _current = new();
         private ClassDeclStatement? _stringObj;
-        private static readonly DataType _voidType = new DataType(TypeKeyword.Void);
-        private static readonly DataType _boolType = new DataType(TypeKeyword.Bool);
-        private static readonly DataType _unknownType = new DataType(TypeKeyword.Unknown);
+        private static readonly DataType _voidType = new(TypeKeyword.Void);
+        private static readonly DataType _boolType = new(TypeKeyword.Bool);
+        private static readonly DataType _unknownType = new(TypeKeyword.Unknown);
 
         public TypeChecker(ModuleEnvironment module)
         {
@@ -606,15 +606,23 @@ namespace Caique.Semantics
             return _voidType;
         }
 
-        public DataType Visit(SelfExpression selfExpression)
+        public DataType Visit(KeywordValueExpression keywordValueExpression)
         {
-            if (_current.CurrentObject?.DataType != null)
-                return _current.CurrentObject.DataType;
+            if (keywordValueExpression.Token.Kind == TokenKind.Self)
+            {
+                if (_current.CurrentObject?.DataType != null)
+                    return _current.CurrentObject.DataType;
 
-            if (_current.CurrentExtendedType != null)
-                return _current.CurrentExtendedType;
+                if (_current.CurrentExtendedType != null)
+                    return _current.CurrentExtendedType;
 
-            _diagnostics.ReportMisplacedSelfKeyword(selfExpression.Span);
+                _diagnostics.ReportMisplacedSelfKeyword(keywordValueExpression.Span);
+            }
+            else if (keywordValueExpression.Token.Kind == TokenKind.True ||
+                     keywordValueExpression.Token.Kind == TokenKind.False)
+            {
+                return _boolType;
+            }
 
             return _unknownType;
         }

@@ -913,11 +913,24 @@ namespace Caique.CodeGeneration
             return leftValue!.Value;
         }
 
-        public LLVMValueRef Visit(SelfExpression selfExpression)
+        public LLVMValueRef Visit(KeywordValueExpression keywordValueExpression)
         {
-            var function = _current.FunctionDecl!.LlvmValue!.Value;
+            if (keywordValueExpression.Token.Kind == TokenKind.Self)
+            {
+                var function = _current.FunctionDecl!.LlvmValue!.Value;
 
-            return LLVM.GetParam(function, 0);
+                return LLVM.GetParam(function, 0);
+            }
+            else if (keywordValueExpression.Token.Kind == TokenKind.True)
+            {
+                return LLVM.ConstInt(LLVM.Int1Type(), 1, 0);
+            }
+            else if (keywordValueExpression.Token.Kind == TokenKind.False)
+            {
+                return LLVM.ConstInt(LLVM.Int1Type(), 0, 0);
+            }
+
+            return null!;
         }
 
         private void ArcRetain(LLVMValueRef objectPointer)
