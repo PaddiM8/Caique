@@ -182,16 +182,13 @@ namespace Caique.CodeGeneration
             );
 
             // Put the builder back where it should be
-            LLVM.PositionBuilderAtEnd(_builder, _current.Block!.LlvmValue!.Value);
+            DeselectTemporaryBlock();
 
             variableDeclStatement.LlvmValue = alloca;
 
             if (variableDeclStatement.Value != null)
             {
                 LLVM.BuildStore(_builder, initializer, alloca);
-
-                //if (variableDeclStatement.Value.DataType!.IsObject)
-                //    ArcRetain(initializer);
             }
 
             return null!;
@@ -307,7 +304,7 @@ namespace Caique.CodeGeneration
                 function,
                 "functionEntry".ToCString()
             );
-            LLVM.PositionBuilderAtEnd(_builder, block);
+            TemporarilySetCurrentBlock(block);
             functionDeclStatement.BlockLlvmValue = block;
 
             // Assign reference parameters to object fields
@@ -331,6 +328,9 @@ namespace Caique.CodeGeneration
                     objectFieldValue
                 );
             }
+
+            // Position the builder where it should be again.
+            if (_current.Block != null) DeselectTemporaryBlock();
 
             return function;
         }
@@ -400,17 +400,17 @@ namespace Caique.CodeGeneration
 
             // Build condition
             LLVM.BuildBr(_builder, conditionBasicBlock);
-            LLVM.PositionBuilderAtEnd(_builder, conditionBasicBlock);
+            SetCurrentBlock(conditionBasicBlock);
             var condition = Next(whileStatement.Condition);
             LLVM.BuildCondBr(_builder, condition, branchBasicBlock, mergeBasicBlock);
 
             // Body
             whileStatement.Body.LlvmValue = branchBasicBlock;
-            LLVM.PositionBuilderAtEnd(_builder, branchBasicBlock); // Position builder at block
+            SetCurrentBlock(branchBasicBlock);
             Next(whileStatement.Body);
             LLVM.BuildBr(_builder, conditionBasicBlock);
 
-            LLVM.PositionBuilderAtEnd(_builder, mergeBasicBlock);
+            SetCurrentBlock(mergeBasicBlock);
 
             return null!;
         }
@@ -807,9 +807,9 @@ namespace Caique.CodeGeneration
             LLVMValueRef parent = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(_builder));
 
             // Blocks
-            LLVMBasicBlockRef thenBB = LLVM.AppendBasicBlock(parent, "then".ToCString());
-            LLVMBasicBlockRef elseBB = LLVM.AppendBasicBlock(parent, "else".ToCString());
-            LLVMBasicBlockRef mergeBB = LLVM.AppendBasicBlock(parent, "ifcont".ToCString());
+            LLVMBasicBlockRef thenBasicBlock = LLVM.AppendBasicBlock(parent, "then".ToCString());
+            LLVMBasicBlockRef elseBasicBlock = LLVM.AppendBasicBlock(parent, "else".ToCString());
+            LLVMBasicBlockRef mergeBasicBlock = LLVM.AppendBasicBlock(parent, "ifcont".ToCString());
 
             bool returnsValue = ifExpression.DataType!.Type != TypeKeyword.Void;
             if (returnsValue)
@@ -825,19 +825,24 @@ namespace Caique.CodeGeneration
             }
 
             // Build condition
-            LLVM.BuildCondBr(_builder, Next(ifExpression.Condition), thenBB, elseBB);
+            LLVM.BuildCondBr(
+                _builder,
+                Next(ifExpression.Condition),
+                thenBasicBlock,
+                elseBasicBlock
+            );
 
             // Then branch
-            LLVM.PositionBuilderAtEnd(_builder, thenBB); // Position builder at block
+            SetCurrentBlock(thenBasicBlock);
             Next(ifExpression.Branch); // Generate branch code
-            LLVM.BuildBr(_builder, mergeBB); // Redirect to merge
+            LLVM.BuildBr(_builder, mergeBasicBlock); // Redirect to merge
 
             // Else branch
-            LLVM.PositionBuilderAtEnd(_builder, elseBB); // Position builder at block
+            SetCurrentBlock(elseBasicBlock);
             if (ifExpression.ElseBranch != null) Next(ifExpression.ElseBranch); // Generate branch code if else statement is present
-            LLVM.BuildBr(_builder, mergeBB); // Redirect to merge
+            LLVM.BuildBr(_builder, mergeBasicBlock); // Redirect to merge
 
-            LLVM.PositionBuilderAtEnd(_builder, mergeBB);
+            SetCurrentBlock(mergeBasicBlock);
 
             return returnsValue
                 ? LLVM.BuildLoad(
@@ -986,6 +991,22 @@ namespace Caique.CodeGeneration
                     "".ToCString()
                 );
             }
+        }
+
+        private void SetCurrentBlock(LLVMBasicBlockRef basicBlock)
+        {
+            LLVM.PositionBuilderAtEnd(_builder, basicBlock);
+            _current.Block!.LlvmValue = basicBlock;
+        }
+
+        private void TemporarilySetCurrentBlock(LLVMBasicBlockRef basicBlock)
+        {
+            LLVM.PositionBuilderAtEnd(_builder, basicBlock);
+        }
+
+        private void DeselectTemporaryBlock()
+        {
+            LLVM.PositionBuilderAtEnd(_builder, _current.Block!.LlvmValue!.Value);
         }
     }
 }
