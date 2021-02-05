@@ -529,12 +529,43 @@ namespace Caique.Parsing
                 end = elseBranch.Span;
             }
 
+            AddBlockToBranchIfNeeded(branch);
+            if (elseBranch != null) AddBlockToBranchIfNeeded(elseBranch);
+
             return new IfExpression(
                 condition,
-                branch,
-                elseBranch,
+                (ExpressionStatement)branch,
+                (ExpressionStatement?)elseBranch,
                 start.Add(end)
             );
+        }
+
+        private ExpressionStatement AddBlockToBranchIfNeeded(Statement branch)
+        {
+            if (branch is ExpressionStatement exprStmt)
+            {
+                if (!(exprStmt.Expression is BlockExpression))
+                {
+                    exprStmt.Expression = new BlockExpression(
+                        new() { new ExpressionStatement(exprStmt.Expression, false) },
+                        _symbolEnvironment.CreateChildEnvironment(),
+                        branch.Span
+                    );
+                }
+
+                return exprStmt;
+            }
+            else
+            {
+                return new ExpressionStatement(
+                    new BlockExpression(
+                        new() { branch },
+                        _symbolEnvironment.CreateChildEnvironment(),
+                        branch.Span
+                    ),
+                    true
+                );
+            }
         }
 
         private BlockExpression ParseBlock()

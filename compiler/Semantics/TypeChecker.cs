@@ -589,15 +589,14 @@ namespace Caique.Semantics
         {
             var conditionType = Next(ifExpression.Condition);
             CheckTypes(_boolType, conditionType, ifExpression.Condition.Span);
-            var branchExprStmt = (ExpressionStatement)ifExpression.Branch;
-            var branchBlock = (BlockExpression)branchExprStmt.Expression;
+            var branchExprStmt = ifExpression.Branch;
+            var branchBlock = branchExprStmt.Expression;
             var branchType = Next(branchBlock);
             ifExpression.DataType = branchType;
 
-            if (ifExpression.ElseBranch is ExpressionStatement elseBranchExprStmt &&
-                elseBranchExprStmt.Expression is BlockExpression elseBranchBlock)
+            if (ifExpression.ElseBranch != null)
             {
-                var elseBranchType = Next(elseBranchBlock);
+                var elseBranchType = Next(ifExpression.ElseBranch.Expression);
                 CheckTypes(branchType, elseBranchType, ifExpression.Span);
 
                 return branchType;

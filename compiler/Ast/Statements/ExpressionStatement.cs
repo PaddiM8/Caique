@@ -5,7 +5,7 @@ namespace Caique.Ast
 {
     public class ExpressionStatement : Statement
     {
-        public Expression Expression { get; }
+        public Expression Expression { get; set; }
 
         public bool TrailingSemicolon { get; }
 
