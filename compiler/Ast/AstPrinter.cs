@@ -62,8 +62,11 @@ namespace Caique.Ast
         public object Visit(ReturnStatement returnStatement)
         {
             PrintStart("ret", ConsoleColor.Magenta);
-            Next(returnStatement.Expression);
-            _indentationLevel--;
+            if (returnStatement.Expression != null)
+            {
+                Next(returnStatement.Expression);
+                _indentationLevel--;
+            }
 
             return null!;
         }

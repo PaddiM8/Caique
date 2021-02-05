@@ -102,7 +102,14 @@ namespace Caique.Semantics
         public object Visit(ReturnStatement returnStatement)
         {
             _current.DataType = _current.CurrentFunctionType;
-            var type = Next(returnStatement.Expression, _current.CurrentFunctionType);
+            if (returnStatement.Expression == null)
+            {
+                returnStatement.DataType = _voidType;
+
+                return null!;
+            }
+
+            var type = Next(returnStatement.Expression!, _current.CurrentFunctionType);
             returnStatement.DataType = CheckTypes(_current.CurrentFunctionType!, type, returnStatement.Span)
                 ? type
                 : _unknownType;

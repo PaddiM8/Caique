@@ -198,9 +198,11 @@ namespace Caique.Parsing
         private ReturnStatement ParseReturn()
         {
             var start = Expect(TokenKind.Ret).Span;
-            var expression = ParseExpressionStatement().Expression;
+            var expression = Consume(TokenKind.Semicolon)
+                ? null
+                : ParseExpressionStatement().Expression;
 
-            return new ReturnStatement(expression, start.Add(expression.Span));
+            return new ReturnStatement(expression, start);
         }
 
         private FunctionDeclStatement ParseFunctionDecl()

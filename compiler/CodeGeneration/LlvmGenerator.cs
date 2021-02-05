@@ -199,6 +199,13 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(ReturnStatement returnStatement)
         {
+            if (returnStatement.Expression == null)
+            {
+                LLVM.BuildRetVoid(_builder);
+
+                return null!;
+            }
+
             var value = Next(returnStatement.Expression);
 
             if (returnStatement.DataType!.IsObject)
