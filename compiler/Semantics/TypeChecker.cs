@@ -9,16 +9,16 @@ using Caique.Util;
 
 namespace Caique.Semantics
 {
-    class TypeChecker : IAstTraverser<object, DataType>
+    class TypeChecker : IAstTraverser<object, IDataType>
     {
         private readonly ModuleEnvironment _module;
         private readonly DiagnosticBag _diagnostics;
         private SymbolEnvironment _environment;
         private TypeCheckerContext _current = new();
         private ClassDeclStatement? _stringObj;
-        private static readonly DataType _voidType = new(TypeKeyword.Void);
-        private static readonly DataType _boolType = new(TypeKeyword.Bool);
-        private static readonly DataType _unknownType = new(TypeKeyword.Unknown);
+        private static readonly PrimitiveType _voidType = new(TypeKeyword.Void);
+        private static readonly PrimitiveType _boolType = new(TypeKeyword.Bool);
+        private static readonly PrimitiveType _unknownType = new(TypeKeyword.Unknown);
 
         public TypeChecker(ModuleEnvironment module)
         {
@@ -35,16 +35,16 @@ namespace Caique.Semantics
         private void Next(Statement statement)
         {
             _current = _current.CreateChild();
-            ((IAstTraverser<object, DataType>)this).Next(statement);
+            ((IAstTraverser<object, IDataType>)this).Next(statement);
             _current = _current.Parent!;
         }
 
-        private DataType Next(Expression expression, DataType? expectedType = null)
+        private IDataType Next(Expression expression, IDataType? expectedType = null)
         {
             _current = _current.CreateChild(expression);
             _current.ExpectedType = expectedType ?? _current.Parent!.Expression?.DataType;
             _current.DataType = _current.Parent!.DataType; // Expressions should carry on the infer-type
-            var value = ((IAstTraverser<object, DataType>)this).Next(expression);
+            var value = ((IAstTraverser<object, IDataType>)this).Next(expression);
             _current = _current.Parent!;
 
             return value;
@@ -185,7 +185,7 @@ namespace Caique.Semantics
         public object Visit(ClassDeclStatement classDeclStatement)
         {
             _current.CurrentObject = classDeclStatement;
-            classDeclStatement.DataType = new DataType(
+            classDeclStatement.DataType = new StructType(
                 TypeKeyword.Identifier,
                 classDeclStatement
             );
@@ -271,7 +271,7 @@ namespace Caique.Semantics
             return null!;
         }
 
-        public DataType Visit(UnaryExpression unaryExpression)
+        public IDataType Visit(UnaryExpression unaryExpression)
         {
             var valueType = Next(unaryExpression.Value);
             unaryExpression.DataType = valueType;
@@ -288,7 +288,7 @@ namespace Caique.Semantics
             return valueType;
         }
 
-        public DataType Visit(BinaryExpression binaryExpression)
+        public IDataType Visit(BinaryExpression binaryExpression)
         {
             var leftType = Next(binaryExpression.Left);
             binaryExpression.DataType = leftType;
@@ -301,7 +301,7 @@ namespace Caique.Semantics
                 : leftType;
         }
 
-        public DataType Visit(DotExpression dotExpression)
+        public IDataType Visit(DotExpression dotExpression)
         {
             var leftType = Next(dotExpression.Expressions.First());
             foreach (var right in dotExpression.Expressions.Skip(1))
@@ -323,13 +323,13 @@ namespace Caique.Semantics
                 }
 
                 // If it's not an object
-                if (leftType.Type != TypeKeyword.Identifier)
+                if (leftType is not StructType leftStructType)
                 {
                     _diagnostics.ReportUnexpectedType(leftType, "object", right.Span);
                     return _unknownType;
                 }
 
-                var classDecl = leftType.ObjectDecl!;
+                var classDecl = leftStructType.StructDecl;
 
                 // Can't continue if the class couldn't be found.
                 // This will probably mostly happen due to other user-errors,
@@ -369,25 +369,25 @@ namespace Caique.Semantics
             return leftType;
         }
 
-        public DataType Visit(LiteralExpression literalExpression)
+        public IDataType Visit(LiteralExpression literalExpression)
         {
-            DataType type;
+            IDataType type;
             if (literalExpression.Value.Kind == TokenKind.NumberLiteral)
             {
                 bool isFloat = literalExpression.Value.Value.Contains(".");
-                type = _current.ExpectedType ?? new DataType(
+                type = _current.ExpectedType ?? new PrimitiveType(
                     isFloat ? TypeKeyword.f32 : TypeKeyword.i32
                 );
             }
             else if (literalExpression.Value.Kind == TokenKind.StringLiteral)
             {
                 type = _current.ExpectedType?.Type == TypeKeyword.i8 && _current.ExpectedType.IsExplicitPointer
-                    ? new DataType(TypeKeyword.i8, null, true)
-                    : new DataType(TypeKeyword.Identifier, _stringObj);
+                    ? new PrimitiveType(TypeKeyword.i8, true)
+                    : new StructType(TypeKeyword.Identifier, _stringObj!);
             }
             else if (literalExpression.Value.Kind == TokenKind.CharLiteral)
             {
-                type = new DataType(TypeKeyword.i8);
+                type = new PrimitiveType(TypeKeyword.i8);
             }
             else
             {
@@ -399,7 +399,7 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(GroupExpression groupExpression)
+        public IDataType Visit(GroupExpression groupExpression)
         {
             var type = Next(groupExpression.Expression);
             groupExpression.DataType = type;
@@ -407,10 +407,10 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(BlockExpression blockExpression)
+        public IDataType Visit(BlockExpression blockExpression)
         {
             _environment = blockExpression.Environment;
-            DataType returnType = _voidType;
+            IDataType returnType = _voidType;
 
             foreach (var (statement, i) in blockExpression.Statements.WithIndex())
             {
@@ -445,7 +445,7 @@ namespace Caique.Semantics
             return returnType;
         }
 
-        public DataType Visit(VariableExpression variableExpression)
+        public IDataType Visit(VariableExpression variableExpression)
         {
             var variableName = variableExpression.Identifier;
             var variableDecl = _environment.GetVariable(variableName.Value);
@@ -456,7 +456,7 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(CallExpression callExpression)
+        public IDataType Visit(CallExpression callExpression)
         {
             var modulePath = callExpression.ModulePath;
             var lastIdentifier = modulePath[^1];
@@ -503,12 +503,12 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(NewExpression newExpression)
+        public IDataType Visit(NewExpression newExpression)
         {
-            var type = Next(newExpression.Type);
+            var type = (StructType)Next(newExpression.Type);
             newExpression.DataType = type;
 
-            var classDecl = type.ObjectDecl!;
+            var classDecl = type.StructDecl;
             if (classDecl == null) return _unknownType;
 
             int argumentCount = newExpression.Arguments.Count;
@@ -540,7 +540,7 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(TypeExpression typeExpression)
+        public IDataType Visit(TypeExpression typeExpression)
         {
             if (typeExpression.ModulePath.Count == 1)
             {
@@ -557,9 +557,8 @@ namespace Caique.Semantics
 
                 if (keyword != TypeKeyword.Identifier)
                 {
-                    var dataType = new DataType(
+                    var dataType = new PrimitiveType(
                         keyword,
-                        null,
                         typeExpression.IsExplicitPointer
                     );
                     typeExpression.DataType = dataType;
@@ -580,9 +579,11 @@ namespace Caique.Semantics
             if (classDecl == null)
             {
                 _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
+
+                return _unknownType;
             }
 
-            var type = new DataType(
+            var type = new StructType(
                 TypeKeyword.Identifier,
                 classDecl,
                 typeExpression.IsExplicitPointer
@@ -592,7 +593,7 @@ namespace Caique.Semantics
             return type;
         }
 
-        public DataType Visit(IfExpression ifExpression)
+        public IDataType Visit(IfExpression ifExpression)
         {
             var conditionType = Next(ifExpression.Condition);
             CheckTypes(_boolType, conditionType, ifExpression.Condition.Span);
@@ -610,7 +611,7 @@ namespace Caique.Semantics
             return _voidType;
         }
 
-        public DataType Visit(KeywordValueExpression keywordValueExpression)
+        public IDataType Visit(KeywordValueExpression keywordValueExpression)
         {
             if (keywordValueExpression.Token.Kind == TokenKind.Self)
             {
@@ -643,7 +644,7 @@ namespace Caique.Semantics
             return module;
         }
 
-        private DataType CheckVariableDecl(Token identifier, VariableDeclStatement? variableDecl)
+        private IDataType CheckVariableDecl(Token identifier, VariableDeclStatement? variableDecl)
         {
             if (variableDecl == null)
             {
@@ -657,7 +658,7 @@ namespace Caique.Semantics
             if (variableDecl.DataType != null)
                 return variableDecl.DataType;
 
-            DataType type;
+            IDataType type;
             if (variableDecl.SpecifiedType != null)
             {
                 type = Next(variableDecl.SpecifiedType);
@@ -672,7 +673,7 @@ namespace Caique.Semantics
             return type;
         }
 
-        private DataType CheckCall(Token identifier, FunctionDeclStatement? functionDecl,
+        private IDataType CheckCall(Token identifier, FunctionDeclStatement? functionDecl,
                                    List<Expression> arguments)
         {
             if (functionDecl == null)
@@ -709,7 +710,7 @@ namespace Caique.Semantics
             return returnType;
         }
 
-        private bool CheckTypes(DataType expected, DataType got, TextSpan span)
+        private bool CheckTypes(IDataType expected, IDataType got, TextSpan span)
         {
             // This means an error has been found somewhere else,
             // so just ignore it.

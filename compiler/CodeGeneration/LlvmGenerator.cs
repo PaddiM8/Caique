@@ -205,7 +205,7 @@ namespace Caique.CodeGeneration
 
             var value = Next(returnStatement.Expression);
 
-            if (returnStatement.DataType!.IsObject)
+            if (returnStatement.DataType is StructType)
                 ArcRetain(value);
 
             // Arc release the values that should be released,
@@ -227,7 +227,7 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(AssignmentStatement assignmentStatement)
         {
             // ARC release the previous reference
-            if (assignmentStatement.Assignee.DataType!.IsObject)
+            if (assignmentStatement.Assignee.DataType is StructType)
                 ArcRelease(LLVM.BuildLoad(_builder, assignmentStatement.Assignee.LlvmValue!.Value, "".ToCString()));
 
             LLVMValueRef assignee = Next(assignmentStatement.Assignee);
@@ -235,7 +235,7 @@ namespace Caique.CodeGeneration
             LLVM.BuildStore(_builder, value, assignee);
 
             // ARC increment the new reference
-            if (assignmentStatement.Assignee.DataType!.IsObject)
+            if (assignmentStatement.Assignee.DataType is StructType)
                 ArcRetain(LLVM.BuildLoad(_builder, assignee, "".ToCString()));
 
             return null!;
@@ -247,9 +247,9 @@ namespace Caique.CodeGeneration
                 Next(functionDeclStatement.ReturnType);
 
             var returnType = functionDeclStatement.ReturnType?.DataType
-                ?? new DataType(TypeKeyword.Void);
+                ?? new PrimitiveType(TypeKeyword.Void);
             string identifier = functionDeclStatement.Identifier.Value;
-            var parameterDataTypes = new List<DataType>();
+            var parameterDataTypes = new List<IDataType>();
 
             // If it belongs to an object
             int parameterOffset = 0;
@@ -348,7 +348,7 @@ namespace Caique.CodeGeneration
 
             // Set the struct field types
             var variableDecls = classDeclStatement.Body.Environment.Variables;
-            var fieldTypes = new List<DataType>();
+            var fieldTypes = new List<IDataType>();
 
             ClassDeclStatement? ancestor = classDeclStatement.Inherited;
             while (ancestor != null)
@@ -502,7 +502,7 @@ namespace Caique.CodeGeneration
                 }
             }
             else if (dataType.Type == TypeKeyword.i8 ||
-                     dataType.ObjectDecl?.Identifier.Value == "String")
+                     dataType is StructType type && type.StructDecl.Identifier.Value == "String")
             {
                 LLVMValueRef globalString = LLVM.BuildGlobalString(
                     _builder,
@@ -531,9 +531,10 @@ namespace Caique.CodeGeneration
                         return stringPtr;
                     }
 
+                    var structType = (StructType)dataType;
                     var malloc = LLVM.BuildMalloc(
                         _builder,
-                        dataType.ObjectDecl!.LlvmType!.Value,
+                        structType.StructDecl.LlvmType!.Value,
                         "newString".ToCString()
                     );
 
@@ -550,7 +551,7 @@ namespace Caique.CodeGeneration
                         arguments[2] = length;
                         LLVM.BuildCall(
                             _builder,
-                            dataType.ObjectDecl!.InitFunction!.LlvmValue!.Value,
+                            structType.StructDecl.InitFunction!.LlvmValue!.Value,
                             arguments,
                             3,
                             "".ToCString()
@@ -629,7 +630,7 @@ namespace Caique.CodeGeneration
             // and it's returning an object
             if (returnValue != null &&
                 functionDeclStatement != null &&
-                functionDeclStatement.Body!.DataType!.IsObject)
+                functionDeclStatement.Body!.DataType is StructType)
             {
                 ArcRetain(returnValue!.Value);
             }
@@ -780,7 +781,7 @@ namespace Caique.CodeGeneration
                     (functionDecl.DataType == null ? "" : identifier).ToCString()
                 );
 
-                if (functionDecl.ReturnType?.DataType?.IsObject ?? false)
+                if (functionDecl.ReturnType?.DataType is StructType)
                 {
                     //ArcRetain(call);
                     _current.Block!.ValuesToArcUpdate.Add(call);
@@ -792,12 +793,11 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(TypeExpression typeExpression)
         {
-            var objectDecl = typeExpression.DataType!.ObjectDecl;
-            if (objectDecl == null) return null;
+            if (typeExpression.DataType is not StructType structType) return null;
 
             // If a type is being used before the object has been emitted,
             // generate the object first.
-            if (objectDecl!.LlvmType == null) Next(objectDecl);
+            if (structType.StructDecl.LlvmType == null) Next(structType.StructDecl);
 
             return null;
         }
@@ -856,7 +856,7 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(NewExpression newExpression)
         {
             Next(newExpression.Type);
-            var objectDecl = newExpression.DataType!.ObjectDecl!;
+            var objectDecl = ((StructType)newExpression.DataType!).StructDecl;
             var type = objectDecl.LlvmType!.Value;
             var malloc = LLVM.BuildMalloc(
                 _builder,

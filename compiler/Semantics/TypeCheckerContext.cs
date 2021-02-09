@@ -7,13 +7,13 @@ namespace Caique.Semantics
     {
         public TypeCheckerContext? Parent { get; init; }
 
-        public DataType? DataType { get; set; }
+        public IDataType? DataType { get; set; }
 
-        public DataType? CurrentFunctionType { get; set; }
+        public IDataType? CurrentFunctionType { get; set; }
 
-        public DataType? CurrentExtendedType { get; set; }
+        public IDataType? CurrentExtendedType { get; set; }
 
-        public DataType? ExpectedType { get; set; }
+        public IDataType? ExpectedType { get; set; }
 
         public ClassDeclStatement? CurrentObject { get; set; }
 

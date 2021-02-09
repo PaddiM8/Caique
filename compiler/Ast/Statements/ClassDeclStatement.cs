@@ -13,7 +13,7 @@ namespace Caique.Ast
 
         public FunctionDeclStatement? InitFunction { get; set; }
 
-        public ClassDeclStatement? Inherited => InheritedType?.DataType?.ObjectDecl;
+        public ClassDeclStatement? Inherited => ((StructType?)InheritedType?.DataType)?.StructDecl;
 
         public ModuleEnvironment Module { get; }
 

@@ -9,7 +9,7 @@ namespace Caique.CodeGeneration
 {
     public static class LlvmExtensions
     {
-        public static unsafe LLVMOpaqueType* ToLlvmType(this DataType dataType, ModuleEnvironment? prelude)
+        public static unsafe LLVMOpaqueType* ToLlvmType(this IDataType dataType, ModuleEnvironment? prelude)
         {
             var keyword = dataType.Type;
 
@@ -23,7 +23,7 @@ namespace Caique.CodeGeneration
                 TypeKeyword.f64 => LLVM.FloatType(),
                 TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Void => LLVM.VoidType(),
-                TypeKeyword.Identifier => LLVM.PointerType(dataType.ObjectDecl!.LlvmType!.Value, 0),
+                TypeKeyword.Identifier => LLVM.PointerType(((StructType)dataType).StructDecl.LlvmType!.Value, 0),
                 TypeKeyword.StringConstant => prelude!.Modules["string"].GetClass("String")!.LlvmType!.Value,
                 TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
@@ -34,7 +34,7 @@ namespace Caique.CodeGeneration
                 : type;
         }
 
-        public static unsafe LLVMOpaqueType** ToLlvmTypeArray(this ICollection<DataType> dataTypes, ModuleEnvironment? prelude)
+        public static unsafe LLVMOpaqueType** ToLlvmTypeArray(this ICollection<IDataType> dataTypes, ModuleEnvironment? prelude)
         {
             var llvmTypes = new LLVMOpaqueType*[dataTypes.Count];
             foreach (var (dataType, i) in dataTypes.WithIndex())

@@ -40,7 +40,6 @@ namespace Caique.Ast
                 UseStatement toVisit => Visit(toVisit),
                 _ => throw new Exception(statement.ToString()),
             };
-            ;
         }
 
         public U Next(Expression expression)

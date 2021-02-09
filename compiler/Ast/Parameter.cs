@@ -12,7 +12,7 @@ namespace Caique.Ast
 
         public bool IsReference { get => Type == null; }
 
-        public DataType? DataType
+        public IDataType? DataType
         {
             get => Type == null ? _dataType : Type.DataType;
             set
@@ -22,7 +22,7 @@ namespace Caique.Ast
             }
         }
 
-        private DataType? _dataType;
+        private IDataType? _dataType;
 
         public Parameter(Token identifier, TypeExpression? type)
         {

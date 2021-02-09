@@ -16,7 +16,7 @@ namespace Caique.Ast
 
         public int IndexInObject { get; set; }
 
-        public override DataType? DataType
+        public override IDataType? DataType
         {
             get => SpecifiedType == null ? _dataType : SpecifiedType.DataType;
             set
@@ -26,7 +26,7 @@ namespace Caique.Ast
             }
         }
 
-        private DataType? _dataType;
+        private IDataType? _dataType;
 
         public VariableDeclStatement(Token identifier,
                                      TextSpan span,

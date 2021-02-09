@@ -14,7 +14,7 @@ namespace Caique.Diagnostics
     /// </summary>
     public class DiagnosticBag : IEnumerable<Diagnostic>
     {
-        private readonly List<Diagnostic> _diagnostics = new List<Diagnostic>();
+        private readonly List<Diagnostic> _diagnostics = new();
 
         public IEnumerator<Diagnostic> GetEnumerator() => _diagnostics.GetEnumerator();
 
@@ -158,7 +158,7 @@ namespace Caique.Diagnostics
             );
         }
 
-        public void ReportUnexpectedType(DataType got, DataType expected, TextSpan span)
+        public void ReportUnexpectedType(IDataType got, IDataType expected, TextSpan span)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
@@ -168,7 +168,7 @@ namespace Caique.Diagnostics
             );
         }
 
-        public void ReportUnexpectedType(DataType got, string expected, TextSpan span)
+        public void ReportUnexpectedType(IDataType got, string expected, TextSpan span)
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
