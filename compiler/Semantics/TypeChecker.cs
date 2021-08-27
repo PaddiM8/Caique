@@ -95,7 +95,7 @@ namespace Caique.Semantics
 
             CheckTypes(assignee.DataType, value.DataType, assignmentStatement.Span);
 
-            // Go through the asignee and make sure it can be assigned to
+            // Go through the assignee and make sure it can be assigned to
             foreach (var expression in assignmentStatement.Assignee.Expressions)
             {
                 if (!(expression is VariableExpression))
