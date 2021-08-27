@@ -16,23 +16,11 @@ namespace Caique.Ast
 
         public int IndexInObject { get; set; }
 
-        public override IDataType? DataType
-        {
-            get => SpecifiedType == null ? _dataType : SpecifiedType.DataType;
-            set
-            {
-                if (SpecifiedType == null) _dataType = value;
-                else SpecifiedType.DataType = value;
-            }
-        }
-
-        private IDataType? _dataType;
-
         public VariableDeclStatement(Token identifier,
                                      TextSpan span,
                                      Expression? value,
+                                     VariableType variableType,
                                      TypeExpression? type = null,
-                                     VariableType variableType = VariableType.Local,
                                      int indexInObject = 0)
                                      : base(span)
         {

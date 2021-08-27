@@ -1,5 +1,6 @@
 ﻿using System;
 using Caique.Ast;
+using Caique.CheckedTree;
 using Caique.Parsing;
 
 namespace Caique.Semantics
@@ -11,7 +12,7 @@ namespace Caique.Semantics
     {
         public TypeKeyword Type { get; }
 
-        public ClassDeclStatement StructDecl { get; }
+        public CheckedClassDeclStatement StructDecl { get; }
 
         public bool IsExplicitPointer { get; set; }
 
@@ -25,7 +26,7 @@ namespace Caique.Semantics
 
         public bool IsInt => false;
 
-        public StructType(TypeKeyword type, ClassDeclStatement structDecl, bool isExplicitPointer = false)
+        public StructType(TypeKeyword type, CheckedClassDeclStatement structDecl, bool isExplicitPointer = false)
         {
             Type = type;
             StructDecl = structDecl;

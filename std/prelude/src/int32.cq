@@ -7,5 +7,6 @@ ext i32 toString(): String {
     let size: i64 = 11;
     let out = malloc(size);
     let length = snprintf(out, size, "%d", self);
+
     new String(out, length)
 }

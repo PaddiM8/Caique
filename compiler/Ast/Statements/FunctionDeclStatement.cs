@@ -8,7 +8,7 @@ namespace Caique.Ast
     {
         public Token Identifier { get; }
 
-        public List<Parameter> Parameters { get; }
+        public List<VariableDeclStatement> Parameters { get; }
 
         public BlockExpression? Body { get; }
 
@@ -25,7 +25,7 @@ namespace Caique.Ast
         public bool IsExtensionFunction => ExtensionOf != null;
 
         public FunctionDeclStatement(Token identifier,
-                                     List<Parameter> parameters,
+                                     List<VariableDeclStatement> parameters,
                                      BlockExpression? body,
                                      TypeExpression? returnType,
                                      bool isInitFunction,

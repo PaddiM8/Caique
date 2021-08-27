@@ -24,7 +24,7 @@ namespace Caique.CodeGeneration
                 TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Void => LLVM.VoidType(),
                 TypeKeyword.Identifier => LLVM.PointerType(((StructType)dataType).StructDecl.LlvmType!.Value, 0),
-                TypeKeyword.StringConstant => prelude!.Modules["string"].GetClass("String")!.LlvmType!.Value,
+                TypeKeyword.StringConstant => prelude!.Modules["string"].GetClass("String")!.Checked!.LlvmType!.Value,
                 TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };

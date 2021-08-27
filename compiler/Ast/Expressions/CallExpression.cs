@@ -13,7 +13,8 @@ namespace Caique.Ast
 
         public FunctionDeclStatement? FunctionDecl { get; set; }
 
-        public CallExpression(List<Token> modulePath, List<Expression> arguments,
+        public CallExpression(List<Token> modulePath,
+                              List<Expression> arguments,
                               TextSpan span) : base(span)
         {
             ModulePath = modulePath;

@@ -8,8 +8,6 @@ namespace Caique.Ast
     {
         public TextSpan Span { get; }
 
-        public IDataType? DataType { get; set; }
-
         public Expression(TextSpan span)
         {
             Span = span;

@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Caique.Ast;
+using Caique.CheckedTree;
 using Caique.Semantics;
 using LLVMSharp.Interop;
 
@@ -10,23 +10,23 @@ namespace Caique.CodeGeneration
     {
         public LlvmGeneratorContext? Parent { get; init; }
 
-        public Statement? Statement { get; init; }
+        public CheckedStatement? Statement { get; init; }
 
-        public Expression? Expression { get; init; }
+        public CheckedExpression? Expression { get; init; }
 
         public LLVMValueRef? BlockReturnValueAlloca { get; set; }
 
         public LLVMValueRef? DotExpressionObject { get; set; }
 
-        public FunctionDeclStatement? FunctionDecl { get; set; }
+        public CheckedFunctionDeclStatement? FunctionDecl { get; set; }
 
         public SymbolEnvironment? SymbolEnvironment { get; set; }
 
         public bool ShouldBeLoaded { get; set; } = true;
 
-        public BlockExpression? Block { get; set; }
+        public CheckedBlockExpression? Block { get; set; }
 
-        public LlvmGeneratorContext CreateChild(Statement statement)
+        public LlvmGeneratorContext CreateChild(CheckedStatement statement)
         {
             return new LlvmGeneratorContext
             {
@@ -39,7 +39,7 @@ namespace Caique.CodeGeneration
             };
         }
 
-        public LlvmGeneratorContext CreateChild(Expression expression)
+        public LlvmGeneratorContext CreateChild(CheckedExpression expression)
         {
             return new LlvmGeneratorContext
             {

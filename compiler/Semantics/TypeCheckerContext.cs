@@ -1,5 +1,6 @@
 ﻿using System;
 using Caique.Ast;
+using Caique.CheckedTree;
 
 namespace Caique.Semantics
 {
@@ -15,9 +16,13 @@ namespace Caique.Semantics
 
         public IDataType? ExpectedType { get; set; }
 
-        public ClassDeclStatement? CurrentObject { get; set; }
+        public CheckedClassDeclStatement? CurrentObject { get; set; }
 
-        public Expression? Expression { get; set; }
+        public Expression? Expression { get; init; }
+
+        public Statement? Statement { get; init; }
+
+        public CheckedExpression? CheckedExpression { get; set; }
 
         public TypeCheckerContext CreateChild()
         {
@@ -39,6 +44,18 @@ namespace Caique.Semantics
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
                 Expression = expression,
+            };
+        }
+
+        public TypeCheckerContext CreateChild(Statement statement)
+        {
+            return new TypeCheckerContext
+            {
+                Parent = this,
+                CurrentFunctionType = CurrentFunctionType,
+                CurrentExtendedType = CurrentExtendedType,
+                CurrentObject = CurrentObject,
+                Statement = statement,
             };
         }
     }

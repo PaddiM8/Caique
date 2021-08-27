@@ -7,7 +7,7 @@ namespace Caique.Cli
     static class FileProvider
     {
         private static readonly ManifestEmbeddedFileProvider _embeddedProvider =
-            new ManifestEmbeddedFileProvider(typeof(Program).Assembly);
+            new(typeof(Program).Assembly);
 
         public static string GetFileContent(string fileName)
         {

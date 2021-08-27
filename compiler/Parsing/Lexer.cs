@@ -48,7 +48,7 @@ namespace Caique.Parsing
             }
         }
 
-        private TextPosition CurrentTextPosition => new TextPosition(_position.line, _position.column);
+        private TextPosition CurrentTextPosition => new(_position.line, _position.column);
 
         private readonly string _source;
         private (int index, int line, int column) _position = (0, 1, 1);

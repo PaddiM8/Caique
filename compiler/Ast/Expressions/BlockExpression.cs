@@ -11,8 +11,6 @@ namespace Caique.Ast
 
         public SymbolEnvironment Environment { get; }
 
-        public bool ReturnsLastExpression { get; set; }
-
         public BlockExpression(List<Statement> statements, SymbolEnvironment environment,
                                TextSpan span) : base(span)
         {

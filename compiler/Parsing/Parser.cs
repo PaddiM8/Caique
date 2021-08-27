@@ -39,7 +39,7 @@ namespace Caique.Parsing
         private readonly ModuleEnvironment _moduleEnvironment;
         private SymbolEnvironment _symbolEnvironment;
         private int _index;
-        private static readonly TypeExpression _objectTypeExpression = new TypeExpression(new List<Token>
+        private static readonly TypeExpression _objectTypeExpression = new(new List<Token>
             {
                 new Token(
                     TokenKind.Identifier,
@@ -191,6 +191,7 @@ namespace Caique.Parsing
                 identifier,
                 start.Add(value.Span),
                 value,
+                VariableType.Local,
                 type
             );
         }
@@ -234,15 +235,7 @@ namespace Caique.Parsing
                 // Add the parameters to the symbol table
                 foreach (var parameter in parameters)
                 {
-                    body.Environment.TryAdd(
-                        new VariableDeclStatement(
-                            parameter.Identifier,
-                            parameter.Type!.Span.Add(parameter.Identifier.Span),
-                            null,
-                            parameter.Type,
-                            VariableType.FunctionParameter
-                        )
-                    );
+                    body.Environment.TryAdd(parameter);
                 }
             }
 
@@ -347,8 +340,8 @@ namespace Caique.Parsing
                 identifier,
                 identifier.Span.Add(type.Span),
                 value,
-                type,
                 VariableType.Object,
+                type,
                 index
             );
 
@@ -373,7 +366,7 @@ namespace Caique.Parsing
 
             // Parameters
             Expect(TokenKind.OpenParenthesis);
-            var parameters = new List<Parameter>();
+            var parameters = new List<VariableDeclStatement>();
             do
             {
                 var identifier = Expect(TokenKind.Identifier);
@@ -382,8 +375,11 @@ namespace Caique.Parsing
                 if (Consume(TokenKind.Colon))
                     type = ParseType();
 
-                parameters.Add(new Parameter(
+                parameters.Add(new VariableDeclStatement(
                     identifier,
+                    identifier.Span,
+                    null,
+                    VariableType.FunctionParameter,
                     type
                 ));
             }
@@ -396,13 +392,8 @@ namespace Caique.Parsing
             // Add parameters to symbol table
             foreach (var parameter in parameters)
             {
-                if (parameter.IsReference) continue;
-                block.Environment.TryAdd(new VariableDeclStatement(
-                    parameter.Identifier,
-                    parameter.Identifier.Span,
-                    null,
-                    parameter.Type
-                ));
+                if (parameter.SpecifiedType == null) continue;
+                block.Environment.TryAdd(parameter);
             }
 
             return new FunctionDeclStatement(
@@ -664,11 +655,11 @@ namespace Caique.Parsing
             return (arguments, start.Add(end));
         }
 
-        private List<Parameter> ParseParameters()
+        private List<VariableDeclStatement> ParseParameters()
         {
             Expect(TokenKind.OpenParenthesis);
 
-            var parameters = new List<Parameter>();
+            var parameters = new List<VariableDeclStatement>();
             do
             {
                 // In case of trailing comma,
@@ -679,7 +670,13 @@ namespace Caique.Parsing
                 var identifier = Expect(TokenKind.Identifier, "parameter name");
                 Expect(TokenKind.Colon);
                 var type = ParseType();
-                parameters.Add(new Parameter(identifier, type));
+                parameters.Add(new VariableDeclStatement(
+                    identifier,
+                    type.Span.Add(identifier.Span),
+                    null,
+                    VariableType.FunctionParameter,
+                    type
+                ));
             }
             while (!IsAtEnd && Consume(TokenKind.Comma));
 

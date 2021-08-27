@@ -12,31 +12,23 @@ namespace Caique.Semantics
     {
         public SymbolEnvironment? Parent { get; }
 
-        public ClassDeclStatement? ParentObject
-        {
-            get => _parentObject ?? Parent?.ParentObject;
-        }
+        public StructSymbol? ParentObject =>
+            _parentObject ?? Parent?.ParentObject;
 
-        public ICollection<ClassDeclStatement> Classes
-        {
-            get => _classes.Values;
-        }
+        public ICollection<StructSymbol> Classes =>
+            _classes.Values;
 
-        public ICollection<FunctionDeclStatement> Functions
-        {
-            get => _functions.Values;
-        }
+        public ICollection<FunctionSymbol> Functions =>
+            _functions.Values;
 
-        public ICollection<VariableDeclStatement?> Variables
-        {
-            get => _variables.Values;
-        }
+        public ICollection<VariableSymbol?> Variables =>
+            _variables.Values;
 
-        private ClassDeclStatement? _parentObject;
+        private StructSymbol? _parentObject;
 
-        private readonly Dictionary<string, ClassDeclStatement> _classes = new();
-        private readonly Dictionary<string, FunctionDeclStatement> _functions = new();
-        private readonly Dictionary<string, VariableDeclStatement?> _variables = new();
+        private readonly Dictionary<string, StructSymbol> _classes = new();
+        private readonly Dictionary<string, FunctionSymbol> _functions = new();
+        private readonly Dictionary<string, VariableSymbol?> _variables = new();
 
         public SymbolEnvironment(SymbolEnvironment? parent = null)
         {
@@ -54,31 +46,45 @@ namespace Caique.Semantics
 
         public void Add(ClassDeclStatement classDecl)
         {
-            _classes.Add(classDecl.Identifier.Value, classDecl);
-            classDecl.Body.Environment._parentObject = classDecl;
+            var symbol = new StructSymbol(classDecl);
+            _classes.Add(classDecl.Identifier.Value, symbol);
+            classDecl.Body.Environment._parentObject = symbol;
         }
 
         public void Add(FunctionDeclStatement function)
         {
+            var symbol = new FunctionSymbol(function);
             if (function.IsExtensionFunction)
             {
                 string extensionTypeName = function.ExtensionOf!.ModulePath[^1].Value;
                 _functions.Add(
                     $"{extensionTypeName}.{function.Identifier.Value}",
-                    function
+                    symbol
                 );
 
                 return;
             }
 
-            _functions.Add(function.Identifier.Value, function);
+            _functions.Add(function.Identifier.Value, symbol);
         }
 
         public bool TryAdd(VariableDeclStatement variable)
         {
-            if (ContainsVariable(variable.Identifier.Value)) return false;
+            return TryAdd(variable, out VariableSymbol? _);
+        }
 
-            _variables.Add(variable.Identifier.Value, variable);
+        public bool TryAdd(VariableDeclStatement variable, out VariableSymbol? symbol)
+        {
+            var tryGetVariable = GetVariable(variable.Identifier.Value, false);
+            if (tryGetVariable != null)
+            {
+                symbol = tryGetVariable;
+
+                return false;
+            }
+
+            symbol = new VariableSymbol(variable, this);
+            _variables.Add(variable.Identifier.Value, symbol);
 
             return true;
         }
@@ -88,15 +94,15 @@ namespace Caique.Semantics
         /// </summary>
         /// <param name="identifier">The name of the class.</param>
         /// <returns>Null if none was found.</returns>
-        public ClassDeclStatement? GetClass(string identifier)
+        public StructSymbol? GetClass(string identifier)
         {
-            _classes.TryGetValue(identifier, out ClassDeclStatement? classDecl);
+            _classes.TryGetValue(identifier, out StructSymbol? classDecl);
             if (classDecl != null) return classDecl;
 
             SymbolEnvironment? parent = Parent;
             while (parent != null)
             {
-                if (Parent!._classes.TryGetValue(identifier, out ClassDeclStatement? parentClassDecl))
+                if (Parent!._classes.TryGetValue(identifier, out StructSymbol? parentClassDecl))
                     return parentClassDecl;
             }
 
@@ -109,13 +115,13 @@ namespace Caique.Semantics
         /// <param name="identifier">The name of the function.</param>
         /// <param name="lookInParentScopes">If this is false, it will only look in the current SymbolEnvironment.</param>
         /// <returns>Null if none was found.</returns>
-        public FunctionDeclStatement? GetFunction(string identifier, bool lookInParentScopes = true)
+        public FunctionSymbol? GetFunction(string identifier, bool lookInParentScopes = true)
         {
-            _functions.TryGetValue(identifier, out FunctionDeclStatement? function);
+            _functions.TryGetValue(identifier, out FunctionSymbol? function);
             if (function != null) return function;
             if (!lookInParentScopes) return null;
 
-            var fromAncestor = ParentObject?.Inherited?.GetFunction(identifier);
+            var fromAncestor = ParentObject?.Checked?.Inherited?.GetFunction(identifier);
             if (fromAncestor != null) return fromAncestor;
 
             SymbolEnvironment? parent = Parent;
@@ -134,19 +140,19 @@ namespace Caique.Semantics
         /// <param name="identifier">The name of the variable.</param>
         /// <param name="lookInParentScopes">If this is false, it will only look in the current SymbolEnvironment.</param>
         /// <returns>Null if none was found.</returns>
-        public VariableDeclStatement? GetVariable(string identifier, bool lookInParentScopes = true)
+        public VariableSymbol? GetVariable(string identifier, bool lookInParentScopes = true)
         {
-            _variables.TryGetValue(identifier, out VariableDeclStatement? variable);
+            _variables.TryGetValue(identifier, out VariableSymbol? variable);
             if (variable != null) return variable;
             if (!lookInParentScopes) return null;
 
-            var fromAncestor = ParentObject?.Inherited?.GetVariable(identifier);
+            var fromAncestor = ParentObject?.Checked?.Inherited?.GetVariable(identifier);
             if (fromAncestor != null) return fromAncestor;
 
             SymbolEnvironment? parent = Parent;
             while (parent != null)
             {
-                if (Parent!._variables.TryGetValue(identifier, out VariableDeclStatement? parentVariable))
+                if (Parent!._variables.TryGetValue(identifier, out VariableSymbol? parentVariable))
                     return parentVariable;
             }
 
@@ -179,12 +185,12 @@ namespace Caique.Semantics
 
             foreach (var (_, function) in _functions)
             {
-                Console.WriteLine(padding + function.Identifier.Value + "()");
+                Console.WriteLine(padding + function.Syntax.Identifier.Value + "()");
             }
 
             foreach (var (_, variable) in _variables)
             {
-                Console.WriteLine(padding + variable!.Identifier.Value);
+                Console.WriteLine(padding + variable!.Syntax.Identifier.Value);
             }
 
             Console.ResetColor();

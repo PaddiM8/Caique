@@ -2,29 +2,29 @@ using System;
 using System.Collections.Generic;
 using LLVMSharp.Interop;
 
-namespace Caique.Ast
+namespace Caique.CheckedTree
 {
-    public partial class Statement
+    public partial class CheckedExpression
+    {
+        public LLVMValueRef? LlvmValue { get; set; }
+    }
+
+    public partial class CheckedStatement
     {
         public LLVMValueRef? LlvmValue { get; set; }
 
         public LLVMTypeRef? LlvmType { get; set; }
     }
 
-    public partial class FunctionDeclStatement
+    public partial class CheckedFunctionDeclStatement
     {
         public LLVMBasicBlockRef? BlockLlvmValue { get; set; }
     }
 
-    public partial class BlockExpression
+    public partial class CheckedBlockExpression
     {
-        public LLVMBasicBlockRef? LlvmValue { get; set; }
+        public new LLVMBasicBlockRef? LlvmValue { get; set; }
 
         public List<LLVMValueRef> ValuesToArcUpdate { get; set; } = new();
-    }
-
-    public partial class DotExpression
-    {
-        public LLVMValueRef? LlvmValue { get; set; }
     }
 }

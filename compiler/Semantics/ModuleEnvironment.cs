@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Caique.Ast;
+using Caique.CheckedTree;
 using Caique.CodeGeneration;
 using Caique.Diagnostics;
 using Caique.Parsing;
@@ -41,7 +42,9 @@ namespace Caique.Semantics
         /// </summary>
         public bool IsCodeModule { get; }
 
-        public List<Statement>? Ast { get; private set; }
+        public IEnumerable<Statement>? Ast { get; private set; }
+
+        public IEnumerable<CheckedStatement>? TypeTree { get; private set; }
 
         public DiagnosticBag Diagnostics { get; }
 
@@ -90,7 +93,7 @@ namespace Caique.Semantics
                 //new AstPrinter(Ast).Print();
 
                 // Type checking
-                new TypeChecker(this).Analyse();
+                TypeTree = new TypeChecker(this).Analyse();
 
                 // Code generation
                 if (!Diagnostics.Any())
@@ -210,7 +213,7 @@ namespace Caique.Semantics
         /// <param name="identifier">Name of the function.</param>
         /// <param name="lookInImports">Whether or not to try to find it in imported modules.</param>
         /// <returns>Null if none was found.</returns>
-        public ClassDeclStatement? GetClass(string identifier, bool lookInImports = true)
+        public StructSymbol? GetClass(string identifier, bool lookInImports = true)
         {
             var classDecl = SymbolEnvironment.GetClass(identifier);
             if (classDecl != null)
@@ -237,7 +240,7 @@ namespace Caique.Semantics
         /// <param name="identifier">Name of the function.</param>
         /// <param name="lookInImports">Whether or not to try to find it in imported modules.</param>
         /// <returns>Null if none was found.</returns>
-        public FunctionDeclStatement? GetFunction(string identifier, bool lookInImports = true)
+        public FunctionSymbol? GetFunction(string identifier, bool lookInImports = true)
         {
             var functionDecl = SymbolEnvironment.GetFunction(identifier);
             if (functionDecl != null)

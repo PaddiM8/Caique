@@ -13,8 +13,6 @@ namespace Caique.Ast
 
         public FunctionDeclStatement? InitFunction { get; set; }
 
-        public ClassDeclStatement? Inherited => ((StructType?)InheritedType?.DataType)?.StructDecl;
-
         public ModuleEnvironment Module { get; }
 
         public TypeExpression? InheritedType { get; set; }
@@ -31,44 +29,6 @@ namespace Caique.Ast
             InheritedType = ancestor;
             Module = module;
             InitFunction = initFunction;
-        }
-
-        /// <summary>
-        /// Gets an object variable, and also looks inside ancestor objects.
-        /// </summary>
-        /// <param name="identifier">Name of the variable to find.</param>
-        public VariableDeclStatement? GetVariable(string identifier)
-        {
-            // Attempt to get the variable from the current class,
-            // but if it is not found there, try call this method
-            // from the ancestor instead (if there is one),
-            // in order to try to find it there.
-            return Body.Environment.GetVariable(identifier, false)
-                ?? Inherited?.GetVariable(identifier);
-        }
-
-        /// <summary>
-        /// Gets an object function, and also looks inside ancestor objects.
-        /// </summary>
-        /// <param name="identifier">Name of the function to find.</param>
-        public FunctionDeclStatement? GetFunction(string identifier)
-        {
-            // Attempt to get the function from the current class,
-            // but if it is not found there, try call this method
-            // from the ancestor instead (if there is one),
-            // in order to try to find it there.
-            return Body.Environment.GetFunction(identifier, false)
-                ?? Inherited?.GetFunction(identifier);
-        }
-
-        public bool HasAncestor(string identifier)
-        {
-            // The ancestor was found
-            if (Inherited?.Identifier.Value == identifier)
-                return true;
-
-            return Inherited?.HasAncestor(identifier)
-                ?? false; // Return false if "Inherited" is null (there are no more ancestors to compare)
         }
     }
 }
