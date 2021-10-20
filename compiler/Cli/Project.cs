@@ -98,7 +98,12 @@ namespace Caique.Cli
             compilation.Compile(targetPath);
             if (LinkObjectFiles(targetPath, options.StdPath))
                 // Run the generated executable
-                Process.Start(targetPath + "/main");
+                using (var process = new Process())
+                {
+                    process.StartInfo.FileName = targetPath + "/main";
+                    process.Start();
+                    process.WaitForExit();
+                }
         }
 
         private static bool LinkObjectFiles(string targetPath, string stdPath)
