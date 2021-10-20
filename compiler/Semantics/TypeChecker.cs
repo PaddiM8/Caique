@@ -161,11 +161,7 @@ namespace Caique.Semantics
 
             if (functionDeclStatement.Identifier.Value != "init")
             {
-                var identifier = functionDeclStatement.Identifier.Value;
-                var symbolName = functionDeclStatement.IsExtensionFunction
-                    ? $"{functionDeclStatement.ExtensionOf!.ModulePath[^1].Value}.{identifier}"
-                    : identifier;
-                var symbol = _environment.GetFunction(symbolName)!;
+                var symbol = _environment.GetFunction(functionDeclStatement.FullName)!;
                 symbol.Checked = checkedFunction;
             }
 

@@ -8,6 +8,10 @@ namespace Caique.Ast
     {
         public Token Identifier { get; }
 
+        public string FullName => IsExtensionFunction
+            ? ExtensionOf!.FullName + "." + Identifier.Value
+            : Identifier.Value;
+
         public List<VariableDeclStatement> Parameters { get; }
 
         public BlockExpression? Body { get; }

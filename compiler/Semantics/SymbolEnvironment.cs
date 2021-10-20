@@ -53,19 +53,7 @@ namespace Caique.Semantics
 
         public void Add(FunctionDeclStatement function)
         {
-            var symbol = new FunctionSymbol(function);
-            if (function.IsExtensionFunction)
-            {
-                string extensionTypeName = function.ExtensionOf!.ModulePath[^1].Value;
-                _functions.Add(
-                    $"{extensionTypeName}.{function.Identifier.Value}",
-                    symbol
-                );
-
-                return;
-            }
-
-            _functions.Add(function.Identifier.Value, symbol);
+            _functions.Add(function.FullName, new FunctionSymbol(function));
         }
 
         public bool TryAdd(VariableDeclStatement variable)

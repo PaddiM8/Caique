@@ -251,14 +251,13 @@ namespace Caique.CodeGeneration
             {
                 Console.WriteLine("main");
             }
-            string identifier = functionDeclStatement.Identifier.Value;
+            string identifier = functionDeclStatement.FullName;
             var parameterDataTypes = new List<IDataType>();
 
             // If it belongs to an object
             int parameterOffset = 0;
             if (functionDeclStatement.ParentObject != null)
             {
-                identifier = identifier + "." + functionDeclStatement.ParentObject.Syntax.Identifier.Value;
                 parameterOffset++;
 
                 // Add the parent object type as the first parameter
@@ -319,7 +318,7 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(CheckedClassDeclStatement classDeclStatement)
         {
             // Create the struct type
-            string identifier = classDeclStatement.Identifier.Value;
+            string identifier = classDeclStatement.FullName;
             var namedStruct = LLVM.StructCreateNamed(
                 _context,
                 ("class." + identifier).ToCString()
@@ -360,7 +359,7 @@ namespace Caique.CodeGeneration
             );
 
             if (classDeclStatement.InitFunction != null &&
-                !(_current.Parent?.Expression is CheckedTypeExpression))
+                _current.Parent?.Expression is not CheckedTypeExpression)
             {
                 Next(classDeclStatement.InitFunction);
             }
@@ -481,7 +480,7 @@ namespace Caique.CodeGeneration
                 }
             }
             else if (dataType.Type == TypeKeyword.i8 ||
-                     dataType is StructType type && type.StructDecl.Identifier.Value == "String")
+                     dataType is StructType type && type.StructDecl.FullName == "String")
             {
                 LLVMValueRef globalString = LLVM.BuildGlobalString(
                     _builder,
@@ -726,7 +725,7 @@ namespace Caique.CodeGeneration
                     arguments[i + argumentOffset] = Next(argument);
                 }
 
-                var identifier = callExpression.FunctionSymbol.Syntax.Identifier.Value;
+                var identifier = callExpression.FunctionSymbol.Checked!.FullName;
                 var call = LLVM.BuildCall(
                     _builder,
                     functionDecl.LlvmValue!.Value,

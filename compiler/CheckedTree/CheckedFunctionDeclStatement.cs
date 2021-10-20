@@ -9,6 +9,25 @@ namespace Caique.CheckedTree
     {
         public Token Identifier { get; }
 
+        public string FullName
+        {
+            get
+            {
+                if (IsExtensionFunction)
+                {
+                    return ExtensionOf!.ToString() + "." + Identifier.Value;
+                }
+                else if (IsMethod)
+                {
+                    return ParentObject!.Checked!.FullName + "." + Identifier.Value;
+                }
+                else
+                {
+                    return Identifier.Value;
+                }
+            }
+        }
+
         public List<CheckedVariableDeclStatement> Parameters { get; }
 
         public CheckedBlockExpression? Body { get; set; }

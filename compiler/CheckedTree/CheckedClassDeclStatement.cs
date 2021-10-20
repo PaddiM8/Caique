@@ -10,6 +10,8 @@ namespace Caique.CheckedTree
     {
         public Token Identifier { get; }
 
+        public string FullName => Identifier.Value;
+
         public CheckedBlockExpression? Body { get; set; }
 
         public SymbolEnvironment Environment { get; }
