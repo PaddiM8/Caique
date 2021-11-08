@@ -803,9 +803,9 @@ namespace Caique.Parsing
         private Token Expect(TokenKind kind, string description)
         {
             if (Current.Kind == kind) return Advance();
-
             _diagnostics.ReportUnexpectedToken(Current, description);
-            throw new ParsingErrorException();
+
+            return new Token(kind, "", Peek(0)!.Span);
         }
 
         /// <summary>
@@ -822,7 +822,14 @@ namespace Caique.Parsing
             }
 
             _diagnostics.ReportUnexpectedToken(Current, kinds);
-            throw new ParsingErrorException();
+            if (kinds.Length == 1)
+            {
+                return new Token(kinds[0], "", Peek(0)!.Span);
+            }
+            else
+            {
+                throw new ParsingErrorException();
+            }
         }
 
         /// <summary>
