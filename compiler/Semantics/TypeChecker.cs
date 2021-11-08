@@ -34,6 +34,16 @@ namespace Caique.Semantics
             }
         }
 
+        public static List<CheckedStatement> Analyse(ModuleEnvironment module)
+        {
+            var typeChecker = new TypeChecker(module);
+            var statements = new List<CheckedStatement>();
+            foreach (var statement in typeChecker._module.Ast!)
+                statements.Add(typeChecker.Next(statement));
+
+            return statements;
+        }
+
         private CheckedStatement Next(Statement statement)
         {
             _current = _current.CreateChild(statement);
@@ -53,15 +63,6 @@ namespace Caique.Semantics
             _current = _current.Parent!;
 
             return value;
-        }
-
-        public List<CheckedStatement> Analyse()
-        {
-            var statements = new List<CheckedStatement>();
-            foreach (var statement in _module.Ast!)
-                statements.Add(Next(statement));
-
-            return statements;
         }
 
         public CheckedStatement Visit(ExpressionStatement expressionStatement)

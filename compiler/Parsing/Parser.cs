@@ -48,7 +48,8 @@ namespace Caique.Parsing
                 )
             }, null);
 
-        public Parser(List<Token> tokens, DiagnosticBag diagnostics,
+        public Parser(List<Token> tokens,
+                      DiagnosticBag diagnostics,
                       ModuleEnvironment moduleEnvironment)
         {
             _tokens = tokens;
@@ -61,16 +62,19 @@ namespace Caique.Parsing
         /// Start the parsing process.
         /// </summary>
         /// <returns>List of abstract syntax trees.</returns>
-        public List<Statement> Parse()
+        public static List<Statement> Parse(List<Token> tokens,
+                                            DiagnosticBag diagnostics,
+                                            ModuleEnvironment moduleEnvironment)
         {
+            var parser = new Parser(tokens, diagnostics, moduleEnvironment);
             var statements = new List<Statement>();
 
             // Parse "use" statements at the top first
-            while (!IsAtEnd && Match(TokenKind.Use))
+            while (!parser.IsAtEnd && parser.Match(TokenKind.Use))
             {
                 try
                 {
-                    statements.Add(ParseUse());
+                    statements.Add(parser.ParseUse());
                 }
                 catch (ParsingErrorException)
                 {
@@ -78,15 +82,15 @@ namespace Caique.Parsing
                 }
             }
 
-            while (!IsAtEnd)
+            while (!parser.IsAtEnd)
             {
                 try
                 {
-                    statements.Add(ParseStatement());
+                    statements.Add(parser.ParseStatement());
                 }
                 catch (ParsingErrorException)
                 {
-                    Synchronise();
+                    parser.Synchronise();
                 }
             }
 

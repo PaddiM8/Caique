@@ -63,20 +63,21 @@ namespace Caique.Parsing
         /// <summary>
         /// Start the lexing process.
         /// </summary>
-        public List<Token> Lex()
+        public static List<Token> Lex(string source, DiagnosticBag diagnostics)
         {
+            var lexer = new Lexer(source, diagnostics);
             var tokens = new List<Token>();
-            while (!IsAtEnd)
+            while (!lexer.IsAtEnd)
             {
-                tokens.Add(NextToken());
+                tokens.Add(lexer.NextToken());
             }
 
             // Make sure there is an EndOfFile token.
             if (tokens.Last().Kind != TokenKind.EndOfFile)
             {
                 tokens.Add(new Token(TokenKind.EndOfFile, "", new TextSpan(
-                    CurrentTextPosition,
-                    CurrentTextPosition)
+                    lexer.CurrentTextPosition,
+                    lexer.CurrentTextPosition)
                 ));
             }
 

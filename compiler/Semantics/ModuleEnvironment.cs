@@ -92,11 +92,11 @@ namespace Caique.Semantics
                 Diagnostics.CurrentFile = FilePath!;
 
                 // Lexing and parsing
-                Tokens = new Lexer(File.ReadAllText(filePath), Diagnostics).Lex();
-                Ast = new Parser(Tokens, Diagnostics, this).Parse();
+                Tokens = Lexer.Lex(File.ReadAllText(filePath), Diagnostics);
+                Ast = Parser.Parse(Tokens, Diagnostics, this);
 
                 // Type checking
-                TypeTree = new TypeChecker(this).Analyse();
+                TypeTree = TypeChecker.Analyse(this);
 
                 // Code generation
                 if (!Diagnostics.Any())
