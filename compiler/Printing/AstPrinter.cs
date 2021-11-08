@@ -1,19 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Caique.Ast;
 using Caique.Parsing;
 
-namespace Caique.Ast
+namespace Caique.Printing
 {
     class AstPrinter : IAstTraverser<object, object>
     {
         private int _indentationLevel = 1;
-        private readonly List<Statement> _ast;
-
-        public AstPrinter(List<Statement> ast)
-        {
-            _ast = ast;
-        }
 
         private void Next(Statement statement)
         {
@@ -25,11 +20,12 @@ namespace Caique.Ast
             ((IAstTraverser<object, object>)this).Next(expression);
         }
 
-        public void Print()
+        public static void Print(IEnumerable<Statement> ast)
         {
-            foreach (var statement in _ast)
+            var printer = new AstPrinter();
+            foreach (var statement in ast)
             {
-                Next(statement);
+                printer.Next(statement);
             }
         }
 

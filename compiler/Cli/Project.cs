@@ -79,11 +79,12 @@ namespace Caique.Cli
             {
                 PrintTokens = options.PrintTokens,
                 PrintAst = options.PrintAst,
-                PrintEnvironment = options.PrintEnvironment
+                PrintEnvironment = options.PrintEnvironment,
+                PrintLlvm = options.PrintLlvm
             };
 
             compilation.Compile(targetPath);
-            LinkObjectFiles(targetPath);
+            LinkObjectFiles(targetPath, options.ShowLinkerOutput);
         }
 
         /// <summary>
@@ -93,10 +94,16 @@ namespace Caique.Cli
         {
             string projectPath = _projectFileInfo!.Directory!.FullName;
             var (sourcePath, targetPath) = PrepareBuild(projectPath, options.StdPath);
-            var compilation = new Compilation(sourcePath, _projectFile!.Dependencies);
+            var compilation = new Compilation(sourcePath, _projectFile!.Dependencies)
+            {
+                PrintTokens = options.PrintTokens,
+                PrintAst = options.PrintAst,
+                PrintEnvironment = options.PrintEnvironment,
+                PrintLlvm = options.PrintLlvm
+            };
 
             compilation.Compile(targetPath);
-            if (LinkObjectFiles(targetPath))
+            if (LinkObjectFiles(targetPath, options.ShowLinkerOutput))
                 // Run the generated executable
                 using (var process = new Process())
                 {
@@ -106,7 +113,7 @@ namespace Caique.Cli
                 }
         }
 
-        private static bool LinkObjectFiles(string targetPath)
+        private static bool LinkObjectFiles(string targetPath, bool showOutput = false)
         {
             var objectFiles = Directory.GetFiles(targetPath, "*.o").ToList();
             var process = new Process()
@@ -116,6 +123,9 @@ namespace Caique.Cli
                     FileName = "gcc",
                     Arguments = "-no-pie -o main " + string.Join(" ", objectFiles),
                     WorkingDirectory = targetPath,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = !showOutput,
+                    RedirectStandardError = !showOutput,
                 }
             };
             process.Start();

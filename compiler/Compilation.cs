@@ -8,6 +8,7 @@ using Caique.CodeGeneration;
 using Caique.Diagnostics;
 using Caique.Parsing;
 using Caique.Semantics;
+using Caique.Printing;
 using Caique.Util;
 
 namespace Caique
@@ -27,6 +28,8 @@ namespace Caique
         public bool PrintAst { get; set; }
 
         public bool PrintEnvironment { get; set; }
+
+        public bool PrintLlvm { get; set; }
 
         private readonly string _rootPath = "";
         private readonly Dictionary<string, string> _libraryPaths;
@@ -70,44 +73,13 @@ namespace Caique
                 Path.Combine(_rootPath, "main.cq")
             );
 
-            if (PrintEnvironment) rootModule.Print();
+            if (PrintTokens) ObjectPrinter.PrintTokens(rootModule);
+            if (PrintAst) ObjectPrinter.PrintAst(rootModule);
+            if (PrintEnvironment) ObjectPrinter.PrintSymbols(rootModule);
+            if (PrintLlvm) ObjectPrinter.PrintGeneratedCode(rootModule);
 
             foreach (var diagnostic in Diagnostics)
                 diagnostic.Print();
-        }
-
-        // TODO: Move this
-        private static void PrintTokenList(List<Token> tokens)
-        {
-            foreach (var token in tokens)
-            {
-                Console.ForegroundColor = ConsoleColor.Blue;
-                Console.Write(token.Kind);
-                Console.ResetColor();
-
-                if (!string.IsNullOrEmpty(token.Value))
-                {
-                    Console.Write($": {token.Value}");
-                }
-
-                Console.Write(" | (");
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.Write(
-                    "{0}:{1}",
-                    token.Span.Start.Line,
-                    token.Span.Start.Column
-                );
-                Console.ResetColor();
-                Console.Write(") -> (");
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.Write(
-                    "{0}:{1}",
-                    token.Span.End.Line,
-                    token.Span.End.Column
-                );
-                Console.ResetColor();
-                Console.WriteLine(")");
-            }
         }
     }
 }

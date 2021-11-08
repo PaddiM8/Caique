@@ -167,23 +167,5 @@ namespace Caique.Semantics
             // If the parent or its ancestors contain the variable
             return Parent != null && Parent.ContainsVariable(identifier);
         }
-
-        public void Print(int layer = 0)
-        {
-            string padding = string.Join("", Enumerable.Repeat("┃  ", layer)) + "┣━ ";
-            Console.ForegroundColor = ConsoleColor.DarkCyan;
-
-            foreach (var (_, function) in _functions)
-            {
-                Console.WriteLine(padding + function.Syntax.Identifier.Value + "()");
-            }
-
-            foreach (var (_, variable) in _variables)
-            {
-                Console.WriteLine(padding + variable!.Syntax.Identifier.Value);
-            }
-
-            Console.ResetColor();
-        }
     }
 }

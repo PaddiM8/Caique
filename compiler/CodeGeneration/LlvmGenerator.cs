@@ -56,6 +56,16 @@ namespace Caique.CodeGeneration
                 _current.ClassDecl = null;
             }
 
+            sbyte* error = "".ToCString();
+            int _2 = LLVM.PrintModuleToFile(
+                _llvmModule,
+                ("experiments/ll/" + _module.Identifier + ".ll").ToCString(),
+                &error
+            );
+        }
+
+        public void Print()
+        {
             sbyte* moduleError;
             _ = LLVM.VerifyModule(
                 _llvmModule,
@@ -66,7 +76,6 @@ namespace Caique.CodeGeneration
 
             // Print out the LLVM IR
             LLVM.DumpModule(_llvmModule);
-            int _2 = LLVM.PrintModuleToFile(_llvmModule, ("experiments/ll/" + _module.Identifier + ".ll").ToCString(), &moduleError);
         }
 
         public void GenerateClass(StructSymbol symbol, List<CheckedFunctionDeclStatement> functionList)

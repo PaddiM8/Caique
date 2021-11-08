@@ -15,6 +15,12 @@ namespace Caique.Cli.Options
         [Option("environment", Required = false, HelpText = "Print the module/symbol environment")]
         public bool PrintEnvironment { get; set; }
 
+        [Option("llvm", Required = false, HelpText = "Print LLVM IR")]
+        public bool PrintLlvm { get; set; }
+
+        [Option("show-linker-output", Required = false, HelpText = "Show the linker output")]
+        public bool ShowLinkerOutput { get; set; }
+
         [Option("std-path", Required = false, HelpText = "Path to the standard library object files.", Default = "std/")]
         public string StdPath { get; set; } = "";
 

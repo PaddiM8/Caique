@@ -42,9 +42,13 @@ namespace Caique.Semantics
         /// </summary>
         public bool IsCodeModule { get; }
 
+        public List<Token>? Tokens { get; private set; }
+
         public IEnumerable<Statement>? Ast { get; private set; }
 
         public IEnumerable<CheckedStatement>? TypeTree { get; private set; }
+
+        public LlvmGenerator? CodeGenerator { get; private set; }
 
         public DiagnosticBag Diagnostics { get; }
 
@@ -88,9 +92,8 @@ namespace Caique.Semantics
                 Diagnostics.CurrentFile = FilePath!;
 
                 // Lexing and parsing
-                var tokens = new Lexer(File.ReadAllText(filePath), Diagnostics).Lex();
-                Ast = new Parser(tokens, Diagnostics, this).Parse();
-                //new AstPrinter(Ast.ToList()).Print();
+                Tokens = new Lexer(File.ReadAllText(filePath), Diagnostics).Lex();
+                Ast = new Parser(Tokens, Diagnostics, this).Parse();
 
                 // Type checking
                 TypeTree = new TypeChecker(this).Analyse();
@@ -98,9 +101,9 @@ namespace Caique.Semantics
                 // Code generation
                 if (!Diagnostics.Any())
                 {
-                    var generator = new LlvmGenerator(this);
-                    generator.Generate();
-                    generator.GenerateObjectFile(_outputDirectory);
+                    CodeGenerator = new LlvmGenerator(this);
+                    CodeGenerator.Generate();
+                    CodeGenerator.GenerateObjectFile(_outputDirectory);
                 }
 
                 Diagnostics.CurrentFile = previousDiagnosticsFile;
@@ -317,19 +320,6 @@ namespace Caique.Semantics
             }
 
             return (null, modulePathQueue.Prepend(identifier));
-        }
-
-        public void Print(int layer = 0)
-        {
-            string padding = string.Join("", Enumerable.Repeat("┃  ", layer)) + "┣━ ";
-            Console.WriteLine(padding + Identifier);
-
-            foreach (var (_, child) in Modules)
-            {
-                child.Print(layer + 1);
-            }
-
-            SymbolEnvironment.Print(layer + 1);
         }
     }
 }
