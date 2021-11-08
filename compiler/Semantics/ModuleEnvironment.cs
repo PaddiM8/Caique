@@ -30,6 +30,11 @@ namespace Caique.Semantics
         /// </summary>
         public string FilePath { get; }
 
+        /// <summary>
+        /// The path to the file/directory relative to the root module.
+        /// </summary>
+        public string RelativeFilePath => Path.GetRelativePath(Root.FilePath, FilePath);
+
         public ModuleEnvironment? Parent;
 
         public ModuleEnvironment Root { get; }
@@ -89,7 +94,7 @@ namespace Caique.Semantics
                 }
 
                 string previousDiagnosticsFile = Diagnostics.CurrentFile;
-                Diagnostics.CurrentFile = FilePath!;
+                Diagnostics.CurrentFile = RelativeFilePath;
 
                 // Lexing and parsing
                 Tokens = Lexer.Lex(File.ReadAllText(filePath), Diagnostics);
@@ -155,7 +160,7 @@ namespace Caique.Semantics
             ModuleEnvironment module;
             if (modulePath.First() == "root") // Start from root
             {
-                filePath = Root.FilePath!;
+                filePath = Root.FilePath;
                 module = Root;
                 modulePath = modulePath.Skip(1);
             }
@@ -167,7 +172,7 @@ namespace Caique.Semantics
             }
             else // Normal, relative module
             {
-                filePath = FilePath!;
+                filePath = FilePath;
                 module = this;
             }
 
