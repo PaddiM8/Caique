@@ -32,36 +32,14 @@ namespace Caique.CodeGeneration
         public void Generate()
         {
             var functions = new List<CheckedFunctionDeclStatement>();
-            foreach (var statement in _module.TypeTree!)
+            foreach (var classSymbol in _module.SymbolEnvironment.Classes)
             {
-                switch (statement)
-                {
-                    case CheckedClassDeclStatement classDeclStatement:
-                        // May already have been done by TypeExpression.
-                        if (classDeclStatement.LlvmType == null)
-                            Next(statement);
+                GenerateClass(classSymbol, functions);
+            }
 
-                        if (classDeclStatement.InitFunction != null)
-                        {
-                            if (classDeclStatement.InitFunction.LlvmValue == null)
-                                Next(classDeclStatement.InitFunction);
-
-                            functions.Add(classDeclStatement.InitFunction);
-                        }
-
-                        foreach (var function in classDeclStatement.Body!.Environment.Functions)
-                        {
-                            Next(function.Checked!);
-                            if (function.Checked!.Body != null) functions.Add(function.Checked);
-                        }
-                        break;
-                    case CheckedFunctionDeclStatement functionDeclStatement:
-                        Next(statement);
-
-                        if (functionDeclStatement.Body != null)
-                            functions.Add(functionDeclStatement);
-                        break;
-                }
+            foreach (var functionSymbol in _module.SymbolEnvironment.Functions)
+            {
+                GenerateFunction(functionSymbol, functions);
             }
 
             foreach (var functionDeclStatement in functions)
@@ -72,8 +50,10 @@ namespace Caique.CodeGeneration
                     Statement = functionDeclStatement
                 };
 
+                _current.ClassDecl = functionDeclStatement.ParentObject;
                 _current.FunctionDecl = functionDeclStatement;
                 Next(functionDeclStatement.Body!);
+                _current.ClassDecl = null;
             }
 
             sbyte* moduleError;
@@ -87,6 +67,52 @@ namespace Caique.CodeGeneration
             // Print out the LLVM IR
             LLVM.DumpModule(_llvmModule);
             int _2 = LLVM.PrintModuleToFile(_llvmModule, ("experiments/ll/" + _module.Identifier + ".ll").ToCString(), &moduleError);
+        }
+
+        public void GenerateClass(StructSymbol symbol, List<CheckedFunctionDeclStatement> functionList)
+        {
+            foreach (var checkedClass in symbol.AllChecked)
+            {
+                if (symbol.Syntax.TypeParameters != null && checkedClass.TypeArguments == null)
+                    continue;
+
+                _current.ClassDecl = checkedClass;
+
+                // May already have been done by TypeExpression.
+                if (checkedClass.LlvmType == null)
+                    Next(checkedClass);
+
+                if (checkedClass.InitFunction != null)
+                {
+                    if (checkedClass.InitFunction.LlvmValue == null)
+                        Next(checkedClass.InitFunction);
+
+                    functionList.Add(checkedClass.InitFunction);
+                }
+
+                foreach (var function in checkedClass.Body!.Environment.Functions)
+                {
+                    var checkedFunction = checkedClass.GetFunction(function.Syntax.FullName);
+                    Next(checkedFunction!);
+                    if (checkedFunction!.Body != null) functionList.Add(checkedFunction);
+                }
+            }
+
+            _current.ClassDecl = null;
+        }
+
+        public void GenerateFunction(FunctionSymbol symbol, List<CheckedFunctionDeclStatement> functionList)
+        {
+            foreach (var checkedFunction in symbol.AllChecked)
+            {
+                _current.ClassDecl = checkedFunction.ParentObject;
+                Next(checkedFunction);
+
+                if (checkedFunction.Body != null)
+                    functionList.Add(checkedFunction);
+                
+                _current.ClassDecl = null;
+            }
         }
 
         public void Dispose()
@@ -167,7 +193,7 @@ namespace Caique.CodeGeneration
             LLVMValueRef initializer = variableDeclStatement.Value == null
                 ? null
                 : Next(variableDeclStatement.Value);
-            LLVMTypeRef type = variableDeclStatement.DataType!.ToLlvmType(_module.Prelude);
+            LLVMTypeRef type = ToLlvmType(variableDeclStatement.DataType!);
 
             // Allocate variable
             var firstBlockValue = _current.Block!.Statements.First().LlvmValue;
@@ -247,10 +273,6 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(CheckedFunctionDeclStatement functionDeclStatement)
         {
-            if (_module.Identifier == "main")
-            {
-                Console.WriteLine("main");
-            }
             string identifier = functionDeclStatement.FullName;
             var parameterDataTypes = new List<IDataType>();
 
@@ -261,7 +283,7 @@ namespace Caique.CodeGeneration
                 parameterOffset++;
 
                 // Add the parent object type as the first parameter
-                parameterDataTypes.Add(functionDeclStatement.ParentObject.Checked!.DataType!);
+                parameterDataTypes.Add(functionDeclStatement.ParentObject.DataType!);
             }
 
             if (functionDeclStatement.IsExtensionFunction)
@@ -279,8 +301,8 @@ namespace Caique.CodeGeneration
             );
 
             LLVMTypeRef functionType = LLVM.FunctionType(
-                functionDeclStatement.ReturnType.ToLlvmType(_module.Prelude),
-                parameterDataTypes.ToLlvmTypeArray(_module.Prelude),
+                ToLlvmType(functionDeclStatement.ReturnType),
+                ToLlvmTypeArray(parameterDataTypes),
                 (uint)parameterDataTypes.Count,
                 0
             );
@@ -348,12 +370,15 @@ namespace Caique.CodeGeneration
 
                 // The first items in the struct will be the inherited ones,
                 // so the IndexInObject value needs to be offset.
-                variableDecl.IndexInObject += inheritedFieldCount;
+                if (variableDecl.IndexInObjectAfterInheritance == null)
+                {
+                    variableDecl.IndexInObjectAfterInheritance = variableDecl.IndexInObject + inheritedFieldCount;
+                }
             }
 
             LLVM.StructSetBody(
                 namedStruct,
-                fieldTypes.ToLlvmTypeArray(_module.Prelude),
+                ToLlvmTypeArray(fieldTypes),
                 (uint)fieldTypes.Count,
                 0
             );
@@ -455,7 +480,7 @@ namespace Caique.CodeGeneration
                 if (literalExpression.Value.Kind == TokenKind.CharLiteral)
                 {
                     return LLVM.ConstInt(
-                        dataType.ToLlvmType(_module.Prelude),
+                        ToLlvmType(dataType),
                         (ulong)tokenValue[0],
                         1
                     );
@@ -465,7 +490,7 @@ namespace Caique.CodeGeneration
                 if (dataType.IsFloat)
                 {
                     return LLVM.ConstReal(
-                        dataType.ToLlvmType(_module.Prelude),
+                        ToLlvmType(dataType),
                         double.Parse(tokenValue)
                     );
                 }
@@ -473,7 +498,7 @@ namespace Caique.CodeGeneration
                 {
                     ulong value = ulong.Parse(tokenValue);
                     return LLVM.ConstInt(
-                        dataType.ToLlvmType(_module.Prelude),
+                        ToLlvmType(dataType),
                         value,
                         value < 0 ? 0 : 1
                     );
@@ -673,7 +698,7 @@ namespace Caique.CodeGeneration
                 loadPointer = LLVM.BuildStructGEP(
                     _builder,
                     objectInstance,
-                    (uint)variableDecl.IndexInObject,
+                    (uint)variableDecl.IndexInObjectAfterInheritance!,
                     "field".ToCString()
                 );
             }
@@ -708,7 +733,6 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(CheckedCallExpression callExpression)
         {
-            var functionDecl = callExpression.FunctionSymbol!.Checked!;
             int argumentOffset = callExpression.ObjectInstance == null ? 0 : 1;
             int argumentCount = callExpression.Arguments.Count + argumentOffset;
 
@@ -725,13 +749,16 @@ namespace Caique.CodeGeneration
                     arguments[i + argumentOffset] = Next(argument);
                 }
 
-                var identifier = callExpression.FunctionSymbol.Checked!.FullName;
+                var functionDecl = callExpression.FunctionDecl;
+                string name = functionDecl.ReturnType.Type == TypeKeyword.Void
+                    ? ""
+                    : functionDecl.FullName;
                 var call = LLVM.BuildCall(
                     _builder,
                     functionDecl.LlvmValue!.Value,
                     arguments,
                     (uint)argumentCount,
-                    (functionDecl.ReturnType.Type == TypeKeyword.Void ? "" : identifier).ToCString()
+                    name.ToCString()
                 );
 
                 if (functionDecl.ReturnType is StructType)
@@ -771,7 +798,7 @@ namespace Caique.CodeGeneration
                 // The block expression will use this alloca and give it a value.
                 _current.BlockReturnValueAlloca = LLVM.BuildAlloca(
                     _builder,
-                    ifExpression.DataType!.ToLlvmType(_module.Prelude),
+                    ToLlvmType(ifExpression.DataType!),
                     "retVal".ToCString()
                 );
             }
@@ -874,9 +901,9 @@ namespace Caique.CodeGeneration
 
         private void ArcRetain(LLVMValueRef objectPointer)
         {
-            var obj = _module.Prelude?.Modules["object"].GetClass("object")?.Checked ??
-                _module.Root.Modules["object"].GetClass("object")!.Checked;
-            var retain = obj!.GetFunction("retain")!.Checked!.LlvmValue;
+            var obj = _module.Prelude?.Modules["object"].GetClass("object")?.AllChecked.First() ??
+                _module.Root.Modules["object"].GetClass("object")!.AllChecked.First();
+            var retain = obj!.GetFunction("retain")!.LlvmValue;
 
             fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[1])
             {
@@ -898,9 +925,9 @@ namespace Caique.CodeGeneration
 
         private void ArcRelease(LLVMValueRef objectPointer)
         {
-            var obj = _module.Prelude?.Modules["object"].GetClass("object")?.Checked ??
-                _module.Root.Modules["object"].GetClass("object")!.Checked;
-            var release = obj!.GetFunction("release")!.Checked!.LlvmValue;
+            var obj = _module.Prelude?.Modules["object"].GetClass("object")?.AllChecked.First() ??
+                _module.Root.Modules["object"].GetClass("object")!.AllChecked.First();
+            var release = obj!.GetFunction("release")!.LlvmValue;
 
             fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[1])
             {
@@ -934,6 +961,46 @@ namespace Caique.CodeGeneration
         private void DeselectTemporaryBlock()
         {
             LLVM.PositionBuilderAtEnd(_builder, _current.Block!.LlvmValue!.Value);
+        }
+
+        public unsafe LLVMOpaqueType* ToLlvmType(IDataType dataType)
+        {
+            var keyword = dataType.Type;
+
+            LLVMOpaqueType* type = keyword switch
+            {
+                TypeKeyword.i8 => LLVM.Int8Type(),
+                TypeKeyword.i32 => LLVM.Int32Type(),
+                TypeKeyword.i64 => LLVM.Int64Type(),
+                TypeKeyword.f8 => LLVM.FloatType(),
+                TypeKeyword.f32 => LLVM.FloatType(),
+                TypeKeyword.f64 => LLVM.FloatType(),
+                TypeKeyword.Bool => LLVM.Int1Type(),
+                TypeKeyword.Generic => ToLlvmType(_current.ClassDecl!.TypeArguments![((GenericType)dataType).ParameterIndex]),
+                TypeKeyword.Void => LLVM.VoidType(),
+                TypeKeyword.Identifier => LLVM.PointerType(((StructType)dataType).StructDecl.LlvmType!.Value, 0),
+                TypeKeyword.StringConstant => _module.Prelude!.Modules["string"].GetClass("String")!.AllChecked.First().LlvmType!.Value,
+                TypeKeyword.Unknown => throw new NotImplementedException(),
+                _ => throw new NotImplementedException(),
+            };
+
+            return dataType.IsExplicitPointer
+                ? LLVM.PointerType(type, 0)
+                : type;
+        }
+
+        public unsafe LLVMOpaqueType** ToLlvmTypeArray(ICollection<IDataType> dataTypes)
+        {
+            var llvmTypes = new LLVMOpaqueType*[dataTypes.Count];
+            foreach (var (dataType, i) in dataTypes.WithIndex())
+            {
+                llvmTypes[i] = ToLlvmType(dataType);
+            }
+
+            fixed (LLVMOpaqueType** llvmTypesPointer = llvmTypes)
+            {
+                return llvmTypesPointer;
+            }
         }
     }
 }

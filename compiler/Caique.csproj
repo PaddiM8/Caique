@@ -27,6 +27,7 @@
     <PackageReference Include="LLVMSharp" Version="10.0.0-beta" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="3.1.8" />
     <PackageReference Include="Nett" Version="0.15.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
 </Project>

@@ -6,13 +6,10 @@ useStmt = "use" , identifier , [{ "." , identifier }] , ";" ;
 declaration = classDecl
             | functionDecl
             | varDecl ;
-classDecl = "class" , identifier , parameters , [ ":" , type , { ", " type } ] , blockStmt ;
+classDecl = "class" , identifier, [ typeParameters ] , parameters , [ ":" , type , { ", " type } ] , blockStmt ;
 functionDecl = "fn" , identifier , parameters , [ ":" , type ] , blockStmt ;
 varDecl = "let" , identifier [ ":",  type ] , "=" , expression , ";" ;
 objVarDecl = identifier ":" , type , [ "=" , expression ] , ";" ;
-
-parameters = "(" , [ parameter , [{ "," , parameter }] ] , ")" ;
-parameter = identifier , ":" , type ;
 
 statement = expressionStmt
           | blockStmt
@@ -28,7 +25,7 @@ returnStmt = "ret" , expression ;
 expression = precedenceExpr ;
 precedenceExpr = ? unary/binary expression with primaryExpr as values ? ;
 castExpr = expression , [ "as" type ] ;
-indexerExpr = primaryExpr , [ "[" , expression , "]" ] ;
+(* indexerExpr = primaryExpr , [ "[" , expression , "]" ] ; *)
 dotExpr = primaryExpr ,  [ "." , dotExpr ] ;
 primaryExpr = variableExpr
             | callExpr
@@ -41,12 +38,17 @@ primaryExpr = variableExpr
 variableExpr = identifier ;
 callExpr = modulePath , arguments ;
 groupExpr = "(" , expression , ")" ;
-newExpr = "new" , identifier , arguments ;
+newExpr = "new" , type , arguments ;
 literal = bool | number | string | char ;
 listExpr = "[" , expression , [ "," , expression ] , "]" ;
 
+parameters = "(" , [ parameter , [{ "," , parameter }] ] , ")" ;
+parameter = identifier , ":" , type ;
 arguments = "(" , [ expression , [{ "," , expression }] ] , ")" ;
+typeArguments = "[" , type , [{ "," , type }] , "]" ;
+typeParameters = "[" , identifier , [{ "," , identifier }] , "]" ;
 modulePath = identifier , [{ "->" , identifier }] ;
+type = modulePath , [ typeArguments ] ;
 
 bool = "true" | "false" ;
 number = /[0-9]+(\.[0-9]+)/ ;

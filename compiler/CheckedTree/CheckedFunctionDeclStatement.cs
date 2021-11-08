@@ -19,7 +19,7 @@ namespace Caique.CheckedTree
                 }
                 else if (IsMethod)
                 {
-                    return ParentObject!.Checked!.FullName + "." + Identifier.Value;
+                    return ParentObject!.FullName + "." + Identifier.Value;
                 }
                 else
                 {
@@ -34,7 +34,7 @@ namespace Caique.CheckedTree
 
         public IDataType ReturnType { get; }
 
-        public StructSymbol? ParentObject { get; }
+        public CheckedClassDeclStatement? ParentObject { get; }
 
         public ModuleEnvironment? Module { get; }
 
@@ -51,7 +51,7 @@ namespace Caique.CheckedTree
                                             CheckedBlockExpression? body,
                                             IDataType returnType,
                                             bool isInitFunction,
-                                            StructSymbol? parentObject,
+                                            CheckedClassDeclStatement? parentObject,
                                             ModuleEnvironment? module,
                                             IDataType? extensionOf = null)
         {

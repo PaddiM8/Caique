@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Caique.Ast;
 using Caique.CheckedTree;
 
@@ -18,11 +19,15 @@ namespace Caique.Semantics
 
         public CheckedClassDeclStatement? CurrentObject { get; set; }
 
+        public ClassDeclStatement? CurrentClassDecl { get; set; }
+
         public Expression? Expression { get; init; }
 
         public Statement? Statement { get; init; }
 
         public CheckedExpression? CheckedExpression { get; set; }
+
+        public List<IDataType>? TypeArgumentsForClass { get; set; }
 
         public TypeCheckerContext CreateChild()
         {
@@ -32,6 +37,8 @@ namespace Caique.Semantics
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
+                CurrentClassDecl = CurrentClassDecl,
+                TypeArgumentsForClass = TypeArgumentsForClass,
             };
         }
 
@@ -43,7 +50,9 @@ namespace Caique.Semantics
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
+                CurrentClassDecl = CurrentClassDecl,
                 Expression = expression,
+                TypeArgumentsForClass = TypeArgumentsForClass,
             };
         }
 
@@ -55,7 +64,9 @@ namespace Caique.Semantics
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
+                CurrentClassDecl = CurrentClassDecl,
                 Statement = statement,
+                TypeArgumentsForClass = TypeArgumentsForClass,
             };
         }
     }

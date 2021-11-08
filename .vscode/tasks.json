@@ -3,7 +3,7 @@
     "tasks": [
         {
             "label": "build",
-            "command": "/home/paddi/dotnet/dotnet",
+            "command": "dotnet",
             "type": "process",
             "args": [
                 "build",

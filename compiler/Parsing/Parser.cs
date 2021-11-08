@@ -46,7 +46,7 @@ namespace Caique.Parsing
                     "object",
                     new TextSpan(new TextPosition(0, 0), new TextPosition(0, 0))
                 )
-            });
+            }, null);
 
         public Parser(List<Token> tokens, DiagnosticBag diagnostics,
                       ModuleEnvironment moduleEnvironment)
@@ -261,6 +261,13 @@ namespace Caique.Parsing
             Expect(TokenKind.Class, "class declaration");
             var identifier = Expect(TokenKind.Identifier);
 
+            // Generics
+            List<Token>? typeParameters = null;
+            if (Match(TokenKind.OpenSquareBracket))
+            {
+                typeParameters = ParseTypeParameters();
+            }
+
             // Inheritance
             TypeExpression? ancestor;
             if (Consume(TokenKind.Colon)) ancestor = ParseType();
@@ -269,9 +276,11 @@ namespace Caique.Parsing
             var (block, init) = ParseClassBlock();
             var statement = new ClassDeclStatement(
                 identifier,
+                typeParameters,
                 block,
                 identifier.Span,
                 _moduleEnvironment,
+                _symbolEnvironment,
                 ancestor,
                 init
             );
@@ -685,18 +694,55 @@ namespace Caique.Parsing
             return parameters;
         }
 
+        private List<Token> ParseTypeParameters()
+        {
+            Expect(TokenKind.OpenSquareBracket);
+
+            var parameters = new List<Token>();
+            do
+            {
+                parameters.Add(Expect(TokenKind.Identifier));
+            }
+            while (!IsAtEnd && Consume(TokenKind.Comma));
+
+            Expect(TokenKind.ClosedSquareBracket);
+
+            return parameters;
+        }
+
+        private List<TypeExpression> ParseTypeArguments()
+        {
+            Expect(TokenKind.OpenSquareBracket);
+
+            var arguments = new List<TypeExpression>();
+            do
+            {
+                arguments.Add(ParseType());
+            }
+            while (!IsAtEnd && Consume(TokenKind.Comma));
+
+            Expect(TokenKind.ClosedSquareBracket);
+
+            return arguments;
+        }
+
         private TypeExpression ParseType()
         {
             if (Match(TokenKind.Identifier))
             {
-                return new TypeExpression(ParseModulePath(), Consume(TokenKind.Star));
+                return new TypeExpression(
+                    ParseModulePath(),
+                    Match(TokenKind.OpenSquareBracket) ? ParseTypeArguments() : null,
+                    Consume(TokenKind.Star)
+                );
             }
             else
             {
-                return new TypeExpression(new List<Token>()
-                {
-                    Advance()
-                }, Consume(TokenKind.Star));
+                return new TypeExpression(
+                    new() { Advance() },
+                    null,
+                    Consume(TokenKind.Star)
+                );
             }
         }
 

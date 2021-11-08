@@ -6,6 +6,7 @@ using Caique.Ast;
 using Caique.CheckedTree;
 using Caique.Diagnostics;
 using Caique.Parsing;
+using System.Text;
 using Caique.Util;
 
 namespace Caique.Semantics
@@ -54,10 +55,13 @@ namespace Caique.Semantics
             return value;
         }
 
-        public IEnumerable<CheckedStatement> Analyse()
+        public List<CheckedStatement> Analyse()
         {
+            var statements = new List<CheckedStatement>();
             foreach (var statement in _module.Ast!)
-                yield return Next(statement);
+                statements.Add(Next(statement));
+
+            return statements;
         }
 
         public CheckedStatement Visit(ExpressionStatement expressionStatement)
@@ -98,7 +102,7 @@ namespace Caique.Semantics
             // Go through the assignee and make sure it can be assigned to
             foreach (var expression in assignmentStatement.Assignee.Expressions)
             {
-                if (!(expression is VariableExpression))
+                if (expression is not VariableExpression)
                 {
                     _diagnostics.ReportMisplacedAssignmentOperator(assignmentStatement.Span);
                     break;
@@ -110,6 +114,39 @@ namespace Caique.Semantics
 
         public CheckedStatement Visit(FunctionDeclStatement functionDeclStatement)
         {
+            // Same *exact* one has already been checked
+            var alreadyChecked = _current.CurrentObject?.GetFunction(functionDeclStatement.FullName) ??
+                _module.GetFunction(functionDeclStatement.FullName)?.AllChecked.FirstOrDefault();
+            if (alreadyChecked != null) return alreadyChecked;
+
+            // Should only be null if it's an init function
+            var symbol = _current.CurrentObject?.Environment.GetFunction(functionDeclStatement.FullName) ??
+                _module.GetFunction(functionDeclStatement.FullName);
+            if (symbol?.HasChecked ?? false)
+            {
+                // If it's from the same syntactical scope but belongs to
+                // another class signature. For example for different
+                // type arguments.
+                var similarFunction = symbol.AllChecked.First();
+                var newCheckedFunction = new CheckedFunctionDeclStatement(
+                    functionDeclStatement.Identifier,
+                    similarFunction.Parameters,
+                    similarFunction.Body,
+                    similarFunction.ReturnType,
+                    functionDeclStatement.IsInitFunction,
+                    _current.CurrentObject,
+                    _module,
+                    similarFunction.ExtensionOf
+                );
+
+                if (functionDeclStatement.Identifier.Value != "init")
+                {
+                    symbol!.AddChecked(newCheckedFunction);
+                }
+
+                return newCheckedFunction;
+            }
+
             _current.CurrentFunctionType = functionDeclStatement.ReturnType == null
                 ? _voidType
                 : Next(functionDeclStatement.ReturnType).DataType;
@@ -136,14 +173,28 @@ namespace Caique.Semantics
             _environment = functionDeclStatement.Body?.Environment ?? _environment;
             foreach (var uncheckedParameter in functionDeclStatement.Parameters)
             {
-                parameters.Add((CheckedVariableDeclStatement)Next(uncheckedParameter));
+                // If there is no body, just create the object,
+                // since there is no scope to define the variable in.
+                CheckedVariableDeclStatement checkedParameter;
+                if (functionDeclStatement.Body == null)
+                {
+                    checkedParameter = new CheckedVariableDeclStatement(
+                        uncheckedParameter.Identifier,
+                        null,
+                        Next(uncheckedParameter.SpecifiedType!).DataType,
+                        VariableType.FunctionParameter
+                    );
+                }
+                else
+                {
+                    checkedParameter = (CheckedVariableDeclStatement)Next(uncheckedParameter);
+                }
+
+                parameters.Add(checkedParameter);
             }
 
             _environment = previousEnvironment;
 
-            var parentObject = _current.CurrentObject != null
-                ? _module.GetClass(_current.CurrentObject!.Identifier.Value, false)!
-                : null;
             var extensionOf = functionDeclStatement.IsExtensionFunction
                 ? Next(functionDeclStatement.ExtensionOf!).DataType
                 : null;
@@ -154,15 +205,14 @@ namespace Caique.Semantics
                 body,
                 _current.CurrentFunctionType,
                 functionDeclStatement.IsInitFunction,
-                parentObject,
+                _current.CurrentObject,
                 _module,
                 extensionOf
             );
 
             if (functionDeclStatement.Identifier.Value != "init")
             {
-                var symbol = _environment.GetFunction(functionDeclStatement.FullName)!;
-                symbol.Checked = checkedFunction;
+                symbol!.AddChecked(checkedFunction);
             }
 
             return checkedFunction;
@@ -171,17 +221,21 @@ namespace Caique.Semantics
         public CheckedStatement Visit(ClassDeclStatement classDeclStatement)
         {
             var symbol = _module.GetClass(classDeclStatement.Identifier.Value, false)!;
-            if (symbol.Checked != null) return symbol.Checked;
+            var alreadyChecked = _current.TypeArgumentsForClass == null
+                ? symbol.GetChecked(classDeclStatement.Identifier.Value)
+                : symbol.GetCheckedFromTypeArguments(_current.TypeArgumentsForClass);
+            if (alreadyChecked != null) return alreadyChecked;
 
             var checkedClass = new CheckedClassDeclStatement(
                 classDeclStatement.Identifier,
+                _current.TypeArgumentsForClass,
                 classDeclStatement.Body.Environment,
                 _module,
                 classDeclStatement.InheritedType != null
                     ? Next(classDeclStatement.InheritedType).DataType
                     : null
             );
-            symbol.Checked = checkedClass;
+            symbol.AddChecked(checkedClass);
             _current.CurrentObject = checkedClass;
 
             if (classDeclStatement.InheritedType != null)
@@ -197,6 +251,9 @@ namespace Caique.Semantics
                     );
                 }
             }
+
+            var previousClassDecl = _current.CurrentClassDecl;
+            _current.CurrentClassDecl = classDeclStatement;
 
             // Constructor
             if (classDeclStatement.InitFunction != null)
@@ -256,6 +313,7 @@ namespace Caique.Semantics
             }
 
             checkedClass.Body = (CheckedBlockExpression)Next(classDeclStatement.Body);
+            _current.CurrentClassDecl = previousClassDecl;
 
             return checkedClass;
         }
@@ -339,13 +397,14 @@ namespace Caique.Semantics
                 {
                     var identifier = extensionFunctionCall.ModulePath[^1];
                     var extensionFunctionSymbol = _module.GetFunction($"{left.DataType}.{identifier.Value}");
+                    var checkedExtensionFunction = extensionFunctionSymbol?.AllChecked.First();
                     if (extensionFunctionSymbol != null &&
                         extensionFunctionSymbol.Syntax.IsExtensionFunction &&
-                        left.DataType.IsCompatible(extensionFunctionSymbol.Checked!.ExtensionOf!))
+                        left.DataType.IsCompatible(checkedExtensionFunction!.ExtensionOf!))
                     {
                         var checkedCall = CheckCall(
                             identifier,
-                            extensionFunctionSymbol,
+                            checkedExtensionFunction,
                             extensionFunctionCall.Arguments,
                             left
                         );
@@ -365,21 +424,27 @@ namespace Caique.Semantics
                     return new CheckedUnknownExpression();
                 }
 
-                var classSymbol = leftStructType.StructDecl;
+                var checkedClass = leftStructType.StructDecl;
 
                 // Can't continue if the class couldn't be found.
                 // This will probably mostly happen due to other user-errors,
                 // which will reported where relevant instead.
-                if (classSymbol == null) return new CheckedUnknownExpression();
+                if (checkedClass == null) return new CheckedUnknownExpression();
 
                 // Check if the variable/function exists in the class
                 if (uncheckedRight is CallExpression callExpression)
                 {
                     var identifier = callExpression.ModulePath[^1];
-                    var functionSymbol = classSymbol.GetFunction(identifier.Value);
+                    var checkedFunction = checkedClass.GetFunction(identifier.Value);
+                    if (checkedFunction == null)
+                    {
+                        var symbol = checkedClass.Environment.GetFunction(identifier.Value);
+                        checkedFunction = (CheckedFunctionDeclStatement)Next(symbol!.Syntax);
+                    }
+
                     var call = CheckCall(
                         identifier,
-                        functionSymbol,
+                        checkedFunction,
                         callExpression.Arguments,
                         left
                     );
@@ -391,14 +456,21 @@ namespace Caique.Semantics
                 else if (uncheckedRight is VariableExpression variableExpression)
                 {
                     var identifier = variableExpression.Identifier;
-                    var variableSymbol = classSymbol.GetVariable(identifier.Value);
-                    var variableDecl = CheckVariableDecl(identifier, variableSymbol);
+                    var checkedVariable = checkedClass.GetVariable(identifier.Value);
+                    var variableDecl = CheckVariableDecl(identifier, checkedVariable);
                     if (variableDecl == null) return new CheckedUnknownExpression();
+
+                    var dataType = checkedVariable!.Checked!.DataType;
+                    if (dataType is GenericType dataTypeGeneric &&
+                        left?.DataType is StructType objectInstanceType)
+                    {
+                        dataType = objectInstanceType.TypeArguments![dataTypeGeneric.ParameterIndex];
+                    }
 
                     left = new CheckedVariableExpression(
                         identifier,
                         variableDecl,
-                        variableDecl.DataType,
+                        dataType,
                         left
                     );
                 }
@@ -430,7 +502,7 @@ namespace Caique.Semantics
             {
                 type = _current.ExpectedType?.Type == TypeKeyword.i8 && _current.ExpectedType.IsExplicitPointer
                     ? new PrimitiveType(TypeKeyword.i8, true)
-                    : new StructType(TypeKeyword.Identifier, _stringObj!.Checked!);
+                    : new StructType(TypeKeyword.Identifier, null, _stringObj!.AllChecked.First());
             }
             else if (literalExpression.Value.Kind == TokenKind.CharLiteral)
             {
@@ -544,25 +616,48 @@ namespace Caique.Semantics
                 if (module == null) return new CheckedUnknownExpression();
             }
 
-            FunctionSymbol? functionSymbol;
-            if (_environment.ParentObject != null && modulePath.Count == 1)
+            CheckedFunctionDeclStatement? checkedFunction;
+            FunctionSymbol? symbol;
+            if (_current.CurrentObject != null && modulePath.Count == 1)
             {
-                functionSymbol = _environment.ParentObject?.Checked?.GetFunction(lastIdentifier.Value) ??
-                    module.GetFunction(lastIdentifier.Value, false);
+                // If it's not in a class, it won't have different semantical variations (yet),
+                // so it's safe to just take the first (and only) checked one from the symbol.
+                var method = _current.CurrentObject.GetFunction(lastIdentifier.Value);
+                if (method != null)
+                {
+                    checkedFunction = method;
+                    symbol = _current.CurrentObject.Environment.GetFunction(lastIdentifier.Value);
+                }
+                else
+                {
+                    symbol = module.GetFunction(lastIdentifier.Value, false);
+                    checkedFunction = symbol?.AllChecked.FirstOrDefault();
+                }
             }
             else
             {
-                functionSymbol = module.GetFunction(
+                // If it's not in a class, it won't have different semantical variations (yet),
+                // so it's safe to just take the first (and only) checked one from the symbol.
+                symbol = module.GetFunction(
                     lastIdentifier.Value,
                     modulePath.Count > 1 // Look in imports if a proper module path is specified
                 );
+                checkedFunction = symbol?.AllChecked.FirstOrDefault();
+            }
+
+            if (checkedFunction == null)
+            {
+                var previousObject = _current.CurrentObject;
+                if (!symbol!.Syntax.IsMethod) _current.CurrentObject = null;
+                checkedFunction = (CheckedFunctionDeclStatement)Next(symbol!.Syntax);
+                _current.CurrentObject = previousObject;
             }
 
             var checkedCall = CheckCall(
                 lastIdentifier,
-                functionSymbol,
+                checkedFunction,
                 callExpression.Arguments,
-                functionSymbol!.Syntax.IsMethod
+                checkedFunction!.IsMethod
                     ? new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentObject!.DataType)
                     : null
             );
@@ -574,12 +669,6 @@ namespace Caique.Semantics
         {
             var type = (StructType)((CheckedTypeExpression)Next(newExpression.Type)).DataType;
             var classDecl = type.StructDecl;
-            /*if (classDecl == null)
-            {
-                _diagnostics.ReportSymbolDoesNotExist(newExpression.Type.ModulePath[^1]);
-
-                return new CheckedUnknownExpression();
-            }*/
 
             int argumentCount = newExpression.Arguments.Count;
             int parameterCount = classDecl.InitFunction?.Parameters.Count ?? 0;
@@ -600,12 +689,17 @@ namespace Caique.Semantics
                 var varDecl = classDecl.Environment.GetVariable(
                     classDecl.InitFunction!.Parameters[i].Identifier.Value
                 );
-
                 if (varDecl == null) continue;
                 if (varDecl.Checked == null) Next(varDecl.Syntax);
-                var argument = Next(uncheckedArgument, varDecl.Checked!.DataType);
 
-                CheckTypes(varDecl.Checked.DataType, argument.DataType, uncheckedArgument.Span);
+                var parameterType = varDecl.Checked!.DataType;
+                if (varDecl.Checked!.DataType is GenericType genericType)
+                {
+                    parameterType = type.TypeArguments![genericType.ParameterIndex];
+                }
+
+                var argument = Next(uncheckedArgument, parameterType);
+                CheckTypes(parameterType, argument.DataType, uncheckedArgument.Span);
                 arguments.Add(argument);
             }
 
@@ -646,10 +740,41 @@ namespace Caique.Semantics
                 if (module == null) return new CheckedUnknownExpression();
             }
 
-            var classSymbol = module.GetClass(lastIdentifier.Value);
-            if (classSymbol != null && classSymbol.Checked == null)
+            // Check type arguments for the type itself
+            List<IDataType>? typeArguments = null;
+            if (typeExpression.TypeArguments != null)
             {
-                classSymbol.Checked = (CheckedClassDeclStatement)Next(classSymbol.Syntax);
+                typeArguments = new List<IDataType>();
+                foreach (var argument in typeExpression.TypeArguments)
+                {
+                    typeArguments.Add(Next(argument).DataType);
+                }
+            }
+
+            // Find out if the type itself is a type argument
+            var objectTypeParameters = _current.CurrentClassDecl?.TypeParameters;
+            if (typeExpression.ModulePath.Count == 1 && objectTypeParameters != null)
+            {
+                for (int i = 0; i < objectTypeParameters.Count; i ++)
+                {
+                    if (objectTypeParameters[i].Value == lastIdentifier.Value)
+                    {
+                        return new CheckedTypeExpression(
+                            new GenericType(lastIdentifier, i, typeExpression.IsExplicitPointer)
+                        );
+                    }
+                }
+            }
+
+            var classSymbol = module.GetClass(lastIdentifier.Value);
+            var checkedClass = typeArguments == null
+                ? classSymbol?.GetChecked(lastIdentifier.Value)
+                : classSymbol?.GetCheckedFromTypeArguments(typeArguments);
+            if (classSymbol != null && checkedClass == null)
+            {
+                _current.TypeArgumentsForClass = typeArguments;
+                checkedClass = (CheckedClassDeclStatement)Next(classSymbol.Syntax);
+                _current.TypeArgumentsForClass = null;
             }
 
             if (classSymbol == null)
@@ -662,7 +787,8 @@ namespace Caique.Semantics
             return new CheckedTypeExpression(
                 new StructType(
                     TypeKeyword.Identifier,
-                    classSymbol.Checked!,
+                    typeArguments,
+                    checkedClass!,
                     typeExpression.IsExplicitPointer
                 )
             );
@@ -800,26 +926,24 @@ namespace Caique.Semantics
         }
 
         private CheckedCallExpression? CheckCall(Token identifier,
-                                                 FunctionSymbol? functionSymbol,
+                                                 CheckedFunctionDeclStatement? checkedFunction,
                                                  List<Expression> arguments,
                                                  CheckedExpression? objectInstance = null)
         {
-            if (functionSymbol == null)
+            if (checkedFunction == null)
             {
                 _diagnostics.ReportSymbolDoesNotExist(identifier);
 
                 return null;
             }
 
-            //var returnType = functionDecl.ReturnType ?? _voidType;
-
             // If wrong number of arguments
-            if (arguments.Count != functionSymbol.Syntax.Parameters.Count)
+            if (arguments.Count != checkedFunction.Parameters.Count)
             {
                 _diagnostics.ReportWrongNumberOfArguments(
                     identifier,
                     arguments.Count,
-                    functionSymbol.Syntax.Parameters.Count
+                    checkedFunction.Parameters.Count
                 );
 
                 return null;
@@ -827,22 +951,31 @@ namespace Caique.Semantics
 
             var checkedArguments = new List<CheckedExpression>();
             foreach (var (argument, parameter) in
-                     arguments.Zip(functionSymbol.Syntax.Parameters))
+                     arguments.Zip(checkedFunction.Parameters))
             {
-                var parameterType = Next(parameter.SpecifiedType!).DataType;
+                var parameterType = parameter.DataType;
+                if (parameter.DataType is GenericType parameterTypeGeneric &&
+                    objectInstance?.DataType is StructType objectType)
+                {
+                    parameterType = objectType.TypeArguments![parameterTypeGeneric.ParameterIndex];
+                }
+
                 var checkedArgument = Next(argument, parameterType);
                 checkedArguments.Add(checkedArgument);
                 CheckTypes(parameterType, checkedArgument.DataType, argument.Span);
             }
 
+            var returnType = checkedFunction.ReturnType;
+            if (returnType is GenericType returnTypeGeneric &&
+                objectInstance?.DataType is StructType objectInstanceType)
+            {
+                returnType = objectInstanceType.TypeArguments![returnTypeGeneric.ParameterIndex];
+            }
 
-            var returnTypeExpression = functionSymbol.Syntax.ReturnType;
             return new CheckedCallExpression(
                 checkedArguments,
-                functionSymbol,
-                returnTypeExpression == null
-                    ? _voidType
-                    : Next(returnTypeExpression).DataType,
+                checkedFunction,
+                returnType,
                 objectInstance
             );
         }

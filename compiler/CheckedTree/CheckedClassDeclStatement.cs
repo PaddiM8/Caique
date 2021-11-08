@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Caique.Ast;
 using Caique.Parsing;
 using Caique.Semantics;
@@ -10,7 +11,9 @@ namespace Caique.CheckedTree
     {
         public Token Identifier { get; }
 
-        public string FullName => Identifier.Value;
+        public string FullName => DataType.ToString();
+
+        public List<IDataType>? TypeArguments { get; }
 
         public CheckedBlockExpression? Body { get; set; }
 
@@ -27,15 +30,17 @@ namespace Caique.CheckedTree
         public IDataType DataType { get; }
 
         public CheckedClassDeclStatement(Token identifier,
+                                         List<IDataType>? typeArguments,
                                          SymbolEnvironment environment,
                                          ModuleEnvironment module,
                                          IDataType? ancestor = null)
         {
             Identifier = identifier;
+            TypeArguments = typeArguments;
             Environment = environment;
             InheritedType = ancestor;
             Module = module;
-            DataType = new StructType(TypeKeyword.Identifier, this);
+            DataType = new StructType(TypeKeyword.Identifier, typeArguments, this);
         }
 
         /// <summary>
@@ -56,14 +61,14 @@ namespace Caique.CheckedTree
         /// Gets an object function, and also looks inside ancestor objects.
         /// </summary>
         /// <param name="identifier">Name of the function to find.</param>
-        public FunctionSymbol? GetFunction(string identifier)
+        public CheckedFunctionDeclStatement? GetFunction(string identifier)
         {
             // Attempt to get the function from the current class,
             // but if it is not found there, try call this method
             // from the ancestor instead (if there is one),
             // in order to try to find it there.
             var function = Environment.GetFunction(identifier, false);
-            if (function != null) return function;
+            if (function != null) return function.GetCheckedFromClass(this);
             else return Inherited?.GetFunction(identifier);
         }
 

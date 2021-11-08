@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Caique.Ast;
 using Caique.CheckedTree;
 using Caique.Parsing;
@@ -11,6 +13,8 @@ namespace Caique.Semantics
     public class StructType : IDataType
     {
         public TypeKeyword Type { get; }
+
+        public List<IDataType>? TypeArguments { get; }
 
         public CheckedClassDeclStatement StructDecl { get; }
 
@@ -26,9 +30,13 @@ namespace Caique.Semantics
 
         public bool IsInt => false;
 
-        public StructType(TypeKeyword type, CheckedClassDeclStatement structDecl, bool isExplicitPointer = false)
+        public StructType(TypeKeyword type,
+                          List<IDataType>? typeArguments,
+                          CheckedClassDeclStatement structDecl,
+                          bool isExplicitPointer = false)
         {
             Type = type;
+            TypeArguments = typeArguments;
             StructDecl = structDecl;
             IsExplicitPointer = isExplicitPointer;
         }
@@ -60,7 +68,16 @@ namespace Caique.Semantics
             return false;
         }
 
-        public override string ToString() =>
-            StructDecl.Identifier.Value + (IsExplicitPointer ? "*" : "");
+        public override string ToString()
+        {
+            string typeArguments = "";
+            string pointer = IsExplicitPointer ? "*" : "";
+            if (TypeArguments != null && TypeArguments.Any())
+            {
+                typeArguments = "[" + string.Join(",", TypeArguments.Select(x => x.ToString())) + "]";
+            }
+
+            return StructDecl.Identifier.Value + typeArguments + pointer;
+        }
     }
 }

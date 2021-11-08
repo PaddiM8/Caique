@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Caique.Parsing;
 using Caique.Semantics;
 using Caique.Util;
@@ -9,45 +10,6 @@ namespace Caique.CodeGeneration
 {
     public static class LlvmExtensions
     {
-        public static unsafe LLVMOpaqueType* ToLlvmType(this IDataType dataType, ModuleEnvironment? prelude)
-        {
-            var keyword = dataType.Type;
-
-            LLVMOpaqueType* type = keyword switch
-            {
-                TypeKeyword.i8 => LLVM.Int8Type(),
-                TypeKeyword.i32 => LLVM.Int32Type(),
-                TypeKeyword.i64 => LLVM.Int64Type(),
-                TypeKeyword.f8 => LLVM.FloatType(),
-                TypeKeyword.f32 => LLVM.FloatType(),
-                TypeKeyword.f64 => LLVM.FloatType(),
-                TypeKeyword.Bool => LLVM.Int1Type(),
-                TypeKeyword.Void => LLVM.VoidType(),
-                TypeKeyword.Identifier => LLVM.PointerType(((StructType)dataType).StructDecl.LlvmType!.Value, 0),
-                TypeKeyword.StringConstant => prelude!.Modules["string"].GetClass("String")!.Checked!.LlvmType!.Value,
-                TypeKeyword.Unknown => throw new NotImplementedException(),
-                _ => throw new NotImplementedException(),
-            };
-
-            return dataType.IsExplicitPointer
-                ? LLVM.PointerType(type, 0)
-                : type;
-        }
-
-        public static unsafe LLVMOpaqueType** ToLlvmTypeArray(this ICollection<IDataType> dataTypes, ModuleEnvironment? prelude)
-        {
-            var llvmTypes = new LLVMOpaqueType*[dataTypes.Count];
-            foreach (var (dataType, i) in dataTypes.WithIndex())
-            {
-                llvmTypes[i] = dataType.ToLlvmType(prelude);
-            }
-
-            fixed (LLVMOpaqueType** llvmTypesPointer = llvmTypes)
-            {
-                return llvmTypesPointer;
-            }
-        }
-
         public static LLVMOpcode ToLlvmOpcode(this TokenKind kind, bool isFloat)
         {
             if (isFloat)

@@ -18,6 +18,8 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef? DotExpressionObject { get; set; }
 
+        public CheckedClassDeclStatement? ClassDecl { get; set; }
+
         public CheckedFunctionDeclStatement? FunctionDecl { get; set; }
 
         public SymbolEnvironment? SymbolEnvironment { get; set; }
@@ -33,6 +35,7 @@ namespace Caique.CodeGeneration
                 Parent = this,
                 Statement = statement,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
+                ClassDecl = ClassDecl,
                 FunctionDecl = FunctionDecl,
                 SymbolEnvironment = SymbolEnvironment,
                 Block = Block,
@@ -47,6 +50,7 @@ namespace Caique.CodeGeneration
                 Expression = expression,
                 BlockReturnValueAlloca = BlockReturnValueAlloca,
                 DotExpressionObject = DotExpressionObject,
+                ClassDecl = ClassDecl,
                 FunctionDecl = FunctionDecl,
                 SymbolEnvironment = SymbolEnvironment,
                 ShouldBeLoaded = ShouldBeLoaded,

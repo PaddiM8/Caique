@@ -90,7 +90,7 @@ namespace Caique.Semantics
                 // Lexing and parsing
                 var tokens = new Lexer(File.ReadAllText(filePath), Diagnostics).Lex();
                 Ast = new Parser(tokens, Diagnostics, this).Parse();
-                //new AstPrinter(Ast).Print();
+                //new AstPrinter(Ast.ToList()).Print();
 
                 // Type checking
                 TypeTree = new TypeChecker(this).Analyse();

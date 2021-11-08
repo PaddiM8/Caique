@@ -7,6 +7,7 @@
         Bool,
         Identifier,
         StringConstant,
+        Generic,
         Void,
         Unknown,
     }

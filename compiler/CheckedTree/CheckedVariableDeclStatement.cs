@@ -17,6 +17,8 @@ namespace Caique.CheckedTree
 
         public int IndexInObject { get; set; }
 
+        public int? IndexInObjectAfterInheritance { get; set; }
+
         public CheckedVariableDeclStatement(Token identifier,
                                             CheckedExpression? value,
                                             IDataType type,

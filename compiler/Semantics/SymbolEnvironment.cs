@@ -109,15 +109,13 @@ namespace Caique.Semantics
             if (function != null) return function;
             if (!lookInParentScopes) return null;
 
-            var fromAncestor = ParentObject?.Checked?.Inherited?.GetFunction(identifier);
+            // Shouldn't matter which variation since they all have the same parent
+            var checkedParent = ParentObject?.AllChecked.First();
+            var fromAncestor = checkedParent?.Inherited?.Environment.GetFunction(identifier);
             if (fromAncestor != null) return fromAncestor;
 
-            SymbolEnvironment? parent = Parent;
-            while (parent != null)
-            {
-                var parentFunction = Parent!.GetFunction(identifier);
-                if (parentFunction != null) return parentFunction;
-            }
+            var parentFunction = Parent?.GetFunction(identifier);
+            if (parentFunction != null) return parentFunction;
 
             return null;
         }
@@ -134,7 +132,9 @@ namespace Caique.Semantics
             if (variable != null) return variable;
             if (!lookInParentScopes) return null;
 
-            var fromAncestor = ParentObject?.Checked?.Inherited?.GetVariable(identifier);
+            // Shouldn't matter which variation since they all have the same parent
+            var checkedParent = ParentObject?.AllChecked.First();
+            var fromAncestor = checkedParent?.Inherited?.Environment.GetVariable(identifier);
             if (fromAncestor != null) return fromAncestor;
 
             SymbolEnvironment? parent = Parent;
@@ -142,6 +142,8 @@ namespace Caique.Semantics
             {
                 if (Parent!._variables.TryGetValue(identifier, out VariableSymbol? parentVariable))
                     return parentVariable;
+                
+                parent = parent.Parent;
             }
 
             return null;

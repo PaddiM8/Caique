@@ -83,7 +83,7 @@ namespace Caique.Cli
             };
 
             compilation.Compile(targetPath);
-            LinkObjectFiles(targetPath, options.StdPath);
+            LinkObjectFiles(targetPath);
         }
 
         /// <summary>
@@ -96,7 +96,7 @@ namespace Caique.Cli
             var compilation = new Compilation(sourcePath, _projectFile!.Dependencies);
 
             compilation.Compile(targetPath);
-            if (LinkObjectFiles(targetPath, options.StdPath))
+            if (LinkObjectFiles(targetPath))
                 // Run the generated executable
                 using (var process = new Process())
                 {
@@ -106,19 +106,9 @@ namespace Caique.Cli
                 }
         }
 
-        private static bool LinkObjectFiles(string targetPath, string stdPath)
+        private static bool LinkObjectFiles(string targetPath)
         {
             var objectFiles = Directory.GetFiles(targetPath, "*.o").ToList();
-
-            var llvmStdPath = Path.Combine(Environment.CurrentDirectory, stdPath, "llvm/bin");
-            if (!Directory.Exists(llvmStdPath))
-            {
-                Console.WriteLine("Standard library could not be found.");
-                return false;
-            }
-
-            objectFiles.AddRange(Directory.GetFiles(llvmStdPath));
-
             var process = new Process()
             {
                 StartInfo = new ProcessStartInfo
