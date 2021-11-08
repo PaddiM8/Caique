@@ -162,7 +162,7 @@ namespace Caique.Diagnostics
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
-                $"Unexpected type {got}, expected {expected}.",
+                $"Unexpected type '{got}', expected '{expected}'.",
                 span,
                 DiagnosticType.Error
             );
@@ -172,7 +172,7 @@ namespace Caique.Diagnostics
         {
             Report(
                 DiagnosticIdentifier.UnexpectedType,
-                $"Unexpected type {got}, expected {expected}.",
+                $"Unexpected type '{got}', expected '{expected}'.",
                 span,
                 DiagnosticType.Error
             );
