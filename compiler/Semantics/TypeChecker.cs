@@ -420,7 +420,10 @@ namespace Caique.Semantics
                 // If it's not an object
                 if (left.DataType is not StructType leftStructType)
                 {
-                    _diagnostics.ReportUnexpectedType(left.DataType, "object", uncheckedRight.Span);
+                    if (left.DataType.Type != TypeKeyword.Unknown)
+                    {
+                        _diagnostics.ReportUnexpectedType(left.DataType, "object", uncheckedRight.Span);
+                    }
 
                     return new CheckedUnknownExpression();
                 }
@@ -646,10 +649,17 @@ namespace Caique.Semantics
                 checkedFunction = symbol?.AllChecked.FirstOrDefault();
             }
 
+            if (symbol == null)
+            {
+                _diagnostics.ReportSymbolDoesNotExist(lastIdentifier);
+
+                return new CheckedUnknownExpression();
+            }
+
             if (checkedFunction == null)
             {
                 var previousObject = _current.CurrentObject;
-                if (!symbol!.Syntax.IsMethod) _current.CurrentObject = null;
+                if (!symbol.Syntax.IsMethod) _current.CurrentObject = null;
                 checkedFunction = (CheckedFunctionDeclStatement)Next(symbol!.Syntax);
                 _current.CurrentObject = previousObject;
             }
