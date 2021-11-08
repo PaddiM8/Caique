@@ -140,7 +140,7 @@ namespace Caique.Semantics
             SymbolEnvironment? parent = Parent;
             while (parent != null)
             {
-                if (Parent!._variables.TryGetValue(identifier, out VariableSymbol? parentVariable))
+                if (parent!._variables.TryGetValue(identifier, out VariableSymbol? parentVariable))
                     return parentVariable;
                 
                 parent = parent.Parent;
