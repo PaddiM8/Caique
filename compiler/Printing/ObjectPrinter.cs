@@ -72,30 +72,10 @@ namespace Caique.Printing
             EnvironmentPrinter.Print(environment);
         }
 
-        public static void PrintGeneratedCode(ModuleEnvironment environment)
-        {
-            foreach (var (_, child) in environment.Modules)
-            {
-                PrintGeneratedCode(child);
-            }
-
-            if (environment.CodeGenerator != null)
-            {
-                PrintIdentifier(environment.Identifier);
-                environment.CodeGenerator.Print();
-                Console.WriteLine();
-            }
-        }
-
         private static void PrintIdentifier(string identifier)
         {
             Console.WriteLine($"{identifier}:");
             Console.WriteLine(string.Join("", Enumerable.Repeat('-', identifier.Length)));
-        }
-
-        private static string GeneratePadding(int layer)
-        {
-            return string.Join("", Enumerable.Repeat("┃  ", layer)) + "┣━ ";
         }
     }
 }

@@ -53,8 +53,6 @@ namespace Caique.Semantics
 
         public IEnumerable<CheckedStatement>? TypeTree { get; private set; }
 
-        public LlvmGenerator? CodeGenerator { get; private set; }
-
         public DiagnosticBag Diagnostics { get; }
 
         public List<ModuleEnvironment> ImportedModules { get; private set; }
@@ -66,6 +64,8 @@ namespace Caique.Semantics
 
         private readonly string _outputDirectory;
         private readonly Dictionary<string, string> _libraryPaths;
+
+        private readonly OutputType _outputType;
 
         /// <summary>
         /// Create a child module
@@ -81,6 +81,7 @@ namespace Caique.Semantics
             IsCodeModule = filePath!.EndsWith(".cq");
             _outputDirectory = Parent._outputDirectory;
             _libraryPaths = Root._libraryPaths;
+            _outputType = Root._outputType;
             Diagnostics = Root.Diagnostics;
             Prelude = Parent.Prelude;
 
@@ -106,9 +107,17 @@ namespace Caique.Semantics
                 // Code generation
                 if (!Diagnostics.Any())
                 {
-                    CodeGenerator = new LlvmGenerator(this);
-                    CodeGenerator.Generate();
-                    CodeGenerator.GenerateObjectFile(_outputDirectory);
+                    var generator = new LlvmGenerator(this);
+                    generator.Generate();
+
+                    if (_outputType == OutputType.ObjectFile)
+                    {
+                        generator.GenerateObjectFile(_outputDirectory);
+                    }
+                    else if (_outputType == OutputType.IntermediateRepresentation)
+                    {
+                        generator.GenerateLlvmFile(_outputDirectory);
+                    }
                 }
 
                 Diagnostics.CurrentFile = previousDiagnosticsFile;
@@ -122,6 +131,7 @@ namespace Caique.Semantics
                                  string filePath,
                                  string outputDirectory,
                                  Dictionary<string, string> libraryPaths,
+                                 OutputType outputType,
                                  DiagnosticBag diagnostics,
                                  ModuleEnvironment? prelude)
         {
@@ -131,6 +141,7 @@ namespace Caique.Semantics
             IsCodeModule = false;
             _outputDirectory = outputDirectory;
             _libraryPaths = libraryPaths;
+            _outputType = outputType;
             Diagnostics = diagnostics;
             Prelude = prelude;
         }

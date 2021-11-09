@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Caique.Ast;
@@ -55,27 +56,6 @@ namespace Caique.CodeGeneration
                 Next(functionDeclStatement.Body!);
                 _current.ClassDecl = null;
             }
-
-            sbyte* error = "".ToCString();
-            int _2 = LLVM.PrintModuleToFile(
-                _llvmModule,
-                ("experiments/ll/" + _module.Identifier + ".ll").ToCString(),
-                &error
-            );
-        }
-
-        public void Print()
-        {
-            sbyte* moduleError;
-            _ = LLVM.VerifyModule(
-                _llvmModule,
-                LLVMVerifierFailureAction.LLVMPrintMessageAction,
-                &moduleError
-            );
-            if (moduleError != null) Console.WriteLine(*moduleError);
-
-            // Print out the LLVM IR
-            LLVM.DumpModule(_llvmModule);
         }
 
         public void GenerateClass(StructSymbol symbol, List<CheckedFunctionDeclStatement> functionList)
@@ -128,6 +108,16 @@ namespace Caique.CodeGeneration
         {
             LLVM.ContextDispose(_context);
             GC.SuppressFinalize(this);
+        }
+
+        public void GenerateLlvmFile(string targetDirectory)
+        {
+            sbyte* error = "".ToCString();
+            int _2 = LLVM.PrintModuleToFile(
+                _llvmModule,
+                Path.Join(targetDirectory, _module.Identifier + ".ll").ToCString(),
+                &error
+            );
         }
 
         public void GenerateObjectFile(string targetDirectory, bool isLinked = false)
