@@ -20,6 +20,8 @@ namespace Caique.CodeGeneration
         private readonly LLVMBuilderRef _builder;
         private LlvmGeneratorContext _current = new();
 
+        private readonly HashSet<string> _declaredExternalSymbols = new();
+
         public LlvmGenerator(ModuleEnvironment module)
         {
             _module = module;
@@ -28,6 +30,22 @@ namespace Caique.CodeGeneration
                 _module.Identifier.ToCString()
             );
             _builder = LLVM.CreateBuilderInContext(_context);
+
+            /*if (_module.Identifier != "object")
+            {
+                var obj = _module.Prelude?.Modules["object"].GetClass("object")?.AllChecked.First() ??
+                    _module.Root.Modules["object"].GetClass("object")!.AllChecked.First();
+                var retain = obj!.GetFunction("retain")!.LlvmValue;
+                var release = obj!.GetFunction("release")!.LlvmValue;
+
+                fixed (LLVMOpaqueType** parameters = new LLVMOpaqueType*[1])
+                {
+                    parameters[0] = LLVM.PointerType(obj.LlvmType!.Value, 0);
+                    var functionType = LLVM.FunctionType(LLVM.VoidType(), parameters, 1, 0);
+                    LLVM.AddFunction(_llvmModule, retain!.Value.Name.ToCString(), functionType);
+                    LLVM.AddFunction(_llvmModule, release!.Value.Name.ToCString(), functionType);
+                }
+            }*/
         }
 
         public void Generate()
@@ -112,7 +130,7 @@ namespace Caique.CodeGeneration
 
         public void GenerateLlvmFile(string targetDirectory)
         {
-            sbyte* error = "".ToCString();
+            sbyte* error;
             int _2 = LLVM.PrintModuleToFile(
                 _llvmModule,
                 Path.Join(targetDirectory, _module.Identifier + ".ll").ToCString(),
@@ -120,7 +138,7 @@ namespace Caique.CodeGeneration
             );
         }
 
-        public void GenerateObjectFile(string targetDirectory, bool isLinked = false)
+        public void GenerateObjectFile(string targetDirectory)
         {
             LLVM.InitializeNativeTarget();
             LLVM.InitializeNativeAsmPrinter();
@@ -143,14 +161,10 @@ namespace Caique.CodeGeneration
                 LLVMCodeModel.LLVMCodeModelDefault
             );
 
-            string name = isLinked
-                ? "linked"
-                : _module.Identifier;
-
             _ = LLVM.TargetMachineEmitToFile(
                 targetMachine,
                 _llvmModule,
-                (targetDirectory + "/" + name + ".o").ToCString(),
+                (targetDirectory + "/" + _module.Identifier + ".o").ToCString(),
                 LLVMCodeGenFileType.LLVMObjectFile,
                 &errorMessage
             );
@@ -546,19 +560,12 @@ namespace Caique.CodeGeneration
                         1
                     );
 
-                    fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[3])
-                    {
-                        arguments[0] = malloc;
-                        arguments[1] = stringPtr;
-                        arguments[2] = length;
-                        LLVM.BuildCall(
-                            _builder,
-                            structType.StructDecl.InitFunction!.LlvmValue!.Value,
-                            arguments,
-                            3,
-                            "".ToCString()
-                        );
-                    }
+                    BuildCall(
+                        structType.StructDecl.InitFunction!.LlvmValue!.Value,
+                        structType.StructDecl.InitFunction!.LlvmType!.Value,
+                        new List<LLVMValueRef>() { malloc, stringPtr, length },
+                        structType.StructDecl.Module != _module
+                    );
 
                     ArcRetain(malloc);
                     _current.Block!.ValuesToArcUpdate.Add(malloc);
@@ -735,38 +742,30 @@ namespace Caique.CodeGeneration
             int argumentOffset = callExpression.ObjectInstance == null ? 0 : 1;
             int argumentCount = callExpression.Arguments.Count + argumentOffset;
 
-            fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
+            var arguments = callExpression.Arguments.Select(x => Next(x)).ToList();
+            if (callExpression.ObjectInstance != null)
             {
-                if (callExpression.ObjectInstance != null)
-                {
-                    arguments[0] = Next(callExpression.ObjectInstance);
-                }
-
-                // Generate all the arguments
-                foreach (var (argument, i) in callExpression.Arguments.WithIndex())
-                {
-                    arguments[i + argumentOffset] = Next(argument);
-                }
-
-                var functionDecl = callExpression.FunctionDecl;
-                string name = functionDecl.ReturnType.Type == TypeKeyword.Void
-                    ? ""
-                    : functionDecl.FullName;
-                var call = LLVM.BuildCall(
-                    _builder,
-                    functionDecl.LlvmValue!.Value,
-                    arguments,
-                    (uint)argumentCount,
-                    name.ToCString()
-                );
-
-                if (functionDecl.ReturnType is StructType)
-                {
-                    _current.Block!.ValuesToArcUpdate.Add(call);
-                }
-
-                return call;
+                arguments.Insert(0, Next(callExpression.ObjectInstance));
             }
+
+            var functionDecl = callExpression.FunctionDecl;
+            string name = functionDecl.ReturnType.Type == TypeKeyword.Void
+                ? ""
+                : functionDecl.FullName;
+            var call = BuildCall(
+                functionDecl.LlvmValue!.Value,
+                functionDecl.LlvmType!.Value,
+                arguments,
+                functionDecl.Module != _module,
+                name
+            );
+
+            if (functionDecl.ReturnType is StructType)
+            {
+                _current.Block!.ValuesToArcUpdate.Add(call);
+            }
+
+            return call;
         }
 
         public LLVMValueRef Visit(CheckedTypeExpression typeExpression)
@@ -844,27 +843,15 @@ namespace Caique.CodeGeneration
 
             if (objectDecl.InitFunction != null)
             {
-                // Arguments
-                int argumentCount = newExpression.Arguments.Count + 1;
-                fixed (LLVMOpaqueValue** arguments = new LLVMOpaqueValue*[argumentCount])
-                {
-                    // Generate all the arguments
-                    foreach (var (argument, i) in newExpression.Arguments.WithIndex())
-                    {
-                        arguments[i + 1] = Next(argument);
-                    }
-
-                    // Call the constructor in this particular object
-                    arguments[0] = malloc;
-
-                    LLVM.BuildCall(
-                        _builder,
-                        objectDecl.InitFunction.LlvmValue!.Value,
-                        arguments,
-                        (uint)argumentCount,
-                        "".ToCString()
-                    );
-                }
+                BuildCall(
+                    objectDecl.InitFunction.LlvmValue!.Value,
+                    objectDecl.InitFunction.LlvmType!.Value,
+                    newExpression.Arguments
+                        .Select(x => Next(x))
+                        .Prepend(malloc)
+                        .ToList(),
+                    objectDecl.InitFunction.Module != _module
+                );
             }
 
             ArcRetain(malloc);
@@ -898,52 +885,73 @@ namespace Caique.CodeGeneration
             return null!;
         }
 
+        private LLVMValueRef BuildCall(LLVMValueRef functionValue,
+                                       LLVMTypeRef functionType,
+                                       ICollection<LLVMValueRef> args,
+                                       bool isExternal,
+                                       string name = "")
+        {
+            fixed (LLVMOpaqueValue** argumentsPtr = new LLVMOpaqueValue*[args.Count])
+            {
+                foreach (var (argument, i) in args.WithIndex())
+                {
+                    argumentsPtr[i] = argument;
+                }
+
+                if (!_declaredExternalSymbols.Contains(functionValue.Name))
+                {
+                    LLVM.AddFunction(_llvmModule, functionValue.Name.ToCString(), functionType);
+                    _declaredExternalSymbols.Add(functionValue.Name);
+                }
+
+                return LLVM.BuildCall(
+                    _builder,
+                    functionValue,
+                    argumentsPtr,
+                    (uint)args.Count,
+                    name.ToCString()
+                );
+            }
+        }
+
         private void ArcRetain(LLVMValueRef objectPointer)
         {
             var obj = _module.Prelude?.Modules["object"].GetClass("object")?.AllChecked.First() ??
                 _module.Root.Modules["object"].GetClass("object")!.AllChecked.First();
-            var retain = obj!.GetFunction("retain")!.LlvmValue;
+            var retain = obj!.GetFunction("retain")!;
+            var arg = LLVM.BuildBitCast(
+                _builder,
+                objectPointer,
+                LLVM.PointerType(obj.LlvmType!.Value, 0),
+                "toObj".ToCString()
+            );
 
-            fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[1])
-            {
-                args[0] = LLVM.BuildBitCast(
-                    _builder,
-                    objectPointer,
-                    LLVM.PointerType(obj.LlvmType!.Value, 0),
-                    "toObj".ToCString()
-                );
-                LLVM.BuildCall(
-                    _builder,
-                    retain!.Value,
-                    args,
-                    1,
-                    "".ToCString()
-                );
-            }
+            BuildCall(
+                retain.LlvmValue!.Value,
+                retain.LlvmType!.Value,
+                new List<LLVMValueRef>() { arg },
+                true
+            );
         }
 
         private void ArcRelease(LLVMValueRef objectPointer)
         {
             var obj = _module.Prelude?.Modules["object"].GetClass("object")?.AllChecked.First() ??
                 _module.Root.Modules["object"].GetClass("object")!.AllChecked.First();
-            var release = obj!.GetFunction("release")!.LlvmValue;
+            var release = obj!.GetFunction("release")!;
+            var arg = LLVM.BuildBitCast(
+                _builder,
+                objectPointer,
+                LLVM.PointerType(obj.LlvmType!.Value, 0),
+                "toObj".ToCString()
+            );
 
-            fixed (LLVMOpaqueValue** args = new LLVMOpaqueValue*[1])
-            {
-                args[0] = LLVM.BuildBitCast(
-                    _builder,
-                    objectPointer,
-                    LLVM.PointerType(obj.LlvmType!.Value, 0),
-                    "toObj".ToCString()
-                );
-                LLVM.BuildCall(
-                    _builder,
-                    release!.Value,
-                    args,
-                    1,
-                    "".ToCString()
-                );
-            }
+            BuildCall(
+                release.LlvmValue!.Value,
+                release.LlvmType!.Value,
+                new List<LLVMValueRef>() { arg },
+                true
+            );
         }
 
         private void SetCurrentBlock(LLVMBasicBlockRef basicBlock)
