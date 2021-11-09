@@ -84,7 +84,14 @@ namespace Caique.Cli
             };
 
             compilation.Compile(targetPath);
-            LinkObjectFiles(targetPath, options.ShowLinkerOutput);
+            if (options.PrintLlvm)
+            {
+                LinkLlvmFiles(targetPath);
+            }
+            else
+            {
+                LinkObjectFiles(targetPath, options.ShowLinkerOutput);
+            }
         }
 
         /// <summary>
@@ -101,9 +108,13 @@ namespace Caique.Cli
                 PrintEnvironment = options.PrintEnvironment,
                 PrintLlvm = options.PrintLlvm
             };
-
             compilation.Compile(targetPath);
-            if (LinkObjectFiles(targetPath, options.ShowLinkerOutput))
+
+            if (options.PrintLlvm)
+            {
+                LinkLlvmFiles(targetPath);
+            }
+            else if (LinkObjectFiles(targetPath, options.ShowLinkerOutput))
                 // Run the generated executable
                 using (var process = new Process())
                 {
@@ -111,6 +122,22 @@ namespace Caique.Cli
                     process.Start();
                     process.WaitForExit();
                 }
+        }
+
+        private static void LinkLlvmFiles(string targetPath)
+        {
+            var llvmFiles = Directory.GetFiles(targetPath, "*.ll").ToList();
+            var process = new Process()
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "llvm-link",
+                    Arguments = "-S -o single.ll " + string.Join(" ", llvmFiles),
+                    WorkingDirectory = targetPath
+                }
+            };
+            process.Start();
+            process.WaitForExit();
         }
 
         private static bool LinkObjectFiles(string targetPath, bool showOutput = false)
