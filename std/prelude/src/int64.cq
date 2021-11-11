@@ -1,11 +1,11 @@
 use string;
 
-fn snprintf(out: i8*, size: i64, format: i8*, input: i64): i32;
-fn malloc(size: i64): i8*;
-
 ext i64 toString(): String {
-    let size: i64 = 11;
+    let size: isize = 11;
     let out = malloc(size);
     let length = snprintf(out, size, "%d", self);
     new String(out, length)
 }
+
+fn snprintf(out: i8*, size: isize, format: i8*, input: i64): isize;
+fn malloc(size: isize): i8*;

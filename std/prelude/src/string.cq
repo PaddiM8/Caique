@@ -3,7 +3,7 @@ use object;
 class String
 {
     Bytes: i8*;
-    Length: i32;
+    Length: isize;
 
     init(Bytes, Length) {}
 
@@ -17,6 +17,6 @@ class String
     }
 }
 
+fn free(a: i8*);
 fn strcat(a: i8*, b: i8*);
-fn printf(a: i8*, b: i8*);
-fn malloc(size: i32): i8*;
+fn malloc(size: isize): i8*;

@@ -1,6 +1,6 @@
 fn printf(x: i8*, y: i8*): i32;
 fn gets(out: i8*);
-fn malloc(size: i32): i8*;
+fn malloc(size: isize): i8*;
 
 fn print(input: String) {
     printf("%s", input.Bytes);
