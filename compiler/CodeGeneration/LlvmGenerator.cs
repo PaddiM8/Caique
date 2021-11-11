@@ -19,6 +19,8 @@ namespace Caique.CodeGeneration
         private readonly LLVMModuleRef _llvmModule;
         private readonly LLVMBuilderRef _builder;
         private LlvmGeneratorContext _current = new();
+        private LLVMValueRef? _mallocValue = null;
+        private LLVMTypeRef? _mallocType = null;
 
         private readonly HashSet<string> _declaredExternalSymbols = new();
 
@@ -30,22 +32,6 @@ namespace Caique.CodeGeneration
                 _module.Identifier.ToCString()
             );
             _builder = LLVM.CreateBuilderInContext(_context);
-
-            /*if (_module.Identifier != "object")
-            {
-                var obj = _module.Prelude?.Modules["object"].GetClass("object")?.AllChecked.First() ??
-                    _module.Root.Modules["object"].GetClass("object")!.AllChecked.First();
-                var retain = obj!.GetFunction("retain")!.LlvmValue;
-                var release = obj!.GetFunction("release")!.LlvmValue;
-
-                fixed (LLVMOpaqueType** parameters = new LLVMOpaqueType*[1])
-                {
-                    parameters[0] = LLVM.PointerType(obj.LlvmType!.Value, 0);
-                    var functionType = LLVM.FunctionType(LLVM.VoidType(), parameters, 1, 0);
-                    LLVM.AddFunction(_llvmModule, retain!.Value.Name.ToCString(), functionType);
-                    LLVM.AddFunction(_llvmModule, release!.Value.Name.ToCString(), functionType);
-                }
-            }*/
         }
 
         public void Generate()
@@ -252,7 +238,7 @@ namespace Caique.CodeGeneration
             // Arc release the values that should be released,
             // since the block won't do it automatically if you don't
             // reach the end of the scope.
-            foreach (var valueToRelease in _current.Block!.ValuesToArcUpdate)
+            foreach (var valueToRelease in _current.Block!.ValuesToRelease)
             {
                 ArcRelease(valueToRelease);
             }
@@ -278,8 +264,8 @@ namespace Caique.CodeGeneration
             LLVM.BuildStore(_builder, value, assignee);
 
             // ARC increment the new reference
-            if (assignmentStatement.Assignee.DataType is StructType)
-                ArcRetain(LLVM.BuildLoad(_builder, assignee, "".ToCString()));
+            //if (assignmentStatement.Assignee.DataType is StructType)
+            //    ArcRetain(LLVM.BuildLoad(_builder, assignee, "".ToCString()));
 
             return null!;
         }
@@ -290,11 +276,8 @@ namespace Caique.CodeGeneration
             var parameterDataTypes = new List<IDataType>();
 
             // If it belongs to an object
-            int parameterOffset = 0;
             if (functionDeclStatement.ParentObject != null)
             {
-                parameterOffset++;
-
                 // Add the parent object type as the first parameter
                 parameterDataTypes.Add(functionDeclStatement.ParentObject.DataType!);
             }
@@ -302,16 +285,16 @@ namespace Caique.CodeGeneration
             if (functionDeclStatement.IsExtensionFunction)
             {
                 identifier = identifier + "." + functionDeclStatement.ExtensionOf;
-                parameterOffset++;
 
                 // Add the extended type as the first parameter
                 parameterDataTypes.Add(functionDeclStatement.ExtensionOf!);
             }
 
             // Add the parameter types to the parameter list
-            parameterDataTypes.AddRange(
-                functionDeclStatement.Parameters.Select(x => x.DataType!)
-            );
+            foreach (var parameter in functionDeclStatement.Parameters)
+            {
+                parameterDataTypes.Add(parameter.DataType);
+            }
 
             LLVMTypeRef functionType = LLVM.FunctionType(
                 ToLlvmType(functionDeclStatement.ReturnType),
@@ -326,6 +309,12 @@ namespace Caique.CodeGeneration
             );
             functionDeclStatement.LlvmValue = function;
             functionDeclStatement.LlvmType = functionType;
+
+            if (functionDeclStatement.FullName == "malloc" && functionDeclStatement.Body == null)
+            {
+                _mallocValue = function;
+                _mallocType = functionType;
+            }
 
             // If the function doesn't have a body,
             // or a call/new expression triggered this function,
@@ -548,14 +537,10 @@ namespace Caique.CodeGeneration
                     }
 
                     var structType = (StructType)dataType;
-                    var malloc = LLVM.BuildMalloc(
-                        _builder,
-                        structType.StructDecl.LlvmType!.Value,
-                        "newString".ToCString()
-                    );
+                    var malloc = BuildMalloc(structType.StructDecl.LlvmType!.Value);
 
                     var length = LLVM.ConstInt(
-                        LLVM.Int32Type(),
+                        ToLlvmType(new PrimitiveType(TypeKeyword.isize)),
                         (ulong)literalExpression.Value.Value.Length,
                         1
                     );
@@ -568,7 +553,7 @@ namespace Caique.CodeGeneration
                     );
 
                     ArcRetain(malloc);
-                    _current.Block!.ValuesToArcUpdate.Add(malloc);
+                    _current.Block!.ValuesToRelease.Add(malloc);
 
                     return malloc;
                 }
@@ -592,14 +577,25 @@ namespace Caique.CodeGeneration
 
             // If the parent is a function declaration
             CheckedFunctionDeclStatement? functionDeclStatement = null;
-            if (_current.Parent.Statement is CheckedFunctionDeclStatement decl)
+            if (_current.Parent!.Statement is CheckedFunctionDeclStatement decl)
                 functionDeclStatement = decl;
 
             // Functions have their own block starts
             if (functionDeclStatement != null)
             {
                 blockExpression.LlvmValue = functionDeclStatement.BlockLlvmValue;
+                _current.BlockLlvmValue = blockExpression.LlvmValue;
                 LLVM.PositionBuilderAtEnd(_builder, functionDeclStatement.BlockLlvmValue!.Value);
+
+                foreach (var (parameter, i) in functionDeclStatement.Parameters.WithIndex())
+                {
+                    if (parameter.DataType.IsAllocated)
+                    {
+                        var param = LLVM.GetParam(functionDeclStatement.LlvmValue!.Value, (uint)i);
+                        ArcRetain(param);
+                        _current.Block.ValuesToRelease.Add(param);
+                    }
+                }
             }
             else if (parentStatementValue != null)
             {
@@ -608,6 +604,7 @@ namespace Caique.CodeGeneration
                     "entry".ToCString()
                 );
                 blockExpression.LlvmValue = block;
+                _current.BlockLlvmValue = blockExpression.LlvmValue;
                 LLVM.PositionBuilderAtEnd(_builder, block);
             }
 
@@ -646,7 +643,7 @@ namespace Caique.CodeGeneration
             // since return statements deal with this themselves.
             if (!manualReturn)
             {
-                foreach (var value in blockExpression.ValuesToArcUpdate)
+                foreach (var value in blockExpression.ValuesToRelease)
                     ArcRelease(value);
             }
 
@@ -697,9 +694,12 @@ namespace Caique.CodeGeneration
             LLVMValueRef loadPointer;
             if (variableDecl.VariableType == VariableType.Object) // Object field
             {
+                bool prevShouldBeLoaded = _current.ShouldBeLoaded;
+                _current.ShouldBeLoaded = true;
                 var objectInstance = variableExpression.ObjectInstance == null
                     ? (LLVMValueRef)LLVM.GetParam(functionDecl.LlvmValue!.Value, 0)
                     : Next(variableExpression.ObjectInstance);
+                _current.ShouldBeLoaded = prevShouldBeLoaded;
 
                 loadPointer = LLVM.BuildStructGEP(
                     _builder,
@@ -745,7 +745,20 @@ namespace Caique.CodeGeneration
             var arguments = callExpression.Arguments.Select(x => Next(x)).ToList();
             if (callExpression.ObjectInstance != null)
             {
-                arguments.Insert(0, Next(callExpression.ObjectInstance));
+                var objectPtr = Next(callExpression.ObjectInstance);
+                var expectedInstanceDecl = callExpression.FunctionDecl.ParentObject!;
+                if (callExpression.ObjectInstance.DataType is StructType gotObjectInstanceType &&
+                    expectedInstanceDecl != gotObjectInstanceType.StructDecl)
+                {
+                    objectPtr = LLVM.BuildBitCast(
+                        _builder,
+                        objectPtr,
+                        LLVM.PointerType(expectedInstanceDecl.LlvmType!.Value, 0),
+                        "cast".ToCString()
+                    );
+                }
+
+                arguments.Insert(0, objectPtr);
             }
 
             var functionDecl = callExpression.FunctionDecl;
@@ -762,7 +775,7 @@ namespace Caique.CodeGeneration
 
             if (functionDecl.ReturnType is StructType)
             {
-                _current.Block!.ValuesToArcUpdate.Add(call);
+                _current.Block!.ValuesToRelease.Add(call);
             }
 
             return call;
@@ -835,11 +848,7 @@ namespace Caique.CodeGeneration
         {
             var objectDecl = ((StructType)newExpression.DataType!).StructDecl;
             var type = objectDecl.LlvmType!.Value;
-            var malloc = LLVM.BuildMalloc(
-                _builder,
-                type,
-                "new".ToCString()
-            );
+            var malloc = BuildMalloc(type);
 
             if (objectDecl.InitFunction != null)
             {
@@ -855,7 +864,7 @@ namespace Caique.CodeGeneration
             }
 
             ArcRetain(malloc);
-            _current.Block!.ValuesToArcUpdate.Add(malloc);
+            _current.Block!.ValuesToRelease.Add(malloc);
 
             return malloc;
         }
@@ -898,7 +907,7 @@ namespace Caique.CodeGeneration
                     argumentsPtr[i] = argument;
                 }
 
-                if (!_declaredExternalSymbols.Contains(functionValue.Name))
+                if (isExternal && !_declaredExternalSymbols.Contains(functionValue.Name))
                 {
                     LLVM.AddFunction(_llvmModule, functionValue.Name.ToCString(), functionType);
                     _declaredExternalSymbols.Add(functionValue.Name);
@@ -954,10 +963,43 @@ namespace Caique.CodeGeneration
             );
         }
 
+        private LLVMValueRef BuildMalloc(LLVMTypeRef type)
+        {
+            if (_mallocValue == null)
+            {
+                _mallocType = LLVM.FunctionType(
+                    LLVM.PointerType(LLVM.Int8Type(), 0),
+                    ToLlvmTypeArray(new List<IDataType> { new PrimitiveType(TypeKeyword.isize) }),
+                    1,
+                    0
+                );
+                _mallocValue = LLVM.AddFunction(
+                    _llvmModule,
+                    "malloc".ToCString(),
+                    _mallocType!.Value
+                );
+            }
+
+            var call = BuildCall(
+                _mallocValue!.Value,
+                _mallocType!.Value,
+                new List<LLVMValueRef> { LLVM.SizeOf(type) },
+                true
+            );
+
+            return LLVM.BuildBitCast(
+                _builder,
+                call,
+                LLVM.PointerType(type, 0),
+                "cast".ToCString()
+            );
+        }
+
         private void SetCurrentBlock(LLVMBasicBlockRef basicBlock)
         {
             LLVM.PositionBuilderAtEnd(_builder, basicBlock);
             _current.Block!.LlvmValue = basicBlock;
+            _current.BlockLlvmValue = basicBlock;
         }
 
         private void TemporarilySetCurrentBlock(LLVMBasicBlockRef basicBlock)
@@ -967,7 +1009,7 @@ namespace Caique.CodeGeneration
 
         private void DeselectTemporaryBlock()
         {
-            LLVM.PositionBuilderAtEnd(_builder, _current.Block!.LlvmValue!.Value);
+            LLVM.PositionBuilderAtEnd(_builder, _current.BlockLlvmValue!.Value);
         }
 
         public unsafe LLVMOpaqueType* ToLlvmType(IDataType dataType)
@@ -979,6 +1021,7 @@ namespace Caique.CodeGeneration
                 TypeKeyword.i8 => LLVM.Int8Type(),
                 TypeKeyword.i32 => LLVM.Int32Type(),
                 TypeKeyword.i64 => LLVM.Int64Type(),
+                TypeKeyword.isize => LLVM.Int64Type(), // TODO: Should depend on target platform
                 TypeKeyword.f8 => LLVM.FloatType(),
                 TypeKeyword.f32 => LLVM.FloatType(),
                 TypeKeyword.f64 => LLVM.FloatType(),

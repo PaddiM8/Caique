@@ -25,6 +25,6 @@ namespace Caique.CheckedTree
     {
         public new LLVMBasicBlockRef? LlvmValue { get; set; }
 
-        public List<LLVMValueRef> ValuesToArcUpdate { get; set; } = new();
+        public List<LLVMValueRef> ValuesToRelease { get; set; } = new();
     }
 }

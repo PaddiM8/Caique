@@ -13,7 +13,7 @@ namespace Caique.Semantics
 
         public bool IsExplicitPointer { get; set; }
 
-        public bool Allocated => false;
+        public bool IsAllocated => false;
 
         public bool IsNumber { get => IsInt || IsFloat; }
 
@@ -24,7 +24,8 @@ namespace Caique.Semantics
             {
                 TypeKeyword.i8 or
                 TypeKeyword.i32 or
-                TypeKeyword.i64 => true,
+                TypeKeyword.i64 or
+                TypeKeyword.isize => true,
                 _ => false,
             };
 

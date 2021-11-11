@@ -398,6 +398,7 @@ namespace Caique.Parsing
                 "i8" => TokenKind.i8,
                 "i32" => TokenKind.i32,
                 "i64" => TokenKind.i64,
+                "isize" => TokenKind.isize,
                 "f8" => TokenKind.f8,
                 "f32" => TokenKind.f32,
                 "f64" => TokenKind.f64,

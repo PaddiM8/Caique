@@ -28,6 +28,8 @@ namespace Caique.CodeGeneration
 
         public CheckedBlockExpression? Block { get; set; }
 
+        public LLVMBasicBlockRef? BlockLlvmValue { get; set; }
+
         public LlvmGeneratorContext CreateChild(CheckedStatement statement)
         {
             return new LlvmGeneratorContext
@@ -39,6 +41,7 @@ namespace Caique.CodeGeneration
                 FunctionDecl = FunctionDecl,
                 SymbolEnvironment = SymbolEnvironment,
                 Block = Block,
+                BlockLlvmValue = BlockLlvmValue,
             };
         }
 
@@ -55,6 +58,7 @@ namespace Caique.CodeGeneration
                 SymbolEnvironment = SymbolEnvironment,
                 ShouldBeLoaded = ShouldBeLoaded,
                 Block = Block,
+                BlockLlvmValue = BlockLlvmValue,
             };
         }
     }

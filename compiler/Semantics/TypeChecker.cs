@@ -729,6 +729,7 @@ namespace Caique.Semantics
                     TokenKind.i8 => TypeKeyword.i8,
                     TokenKind.i32 => TypeKeyword.i32,
                     TokenKind.i64 => TypeKeyword.i64,
+                    TokenKind.isize => TypeKeyword.isize,
                     TokenKind.f8 => TypeKeyword.f8,
                     TokenKind.f32 => TypeKeyword.f32,
                     TokenKind.f64 => TypeKeyword.f64,

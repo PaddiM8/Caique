@@ -1,14 +1,13 @@
 # Automatic Reference Counting
 
-## Call/new expression
-It can either be left alone without passing the pointer elsewhere, or it can for example be the value of a variable declaration. In both cases, there should be *one* retain,
-and *one* release at the end of the scope. Therefore, it might make sense to simply let the call/new expressions handle this, and not eg. the variable declarations. 
+## Function declaration
+* If a parameter is an object, retain at the start and release at the end.
 
-## Variable declaration
-Hmm, does anything need to be done here?
+## Function call
+* If the return type is an object, release at the end of the scope.
 
-## Return statement
+## New expression
+* Don't retain the newly created object, just make sure objects are initialised with a reference count of 1. Release at the end of the scope.
+
+## Return from function
 Retain.
-
-## Block return
-Retain if it belongs to a function.

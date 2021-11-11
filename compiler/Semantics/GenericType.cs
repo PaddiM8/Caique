@@ -17,7 +17,7 @@ namespace Caique.Semantics
 
         public bool IsExplicitPointer { get; set; }
 
-        public bool Allocated => false;
+        public bool IsAllocated => false;
 
         public bool IsNumber => false;
 
