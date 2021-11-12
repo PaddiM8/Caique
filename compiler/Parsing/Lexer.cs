@@ -396,6 +396,8 @@ namespace Caique.Parsing
                 "use" => TokenKind.Use,
                 "while" => TokenKind.While,
                 "void" => TokenKind.Void,
+                "virtual" => TokenKind.Virtual,
+                "override" => TokenKind.Override,
                 "i8" => TokenKind.i8,
                 "i32" => TokenKind.i32,
                 "i64" => TokenKind.i64,

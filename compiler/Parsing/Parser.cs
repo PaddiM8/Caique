@@ -39,6 +39,7 @@ namespace Caique.Parsing
         private readonly ModuleEnvironment _moduleEnvironment;
         private SymbolEnvironment _symbolEnvironment;
         private int _index;
+        private bool _isInsideClass;
         private static readonly TypeExpression _objectTypeExpression = new(new List<Token>
             {
                 new Token(
@@ -117,7 +118,7 @@ namespace Caique.Parsing
             {
                 return ParseReturn();
             }
-            else if (Match(TokenKind.Fn, TokenKind.Ext))
+            else if (Match(TokenKind.Fn, TokenKind.Ext, TokenKind.Virtual, TokenKind.Override))
             {
                 return ParseFunctionDecl();
             }
@@ -214,6 +215,9 @@ namespace Caique.Parsing
         {
             TypeExpression? extensionOf = null;
             TextSpan? start = null;
+            bool hasVirtual = Consume(TokenKind.Virtual);
+            bool hasOverride = !hasVirtual && Consume(TokenKind.Override);
+
             if (Consume(TokenKind.Fn))
             {
                 start = Previous.Span;
@@ -248,7 +252,10 @@ namespace Caique.Parsing
                 parameters,
                 body,
                 returnType,
+                _isInsideClass,
                 false,
+                hasVirtual,
+                hasOverride,
                 start!.Add(start)
             )
             {
@@ -299,12 +306,13 @@ namespace Caique.Parsing
             var start = Expect(TokenKind.OpenBrace).Span;
             var statements = new List<Statement>();
             _symbolEnvironment = _symbolEnvironment.CreateChildEnvironment();
+            _isInsideClass = true;
             int variableDeclIndex = 0;
             FunctionDeclStatement? initFunction = null;
 
             while (!IsAtEnd && !Consume(TokenKind.ClosedBrace))
             {
-                if (Match(TokenKind.Fn))
+                if (Match(TokenKind.Fn, TokenKind.Virtual, TokenKind.Override))
                 {
                     statements.Add(ParseFunctionDecl());
                 }
@@ -333,6 +341,7 @@ namespace Caique.Parsing
             );
 
             _symbolEnvironment = _symbolEnvironment.Parent!;
+            _isInsideClass = false;
 
             return (statement, initFunction);
         }
@@ -434,7 +443,10 @@ namespace Caique.Parsing
                 parameters,
                 block,
                 null,
+                false,
                 true,
+                false,
+                false,
                 keyword.Span
             );
         }

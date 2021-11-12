@@ -17,7 +17,7 @@ namespace Caique.Semantics
 
         public IDataType? ExpectedType { get; set; }
 
-        public CheckedClassDeclStatement? CurrentObject { get; set; }
+        public CheckedClassDeclStatement? CurrentCheckedClass { get; set; }
 
         public ClassDeclStatement? CurrentClassDecl { get; set; }
 
@@ -38,7 +38,7 @@ namespace Caique.Semantics
                 Parent = this,
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentExtendedType = CurrentExtendedType,
-                CurrentObject = CurrentObject,
+                CurrentCheckedClass = CurrentCheckedClass,
                 CurrentClassDecl = CurrentClassDecl,
                 CurrentFunctionDecl = CurrentFunctionDecl,
                 TypeArgumentsForClass = TypeArgumentsForClass,
@@ -52,7 +52,7 @@ namespace Caique.Semantics
                 Parent = this,
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentExtendedType = CurrentExtendedType,
-                CurrentObject = CurrentObject,
+                CurrentCheckedClass = CurrentCheckedClass,
                 CurrentClassDecl = CurrentClassDecl,
                 CurrentFunctionDecl = CurrentFunctionDecl,
                 Expression = expression,
@@ -67,7 +67,7 @@ namespace Caique.Semantics
                 Parent = this,
                 CurrentFunctionType = CurrentFunctionType,
                 CurrentExtendedType = CurrentExtendedType,
-                CurrentObject = CurrentObject,
+                CurrentCheckedClass = CurrentCheckedClass,
                 CurrentClassDecl = CurrentClassDecl,
                 CurrentFunctionDecl = CurrentFunctionDecl,
                 Statement = statement,

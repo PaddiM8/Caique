@@ -5,12 +5,17 @@ namespace Caique.Diagnostics
     /// </summary>
     public enum DiagnosticIdentifier
     {
+        CannotOverrideNonVirtual,
         CanOnlyHaveOneConstructor,
         InvalidCharacterLiteral,
         InvalidModulePath,
+        ExpectedOverride,
         ExpectedSuper,
         MisplacedAssignmentOperator,
+        MisplacedOverride,
         MisplacedSelfKeyword,
+        MisplacedSuperKeywordWithArguments,
+        MisplacedVirtual,
         SymbolAlreadyExists,
         SymbolDoesNotExist,
         UnableToInferType,

@@ -116,12 +116,43 @@ namespace Caique.Semantics
         public CheckedStatement Visit(FunctionDeclStatement functionDeclStatement)
         {
             // Same *exact* one has already been checked
-            var alreadyChecked = _current.CurrentObject?.GetFunction(functionDeclStatement.FullName) ??
-                _module.GetFunction(functionDeclStatement.FullName)?.AllChecked.FirstOrDefault();
-            if (alreadyChecked != null) return alreadyChecked;
+            if (_current.CurrentCheckedClass != null)
+            {
+                var alreadyChecked = _current.CurrentCheckedClass.GetFunction(functionDeclStatement.FullName, false);
+                if (alreadyChecked != null) return alreadyChecked;
+            }
+            else
+            {
+                var alreadyChecked = _module.GetFunction(functionDeclStatement.FullName)?.AllChecked.FirstOrDefault();
+                if (alreadyChecked != null) return alreadyChecked;
+            }
+
+            if (functionDeclStatement.IsVirtual && !functionDeclStatement.IsMethod)
+            {
+                _diagnostics.ReportMisplacedVirtual(functionDeclStatement.Span);
+            }
+
+            if (functionDeclStatement.IsOverride && !functionDeclStatement.IsMethod)
+            {
+                _diagnostics.ReportMisplacedOverride(functionDeclStatement.Span);
+            }
+
+            var inheritedFunction = _current.CurrentCheckedClass?.Inherited?.GetFunction(functionDeclStatement.FullName);
+            if (inheritedFunction != null)
+            {
+                if (!inheritedFunction.IsVirtual)
+                {
+                    _diagnostics.ReportCannotOverrideNonVirtual(functionDeclStatement.Span);
+                }
+
+                if (!functionDeclStatement.IsOverride)
+                {
+                    _diagnostics.ReportExpectedOverride(functionDeclStatement.Span);
+                }
+            }
 
             // Should only be null if it's an init function
-            var symbol = _current.CurrentObject?.Environment.GetFunction(functionDeclStatement.FullName) ??
+            var symbol = _current.CurrentCheckedClass?.Environment.GetFunction(functionDeclStatement.FullName) ??
                 _module.GetFunction(functionDeclStatement.FullName);
             if (symbol?.HasChecked ?? false)
             {
@@ -135,7 +166,9 @@ namespace Caique.Semantics
                     similarFunction.Body,
                     similarFunction.ReturnType,
                     functionDeclStatement.IsInitFunction,
-                    _current.CurrentObject,
+                    functionDeclStatement.IsVirtual,
+                    functionDeclStatement.IsOverride,
+                    _current.CurrentCheckedClass,
                     _module,
                     similarFunction.ExtensionOf
                 );
@@ -208,7 +241,9 @@ namespace Caique.Semantics
                 body,
                 _current.CurrentFunctionType,
                 functionDeclStatement.IsInitFunction,
-                _current.CurrentObject,
+                functionDeclStatement.IsVirtual,
+                functionDeclStatement.IsOverride,
+                _current.CurrentCheckedClass,
                 _module,
                 extensionOf
             );
@@ -239,7 +274,7 @@ namespace Caique.Semantics
                     : null
             );
             symbol.AddChecked(checkedClass);
-            _current.CurrentObject = checkedClass;
+            _current.CurrentCheckedClass = checkedClass;
 
             if (classDeclStatement.InheritedType != null)
             {
@@ -319,6 +354,8 @@ namespace Caique.Semantics
                     ),
                     new PrimitiveType(TypeKeyword.Void),
                     true,
+                    false,
+                    false,
                     checkedClass,
                     _module
                 );
@@ -684,15 +721,15 @@ namespace Caique.Semantics
 
             CheckedFunctionDeclStatement? checkedFunction;
             FunctionSymbol? symbol;
-            if (_current.CurrentObject != null && modulePath.Count == 1)
+            if (_current.CurrentCheckedClass != null && modulePath.Count == 1)
             {
                 // If it's not in a class, it won't have different semantical variations (yet),
                 // so it's safe to just take the first (and only) checked one from the symbol.
-                var method = _current.CurrentObject.GetFunction(lastIdentifier.Value);
-                if (method != null)
+                var parentClass = _current.CurrentCheckedClass.GetParentClassForFunction(lastIdentifier.Value);
+                if (parentClass != null)
                 {
-                    checkedFunction = method;
-                    symbol = _current.CurrentObject.Environment.GetFunction(lastIdentifier.Value);
+                    checkedFunction = parentClass.GetFunction(lastIdentifier.Value);
+                    symbol = parentClass.Environment.GetFunction(lastIdentifier.Value);
                 }
                 else
                 {
@@ -720,10 +757,10 @@ namespace Caique.Semantics
 
             if (checkedFunction == null)
             {
-                var previousObject = _current.CurrentObject;
-                if (!symbol.Syntax.IsMethod) _current.CurrentObject = null;
+                var previousObject = _current.CurrentCheckedClass;
+                if (!symbol.Syntax.IsMethod) _current.CurrentCheckedClass = null;
                 checkedFunction = (CheckedFunctionDeclStatement)Next(symbol!.Syntax);
-                _current.CurrentObject = previousObject;
+                _current.CurrentCheckedClass = previousObject;
             }
 
             var checkedCall = CheckCall(
@@ -731,7 +768,7 @@ namespace Caique.Semantics
                 checkedFunction,
                 callExpression.Arguments,
                 checkedFunction!.IsMethod
-                    ? new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentObject!.DataType)
+                    ? new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentCheckedClass!.DataType)
                     : null
             );
 
@@ -902,11 +939,11 @@ namespace Caique.Semantics
         {
             if (keywordValueExpression.Token.Kind == TokenKind.Self)
             {
-                if (_current.CurrentObject != null)
+                if (_current.CurrentCheckedClass != null)
                 {
                     return new CheckedKeywordValueExpression(
                         keywordValueExpression.Token.Kind,
-                        _current.CurrentObject!.DataType
+                        _current.CurrentCheckedClass!.DataType
                     );
                 }
 
@@ -933,7 +970,7 @@ namespace Caique.Semantics
                         return new CheckedUnknownExpression();
                     }
 
-                    if (_current.CurrentObject?.Inherited?.InitFunction == null)
+                    if (_current.CurrentCheckedClass?.Inherited?.InitFunction == null)
                     {
                         _diagnostics.ReportMisplacedSuperKeywordWithArguments(keywordValueExpression.Token.Span);
 
@@ -942,9 +979,9 @@ namespace Caique.Semantics
 
                     return CheckCall(
                         keywordValueExpression.Token,
-                        _current.CurrentObject.Inherited.InitFunction,
+                        _current.CurrentCheckedClass.Inherited.InitFunction,
                         keywordValueExpression.Arguments,
-                        new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentObject.DataType)
+                        new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentCheckedClass.DataType)
                     )!;
                 }
             }

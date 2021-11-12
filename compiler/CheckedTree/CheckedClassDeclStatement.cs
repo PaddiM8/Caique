@@ -61,7 +61,7 @@ namespace Caique.CheckedTree
         /// Gets an object function, and also looks inside ancestor objects.
         /// </summary>
         /// <param name="identifier">Name of the function to find.</param>
-        public CheckedFunctionDeclStatement? GetFunction(string identifier)
+        public CheckedFunctionDeclStatement? GetFunction(string identifier, bool lookInInherited = true)
         {
             // Attempt to get the function from the current class,
             // but if it is not found there, try call this method
@@ -69,7 +69,15 @@ namespace Caique.CheckedTree
             // in order to try to find it there.
             var function = Environment.GetFunction(identifier, false);
             if (function != null) return function.GetCheckedFromClass(this);
-            else return Inherited?.GetFunction(identifier);
+            else return lookInInherited ? Inherited?.GetFunction(identifier) : null;
+        }
+
+        public CheckedClassDeclStatement? GetParentClassForFunction(string identifier)
+        {
+            if (Environment.GetFunction(identifier, false) != null)
+                return this;
+
+            return Inherited?.GetParentClassForFunction(identifier);
         }
 
         public bool HasAncestor(string identifier)

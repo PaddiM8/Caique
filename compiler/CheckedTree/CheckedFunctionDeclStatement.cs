@@ -40,6 +40,10 @@ namespace Caique.CheckedTree
 
         public bool IsInitFunction { get; }
 
+        public bool IsVirtual { get; }
+
+        public bool IsOverride { get; }
+
         public bool IsMethod { get => ParentObject != null; }
 
         public IDataType? ExtensionOf { get; }
@@ -51,6 +55,8 @@ namespace Caique.CheckedTree
                                             CheckedBlockExpression? body,
                                             IDataType returnType,
                                             bool isInitFunction,
+                                            bool isVirtual,
+                                            bool isOverride,
                                             CheckedClassDeclStatement? parentObject,
                                             ModuleEnvironment? module,
                                             IDataType? extensionOf = null)
@@ -59,6 +65,8 @@ namespace Caique.CheckedTree
             Parameters = parameters;
             Body = body;
             IsInitFunction = isInitFunction;
+            IsVirtual = isVirtual;
+            IsOverride = isOverride;
             ReturnType = returnType;
             ParentObject = parentObject;
             Module = module;

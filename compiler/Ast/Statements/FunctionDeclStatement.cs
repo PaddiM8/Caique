@@ -18,11 +18,12 @@ namespace Caique.Ast
 
         public TypeExpression? ReturnType { get; }
 
-        public ClassDeclStatement? ParentObject { get; set; }
-
         public bool IsInitFunction { get; set; }
 
-        public bool IsMethod { get => ParentObject != null; }
+        public bool IsVirtual { get; set; }
+        public bool IsOverride { get; set; }
+
+        public bool IsMethod { get; }
 
         public TypeExpression? ExtensionOf { get; set; }
 
@@ -32,13 +33,19 @@ namespace Caique.Ast
                                      List<VariableDeclStatement> parameters,
                                      BlockExpression? body,
                                      TypeExpression? returnType,
+                                     bool isMethod,
                                      bool isInitFunction,
+                                     bool isVirtual,
+                                     bool isOverride,
                                      TextSpan span) : base(span)
         {
             Identifier = identifier;
             Parameters = parameters;
             Body = body;
+            IsMethod = isMethod;
             IsInitFunction = isInitFunction;
+            IsVirtual = isVirtual;
+            IsOverride = isOverride;
             ReturnType = returnType;
         }
     }

@@ -17,6 +17,7 @@ namespace Caique.Parsing
 
         // Keywords
         If, Else, Fn, Let, Class, New, Use, Ret, Init, Ext, Self, Super, While, True, False,
+        Virtual, Override,
 
         // Variable length
         Identifier, NumberLiteral, StringLiteral, CharLiteral,

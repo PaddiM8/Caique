@@ -27,6 +27,16 @@ namespace Caique.Diagnostics
             _diagnostics.AddRange(diagnostics);
         }
 
+        public void ReportCannotOverrideNonVirtual(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.CannotOverrideNonVirtual,
+                $"Only functions marked as virtual may be overridden.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportCanOnlyHaveOneConstructor(Token initToken)
         {
             Report(
@@ -58,6 +68,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportExpectedOverride(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.ExpectedSuper,
+                "Expected 'override' keyword on function since a function with the same name already exists in an inherited class.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportExpectedSuper(TextSpan span)
         {
             Report(
@@ -78,6 +98,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportMisplacedOverride(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.MisplacedSuperKeywordWithArguments,
+                $"Misplaced 'override' keyword. The 'override' keyword may only be used on functions belonging to a class.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportMisplacedSelfKeyword(TextSpan span)
         {
             Report(
@@ -91,8 +121,18 @@ namespace Caique.Diagnostics
         public void ReportMisplacedSuperKeywordWithArguments(TextSpan span)
         {
             Report(
-                DiagnosticIdentifier.MisplacedAssignmentOperator,
+                DiagnosticIdentifier.MisplacedSuperKeywordWithArguments,
                 $"Misplaced 'super' keyword. The 'super' keyword may only be used with arguments inside a constructor of a class that inherits from a class that uses a constructor.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportMisplacedVirtual(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.MisplacedSuperKeywordWithArguments,
+                $"Misplaced 'virtual' keyword. The 'virtual' keyword may only be used on functions belonging to a class.",
                 span,
                 DiagnosticType.Error
             );
