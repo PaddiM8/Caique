@@ -345,20 +345,20 @@ namespace Caique.Semantics
             var fieldAssignments = new List<CheckedAssignmentStatement>();
             foreach (var field in checkedClass.Environment.Variables)
             {
-                if (field == null) continue;
+                if (field == null || field.Checked?.Value == null) continue;
                 fieldAssignments.Add(
                     new CheckedAssignmentStatement(
                         new CheckedVariableExpression(
                             field.Syntax.Identifier,
-                            field.Checked!,
-                            field.Checked!.DataType
+                            field.Checked,
+                            field.Checked.DataType
                         ),
-                        field.Checked.Value!
+                        field.Checked.Value
                     )
                 );
             }
 
-            checkedClass.Body.Statements.InsertRange(0, fieldAssignments);
+            checkedClass.InitFunction!.Body!.Statements.InsertRange(0, fieldAssignments);
 
             return checkedClass;
         }
