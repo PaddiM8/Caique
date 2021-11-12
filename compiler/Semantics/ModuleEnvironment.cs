@@ -18,7 +18,7 @@ namespace Caique.Semantics
     /// If one file uses something from another module,
     /// that module will be compiled first unless it hasn't been already.
     /// </summary>
-    public class ModuleEnvironment : IDisposable
+    public class ModuleEnvironment
     {
         /// <summary>
         /// Name of the module.
@@ -145,16 +145,6 @@ namespace Caique.Semantics
             _outputType = outputType;
             Diagnostics = diagnostics;
             Prelude = prelude;
-        }
-
-        public void Dispose()
-        {
-            GC.SuppressFinalize(this);
-            _codeGenerator?.Dispose();
-            foreach (var (_, child) in Modules)
-            {
-                child.Dispose();
-            }
         }
 
         /// <summary>

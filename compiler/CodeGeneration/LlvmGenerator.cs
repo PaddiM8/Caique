@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using Caique.Ast;
 using Caique.CheckedTree;
 using Caique.Parsing;
@@ -12,7 +11,7 @@ using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
 {
-    public unsafe class LlvmGenerator : ICheckedTreeTraverser<LLVMValueRef, LLVMValueRef>, IDisposable
+    public unsafe class LlvmGenerator : ICheckedTreeTraverser<LLVMValueRef, LLVMValueRef>
     {
         private readonly ModuleEnvironment _module;
         private readonly LLVMContextRef _context;
@@ -32,6 +31,11 @@ namespace Caique.CodeGeneration
                 _module.Identifier.ToCString()
             );
             _builder = LLVM.CreateBuilderInContext(_context);
+        }
+
+        ~LlvmGenerator()
+        {
+            LLVM.ContextDispose(_context);
         }
 
         public void Generate()
@@ -106,12 +110,6 @@ namespace Caique.CodeGeneration
                 
                 _current.ClassDecl = null;
             }
-        }
-
-        public void Dispose()
-        {
-            LLVM.ContextDispose(_context);
-            GC.SuppressFinalize(this);
         }
 
         public void GenerateLlvmFile(string targetDirectory)
