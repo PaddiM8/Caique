@@ -382,6 +382,8 @@ namespace Caique.Parsing
             var parameters = new List<VariableDeclStatement>();
             do
             {
+                if (Match(TokenKind.ClosedParenthesis)) break;
+
                 var identifier = Expect(TokenKind.Identifier);
                 TypeExpression? type = null;
 
