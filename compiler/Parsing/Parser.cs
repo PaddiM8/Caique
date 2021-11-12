@@ -312,6 +312,8 @@ namespace Caique.Parsing
                 {
                     if (initFunction != null)
                     {
+                        Advance();
+
                         _diagnostics.ReportCanOnlyHaveOneConstructor(Current);
                         continue;
                     }
@@ -402,13 +404,29 @@ namespace Caique.Parsing
 
             Expect(TokenKind.ClosedParenthesis);
 
-            var block = ParseBlock();
+            BlockExpression block;
+            if (Match(TokenKind.OpenBrace))
+            {
+                block = ParseBlock();
+            }
+            else
+            {
+                Expect(TokenKind.OpenBrace, TokenKind.Semicolon);
+                block = new BlockExpression(
+                    new(),
+                    _symbolEnvironment.CreateChildEnvironment(),
+                    Current.Span
+                );
+            }
 
             // Add parameters to symbol table
-            foreach (var parameter in parameters)
+            if (block != null)
             {
-                if (parameter.SpecifiedType == null) continue;
-                block.Environment.TryAdd(parameter);
+                foreach (var parameter in parameters)
+                {
+                    if (parameter.SpecifiedType == null) continue;
+                    block.Environment.TryAdd(parameter);
+                }
             }
 
             return new FunctionDeclStatement(

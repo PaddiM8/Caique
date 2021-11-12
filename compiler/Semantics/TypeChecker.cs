@@ -264,16 +264,6 @@ namespace Caique.Semantics
                 var initFunction = (CheckedFunctionDeclStatement)Next(classDeclStatement.InitFunction);
                 checkedClass.InitFunction = initFunction;
 
-                if (initFunction.Body == null)
-                {
-                    initFunction.Body = new CheckedBlockExpression(
-                        new(),
-                        new SymbolEnvironment(_environment),
-                        _voidType,
-                        false
-                    );
-                }
-
                 foreach (var (uncheckedParameter, checkedParameter) in
                     classDeclStatement.InitFunction.Parameters.Zip(initFunction.Parameters))
                 {
