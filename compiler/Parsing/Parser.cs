@@ -508,9 +508,11 @@ namespace Caique.Parsing
             {
                 return ParseNew();
             }
-            else if (Match(TokenKind.Self, TokenKind.True, TokenKind.False))
+            else if (Match(TokenKind.Self, TokenKind.Super, TokenKind.True, TokenKind.False))
             {
-                return new KeywordValueExpression(Advance());
+                var keyword = Advance();
+                var (arguments, _) = ParseArguments(false);
+                return new KeywordValueExpression(keyword, arguments);
             }
             else if (Match(TokenKind.Identifier))
             {
@@ -647,10 +649,12 @@ namespace Caique.Parsing
             return identifiers;
         }
 
-        private (List<Expression> arguments, TextSpan span) ParseArguments()
+        private (List<Expression> arguments, TextSpan span) ParseArguments(bool expectParenthesis = true)
         {
-            var start = Expect(TokenKind.OpenParenthesis).Span;
+            if (!expectParenthesis && !Match(TokenKind.OpenParenthesis))
+                return (new(), Current.Span);
 
+            var start = Expect(TokenKind.OpenParenthesis).Span;
             var arguments = new List<Expression>();
             do
             {

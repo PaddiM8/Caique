@@ -58,6 +58,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportExpectedSuper(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.ExpectedSuper,
+                "Expected a super call to the constructor of the inherited class.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
         public void ReportMisplacedAssignmentOperator(TextSpan span)
         {
             Report(
@@ -73,6 +83,16 @@ namespace Caique.Diagnostics
             Report(
                 DiagnosticIdentifier.MisplacedAssignmentOperator,
                 $"Misplaced 'self' keyword. The 'self' keyword can only be used inside objects and extension functions.",
+                span,
+                DiagnosticType.Error
+            );
+        }
+
+        public void ReportMisplacedSuperKeywordWithArguments(TextSpan span)
+        {
+            Report(
+                DiagnosticIdentifier.MisplacedAssignmentOperator,
+                $"Misplaced 'super' keyword. The 'super' keyword may only be used with arguments inside a constructor of a class that inherits from a class that uses a constructor.",
                 span,
                 DiagnosticType.Error
             );

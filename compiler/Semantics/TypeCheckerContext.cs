@@ -21,6 +21,8 @@ namespace Caique.Semantics
 
         public ClassDeclStatement? CurrentClassDecl { get; set; }
 
+        public FunctionDeclStatement? CurrentFunctionDecl { get; set; }
+
         public Expression? Expression { get; init; }
 
         public Statement? Statement { get; init; }
@@ -38,6 +40,7 @@ namespace Caique.Semantics
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
                 CurrentClassDecl = CurrentClassDecl,
+                CurrentFunctionDecl = CurrentFunctionDecl,
                 TypeArgumentsForClass = TypeArgumentsForClass,
             };
         }
@@ -51,6 +54,7 @@ namespace Caique.Semantics
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
                 CurrentClassDecl = CurrentClassDecl,
+                CurrentFunctionDecl = CurrentFunctionDecl,
                 Expression = expression,
                 TypeArgumentsForClass = TypeArgumentsForClass,
             };
@@ -65,6 +69,7 @@ namespace Caique.Semantics
                 CurrentExtendedType = CurrentExtendedType,
                 CurrentObject = CurrentObject,
                 CurrentClassDecl = CurrentClassDecl,
+                CurrentFunctionDecl = CurrentFunctionDecl,
                 Statement = statement,
                 TypeArgumentsForClass = TypeArgumentsForClass,
             };

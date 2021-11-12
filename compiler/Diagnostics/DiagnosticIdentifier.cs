@@ -8,6 +8,7 @@ namespace Caique.Diagnostics
         CanOnlyHaveOneConstructor,
         InvalidCharacterLiteral,
         InvalidModulePath,
+        ExpectedSuper,
         MisplacedAssignmentOperator,
         MisplacedSelfKeyword,
         SymbolAlreadyExists,

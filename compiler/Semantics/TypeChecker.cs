@@ -152,6 +152,7 @@ namespace Caique.Semantics
                 ? _voidType
                 : Next(functionDeclStatement.ReturnType).DataType;
             _current.DataType = _current.CurrentFunctionType;
+            _current.CurrentFunctionDecl = functionDeclStatement;
 
             if (functionDeclStatement.IsExtensionFunction)
             {
@@ -195,6 +196,7 @@ namespace Caique.Semantics
             }
 
             _environment = previousEnvironment;
+            _current.CurrentFunctionDecl = null;
 
             var extensionOf = functionDeclStatement.IsExtensionFunction
                 ? Next(functionDeclStatement.ExtensionOf!).DataType
@@ -312,11 +314,81 @@ namespace Caique.Semantics
                     classDeclStatement.InitFunction.Body!.Span
                 );
             }
+            else
+            {
+                // Create an empty init functions to allow for eg.
+                // field assignments later on.
+                checkedClass.InitFunction = new CheckedFunctionDeclStatement(
+                    new Token(TokenKind.Identifier, "init", new(new(0, 0), new(0, 0))),
+                    new(),
+                    new CheckedBlockExpression(
+                        new(),
+                        _environment.CreateChildEnvironment(),
+                        new PrimitiveType(TypeKeyword.Void),
+                        false
+                    ),
+                    new PrimitiveType(TypeKeyword.Void),
+                    true,
+                    checkedClass,
+                    _module
+                );
+            }
 
             checkedClass.Body = (CheckedBlockExpression)Next(classDeclStatement.Body);
             _current.CurrentClassDecl = previousClassDecl;
 
+            // Add super() to the top of the constructor
+            if (checkedClass.Inherited != null)
+                InsertSuper(checkedClass, classDeclStatement.Span);
+
+            // Add assignment statements for the default field values
+            var fieldAssignments = new List<CheckedAssignmentStatement>();
+            foreach (var field in checkedClass.Environment.Variables)
+            {
+                if (field == null) continue;
+                fieldAssignments.Add(
+                    new CheckedAssignmentStatement(
+                        new CheckedVariableExpression(
+                            field.Syntax.Identifier,
+                            field.Checked!,
+                            field.Checked!.DataType
+                        ),
+                        field.Checked.Value!
+                    )
+                );
+            }
+
+            checkedClass.Body.Statements.InsertRange(0, fieldAssignments);
+
             return checkedClass;
+        }
+
+        public void InsertSuper(CheckedClassDeclStatement checkedClass, TextSpan span)
+        {
+            if (checkedClass.Inherited == null) return;
+
+            var firstInitStatement = checkedClass.InitFunction!.Body?.Statements.FirstOrDefault();
+            bool firstStatementIsSuper = firstInitStatement is CheckedExpressionStatement expressionStatement &&
+                expressionStatement.Expression is CheckedCallExpression call &&
+                call.FunctionDecl == checkedClass.Inherited.InitFunction;
+            if (!firstStatementIsSuper)
+            {
+                if (checkedClass.Inherited.InitFunction!.Parameters.Count > 0)
+                {
+                    _diagnostics.ReportExpectedSuper(span);
+                }
+
+                var superCall = new CheckedCallExpression(
+                    new(),
+                    checkedClass.Inherited.InitFunction!,
+                    checkedClass.Inherited.InitFunction!.ReturnType,
+                    new CheckedKeywordValueExpression(TokenKind.Self, checkedClass.DataType)
+                );
+                checkedClass.InitFunction.Body!.Statements.Insert(
+                    0,
+                    new CheckedExpressionStatement(superCall)
+                );
+            }
         }
 
         public CheckedStatement Visit(WhileStatement whileStatement)
@@ -700,17 +772,27 @@ namespace Caique.Semantics
                 var varDecl = classDecl.Environment.GetVariable(
                     classDecl.InitFunction!.Parameters[i].Identifier.Value
                 );
-                if (varDecl == null) continue;
-                if (varDecl.Checked == null) Next(varDecl.Syntax);
 
-                var parameterType = varDecl.Checked!.DataType;
-                if (varDecl.Checked!.DataType is GenericType genericType)
+                CheckedExpression argument;
+                if (varDecl == null)
                 {
-                    parameterType = type.TypeArguments![genericType.ParameterIndex];
+                    var parameterType = classDecl.InitFunction?.Parameters[i].DataType;
+                    argument = Next(uncheckedArgument, parameterType);
+                    CheckTypes(parameterType!, argument.DataType, uncheckedArgument.Span);
+                }
+                else
+                {
+                    if (varDecl.Checked == null) Next(varDecl.Syntax);
+                    var parameterType = varDecl.Checked!.DataType;
+                    if (varDecl.Checked!.DataType is GenericType genericType)
+                    {
+                        parameterType = type.TypeArguments![genericType.ParameterIndex];
+                    }
+
+                    argument = Next(uncheckedArgument, parameterType);
+                    CheckTypes(parameterType, argument.DataType, uncheckedArgument.Span);
                 }
 
-                var argument = Next(uncheckedArgument, parameterType);
-                CheckTypes(parameterType, argument.DataType, uncheckedArgument.Span);
                 arguments.Add(argument);
             }
 
@@ -849,6 +931,32 @@ namespace Caique.Semantics
                 _diagnostics.ReportMisplacedSelfKeyword(keywordValueExpression.Span);
 
                 return new CheckedUnknownExpression();
+            }
+            else if (keywordValueExpression.Token.Kind == TokenKind.Super)
+            {
+                if (keywordValueExpression.Arguments != null && keywordValueExpression.Arguments.Count > 0)
+                {
+                    if (!_current.CurrentFunctionDecl?.IsInitFunction ?? true)
+                    {
+                        _diagnostics.ReportMisplacedSuperKeywordWithArguments(keywordValueExpression.Token.Span);
+
+                        return new CheckedUnknownExpression();
+                    }
+
+                    if (_current.CurrentObject?.Inherited?.InitFunction == null)
+                    {
+                        _diagnostics.ReportMisplacedSuperKeywordWithArguments(keywordValueExpression.Token.Span);
+
+                        return new CheckedUnknownExpression();
+                    }
+
+                    return CheckCall(
+                        keywordValueExpression.Token,
+                        _current.CurrentObject.Inherited.InitFunction,
+                        keywordValueExpression.Arguments,
+                        new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentObject.DataType)
+                    )!;
+                }
             }
             else if (keywordValueExpression.Token.Kind == TokenKind.True ||
                      keywordValueExpression.Token.Kind == TokenKind.False)

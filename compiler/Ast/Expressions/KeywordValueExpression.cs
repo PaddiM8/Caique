@@ -9,9 +9,13 @@ namespace Caique.Ast
     {
         public Token Token { get; }
 
-        public KeywordValueExpression(Token token) : base(token.Span)
+        public List<Expression>? Arguments { get; }
+
+        public KeywordValueExpression(Token token, List<Expression>? arguments = null)
+            : base(token.Span)
         {
             Token = token;
+            Arguments = arguments;
         }
     }
 }
