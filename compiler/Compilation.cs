@@ -43,7 +43,7 @@ namespace Caique
         public void Compile(string targetPath)
         {
             string preludePath = Path.Combine(_libraryPaths["core"], "../prelude/src");
-            var prelude = new ModuleEnvironment(
+            using var prelude = new ModuleEnvironment(
                 "prelude",
                 preludePath,
                 targetPath,
@@ -58,7 +58,7 @@ namespace Caique
                 Path.Combine(preludePath, "lib.cq")
             );
 
-            var rootModule = new ModuleEnvironment(
+            using var rootModule = new ModuleEnvironment(
                 "root",
                 _rootPath,
                 targetPath,

@@ -18,7 +18,7 @@ namespace Caique.Semantics
     /// If one file uses something from another module,
     /// that module will be compiled first unless it hasn't been already.
     /// </summary>
-    public class ModuleEnvironment
+    public class ModuleEnvironment : IDisposable
     {
         /// <summary>
         /// Name of the module.
@@ -66,6 +66,7 @@ namespace Caique.Semantics
         private readonly Dictionary<string, string> _libraryPaths;
 
         private readonly OutputType _outputType;
+        private readonly LlvmGenerator? _codeGenerator;
 
         /// <summary>
         /// Create a child module
@@ -107,16 +108,16 @@ namespace Caique.Semantics
                 // Code generation
                 if (!Diagnostics.Any())
                 {
-                    var generator = new LlvmGenerator(this);
-                    generator.Generate();
+                    _codeGenerator = new LlvmGenerator(this);
+                    _codeGenerator.Generate();
 
                     if (_outputType == OutputType.ObjectFile)
                     {
-                        generator.GenerateObjectFile(_outputDirectory);
+                        _codeGenerator.GenerateObjectFile(_outputDirectory);
                     }
                     else if (_outputType == OutputType.IntermediateRepresentation)
                     {
-                        generator.GenerateLlvmFile(_outputDirectory);
+                        _codeGenerator.GenerateLlvmFile(_outputDirectory);
                     }
                 }
 
@@ -144,6 +145,16 @@ namespace Caique.Semantics
             _outputType = outputType;
             Diagnostics = diagnostics;
             Prelude = prelude;
+        }
+
+        public void Dispose()
+        {
+            GC.SuppressFinalize(this);
+            _codeGenerator?.Dispose();
+            foreach (var (_, child) in Modules)
+            {
+                child.Dispose();
+            }
         }
 
         /// <summary>
