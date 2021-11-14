@@ -1,25 +1,29 @@
 class object
 {
+    Id: i32;
     ReferenceCount: isize = 0;
-    Id: isize = 0; // For development purposes, remove this later on
+
+    virtual fn deinit() {
+        printf("oop gon. %d\n", Id);
+    }
 
     fn retain() {
         ReferenceCount = ReferenceCount + 1;
-        printf("[%d] ", Id);
-        printf("Retain -> %d\n", ReferenceCount);
+        //printf("[%d] ", Id);
+        //printf("Retain -> %d\n", ReferenceCount);
     }
 
     fn release() {
         ReferenceCount = ReferenceCount - 1;
-        printf("[%d] ", Id);
-        printf("Release -> %d\n", ReferenceCount);
+        //printf("[%d] ", Id);
+        //printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {
-            printf("Destructing. %d\n", Id);
+            deinit();
             free(self);
         }
     }
 }
 
 fn free(ptr: object);
-fn printf(x: i8*, y: isize): i32;
+fn printf(x: i8*, y: i32): i32;

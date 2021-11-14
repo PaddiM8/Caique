@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using LLVMSharp.Interop;
 using Caique.Ast;
 using Caique.CheckedTree;
 using Caique.Parsing;
 using Caique.Semantics;
 using Caique.Util;
-using LLVMSharp.Interop;
 
 namespace Caique.CodeGeneration
 {
@@ -20,6 +20,8 @@ namespace Caique.CodeGeneration
         private LlvmGeneratorContext _current = new();
         private LLVMValueRef? _mallocValue = null;
         private LLVMTypeRef? _mallocType = null;
+        private readonly List<CheckedFunctionDeclStatement> _functions = new();
+        private readonly List<CheckedClassDeclStatement> _classes = new();
 
         private readonly HashSet<string> _declaredExternalSymbols = new();
 
@@ -38,35 +40,28 @@ namespace Caique.CodeGeneration
             LLVM.ContextDispose(_context);
         }
 
-        public void Generate()
+        public void GenerateSymbols()
         {
-            var functions = new List<CheckedFunctionDeclStatement>();
             foreach (var classSymbol in _module.SymbolEnvironment.Classes)
-            {
-                GenerateClass(classSymbol, functions);
-            }
+                GenerateClassSymbol(classSymbol);
 
             foreach (var functionSymbol in _module.SymbolEnvironment.Functions)
-            {
-                GenerateFunction(functionSymbol, functions);
-            }
-
-            foreach (var functionDeclStatement in functions)
-            {
-                _current = new LlvmGeneratorContext
-                {
-                    Parent = null,
-                    Statement = functionDeclStatement
-                };
-
-                _current.ClassDecl = functionDeclStatement.ParentObject;
-                _current.FunctionDecl = functionDeclStatement;
-                Next(functionDeclStatement.Body!);
-                _current.ClassDecl = null;
-            }
+                GenerateFunctionSymbol(functionSymbol);
         }
 
-        public void GenerateClass(StructSymbol symbol, List<CheckedFunctionDeclStatement> functionList)
+        public void GenerateContent()
+        {
+            foreach (var classSymbol in _module.SymbolEnvironment.Classes)
+            {
+                foreach (var checkedClass in classSymbol.AllChecked)
+                    GenerateClassContent(checkedClass);
+            }
+
+            foreach (var checkedFunction in _functions)
+                GenerateFunctionContent(checkedFunction);
+        }
+
+        public void GenerateClassSymbol(StructSymbol symbol)
         {
             foreach (var checkedClass in symbol.AllChecked)
             {
@@ -84,21 +79,84 @@ namespace Caique.CodeGeneration
                     if (checkedClass.InitFunction.LlvmValue == null)
                         Next(checkedClass.InitFunction);
 
-                    functionList.Add(checkedClass.InitFunction);
+                    _functions.Add(checkedClass.InitFunction);
                 }
 
                 foreach (var function in checkedClass.Body!.Environment.Functions)
                 {
                     var checkedFunction = checkedClass.GetFunction(function.Syntax.FullName);
                     Next(checkedFunction!);
-                    if (checkedFunction!.Body != null) functionList.Add(checkedFunction);
+                    if (checkedFunction!.Body != null) _functions.Add(checkedFunction);
                 }
             }
 
             _current.ClassDecl = null;
         }
 
-        public void GenerateFunction(FunctionSymbol symbol, List<CheckedFunctionDeclStatement> functionList)
+        public void GenerateClassContent(CheckedClassDeclStatement checkedClass)
+        {
+            // Set the struct field types
+            var fieldTypeMap = new Dictionary<int, LLVMTypeRef>();
+
+            CheckedClassDeclStatement? ancestor = checkedClass.Inherited;
+            while (ancestor != null)
+            {
+                foreach (var variable in ancestor.Body!.Environment.Variables)
+                {
+                    fieldTypeMap.Add(
+                        variable!.Checked!.IndexInObjectAfterInheritance!.Value,
+                        ToLlvmType(variable.Checked.DataType!)
+                    );
+                }
+
+                ancestor = ancestor.Inherited;
+            }
+
+            var variableDecls = checkedClass.Body!.Environment.Variables;
+            int inheritedFieldCount = fieldTypeMap.Count;
+            foreach (var variableSymbol in variableDecls)
+            {
+                var variableDecl = variableSymbol!.Checked!;
+
+                // The first items in the struct will be the inherited ones,
+                // so the IndexInObject value needs to be offset.
+                if (variableDecl.IndexInObjectAfterInheritance == null)
+                {
+                    variableDecl.IndexInObjectAfterInheritance = variableDecl.IndexInObject + inheritedFieldCount;
+                }
+
+                fieldTypeMap.Add(
+                    variableDecl.IndexInObjectAfterInheritance!.Value,
+                    ToLlvmType(variableDecl!.DataType)
+                );
+            }
+            
+            var fieldTypes = new LLVMTypeRef[fieldTypeMap.Count];
+            foreach (var (i, dataType) in fieldTypeMap)
+            {
+                fieldTypes[i] = dataType;
+            }
+
+            // Class id
+            //fieldTypes.Add(LLVM.Int32Type());
+
+            checkedClass.InternalFieldCount = fieldTypeMap.Count;
+
+            LLVM.StructSetBody(
+                checkedClass.LlvmType!.Value,
+                ToCArray(fieldTypes),
+                (uint)fieldTypeMap.Count,
+                0
+            );
+
+            /*if (checkedClass.InitFunction != null &&
+                _current.Parent?.Expression is not CheckedTypeExpression)
+            {
+                Next(checkedClass.InitFunction);
+            }*/
+        }
+
+        public void GenerateFunctionSymbol(FunctionSymbol symbol)
         {
             foreach (var checkedFunction in symbol.AllChecked)
             {
@@ -106,10 +164,26 @@ namespace Caique.CodeGeneration
                 Next(checkedFunction);
 
                 if (checkedFunction.Body != null)
-                    functionList.Add(checkedFunction);
+                    _functions.Add(checkedFunction);
                 
                 _current.ClassDecl = null;
             }
+        }
+
+        public void GenerateFunctionContent(CheckedFunctionDeclStatement checkedFunction)
+        {
+            _current = new LlvmGeneratorContext
+            {
+                Parent = null,
+                Statement = checkedFunction
+            };
+
+            LLVM.PositionBuilderAtEnd(_builder, checkedFunction.BlockLlvmValue!.Value);
+
+            _current.ClassDecl = checkedFunction.ParentObject;
+            _current.FunctionDecl = checkedFunction;
+            Next(checkedFunction.Body!);
+            _current.ClassDecl = null;
         }
 
         public void GenerateLlvmFile(string targetDirectory)
@@ -252,7 +326,7 @@ namespace Caique.CodeGeneration
         public LLVMValueRef Visit(CheckedAssignmentStatement assignmentStatement)
         {
             // ARC release the previous reference
-            if (assignmentStatement.Assignee.DataType is StructType)
+            if (assignmentStatement.Assignee.DataType.IsAllocated)
                 ArcRelease(LLVM.BuildLoad(_builder, assignmentStatement.Assignee.LlvmValue!.Value, "".ToCString()));
 
             _current.ShouldBeLoaded = false;
@@ -262,7 +336,7 @@ namespace Caique.CodeGeneration
             LLVM.BuildStore(_builder, value, assignee);
 
             // ARC increment the new reference
-            //if (assignmentStatement.Assignee.DataType is StructType)
+            //if (assignmentStatement.Assignee.DataType.IsAllocated)
             //    ArcRetain(LLVM.BuildLoad(_builder, assignee, "".ToCString()));
 
             return null!;
@@ -341,55 +415,12 @@ namespace Caique.CodeGeneration
         {
             // Create the struct type
             string identifier = classDeclStatement.FullName;
-            var namedStruct = LLVM.StructCreateNamed(
+            classDeclStatement.LlvmType = LLVM.StructCreateNamed(
                 _context,
                 ("class." + identifier).ToCString()
             );
 
-            classDeclStatement.LlvmType = namedStruct;
-
-            // Set the struct field types
-            var variableDecls = classDeclStatement.Body!.Environment.Variables;
-            var fieldTypes = new List<IDataType>();
-
-            CheckedClassDeclStatement? ancestor = classDeclStatement.Inherited;
-            while (ancestor != null)
-            {
-                fieldTypes.AddRange(
-                    ancestor.Body!.Environment.Variables.Select(x => x!.Checked!.DataType!)
-                );
-
-                ancestor = ancestor.Inherited;
-            }
-
-            int inheritedFieldCount = fieldTypes.Count;
-            foreach (var variableSymbol in variableDecls)
-            {
-                var variableDecl = variableSymbol!.Checked;
-                fieldTypes.Add(variableDecl!.DataType);
-
-                // The first items in the struct will be the inherited ones,
-                // so the IndexInObject value needs to be offset.
-                if (variableDecl.IndexInObjectAfterInheritance == null)
-                {
-                    variableDecl.IndexInObjectAfterInheritance = variableDecl.IndexInObject + inheritedFieldCount;
-                }
-            }
-
-            LLVM.StructSetBody(
-                namedStruct,
-                ToLlvmTypeArray(fieldTypes),
-                (uint)fieldTypes.Count,
-                0
-            );
-
-            if (classDeclStatement.InitFunction != null &&
-                _current.Parent?.Expression is not CheckedTypeExpression)
-            {
-                Next(classDeclStatement.InitFunction);
-            }
-
-            return null!;
+            return null;
         }
 
         public LLVMValueRef Visit(CheckedWhileStatement whileStatement)
@@ -505,7 +536,7 @@ namespace Caique.CodeGeneration
                 }
             }
             else if (dataType.Type == TypeKeyword.i8 ||
-                     dataType is StructType type && type.StructDecl.FullName == "String")
+                    dataType is StructType type && type.StructDecl.FullName == "String")
             {
                 LLVMValueRef globalString = LLVM.BuildGlobalString(
                     _builder,
@@ -535,7 +566,10 @@ namespace Caique.CodeGeneration
                     }
 
                     var structType = (StructType)dataType;
-                    var malloc = BuildMalloc(structType.StructDecl.LlvmType!.Value);
+                    var malloc = BuildMalloc(
+                        structType.StructDecl.LlvmType!.Value,
+                        structType.StructDecl
+                    );
 
                     var length = LLVM.ConstInt(
                         ToLlvmType(new PrimitiveType(TypeKeyword.isize)),
@@ -581,9 +615,9 @@ namespace Caique.CodeGeneration
             // Functions have their own block starts
             if (functionDeclStatement != null)
             {
+                LLVM.PositionBuilderAtEnd(_builder, functionDeclStatement.BlockLlvmValue!.Value);
                 blockExpression.LlvmValue = functionDeclStatement.BlockLlvmValue;
                 _current.BlockLlvmValue = blockExpression.LlvmValue;
-                LLVM.PositionBuilderAtEnd(_builder, functionDeclStatement.BlockLlvmValue!.Value);
 
                 foreach (var (parameter, i) in functionDeclStatement.Parameters.WithIndex())
                 {
@@ -695,7 +729,7 @@ namespace Caique.CodeGeneration
                 bool prevShouldBeLoaded = _current.ShouldBeLoaded;
                 _current.ShouldBeLoaded = true;
                 var objectInstance = variableExpression.ObjectInstance == null
-                    ? (LLVMValueRef)LLVM.GetParam(functionDecl.LlvmValue!.Value, 0)
+                    ? GetMethodObjectInstance(functionDecl.LlvmValue!.Value)
                     : Next(variableExpression.ObjectInstance);
                 _current.ShouldBeLoaded = prevShouldBeLoaded;
 
@@ -760,16 +794,25 @@ namespace Caique.CodeGeneration
             }
 
             var functionDecl = callExpression.FunctionDecl;
-            string name = functionDecl.ReturnType.Type == TypeKeyword.Void
-                ? ""
-                : functionDecl.FullName;
-            var call = BuildCall(
-                functionDecl.LlvmValue!.Value,
-                functionDecl.LlvmType!.Value,
-                arguments,
-                functionDecl.Module != _module,
-                name
-            );
+            bool isExternal = functionDecl.Module != _module;
+            LLVMValueRef call;
+            if (functionDecl.IsVirtual)
+            {
+                call = BuildCallToVirtual(functionDecl, arguments);
+            }
+            else
+            {
+                string name = functionDecl.ReturnType.Type == TypeKeyword.Void
+                    ? ""
+                    : functionDecl.FullName;
+                call = BuildCall(
+                    functionDecl.LlvmValue!.Value,
+                    functionDecl.LlvmType!.Value,
+                    arguments,
+                    isExternal,
+                    name
+                );
+            }
 
             if (functionDecl.ReturnType is StructType)
             {
@@ -846,7 +889,7 @@ namespace Caique.CodeGeneration
         {
             var objectDecl = ((StructType)newExpression.DataType!).StructDecl;
             var type = objectDecl.LlvmType!.Value;
-            var malloc = BuildMalloc(type);
+            var malloc = BuildMalloc(type, objectDecl);
 
             if (objectDecl.InitFunction != null)
             {
@@ -878,7 +921,7 @@ namespace Caique.CodeGeneration
             {
                 var function = _current.FunctionDecl!.LlvmValue!.Value;
 
-                return LLVM.GetParam(function, 0);
+                return GetMethodObjectInstance(function);
             }
             else if (keywordValueExpression.TokenKind == TokenKind.True)
             {
@@ -893,10 +936,10 @@ namespace Caique.CodeGeneration
         }
 
         private LLVMValueRef BuildCall(LLVMValueRef functionValue,
-                                       LLVMTypeRef functionType,
-                                       ICollection<LLVMValueRef> args,
-                                       bool isExternal,
-                                       string name = "")
+                                    LLVMTypeRef functionType,
+                                    ICollection<LLVMValueRef> args,
+                                    bool isExternal,
+                                    string name = "")
         {
             fixed (LLVMOpaqueValue** argumentsPtr = new LLVMOpaqueValue*[args.Count])
             {
@@ -961,7 +1004,62 @@ namespace Caique.CodeGeneration
             );
         }
 
-        private LLVMValueRef BuildMalloc(LLVMTypeRef type)
+        /*private void AddVirtualMethodTableForClass(CheckedClassDeclStatement checkedClass)
+        {
+            if (checkedClass.VirtualMethods == null) return;
+
+            var elementTypes = new LLVMTypeRef[checkedClass.VirtualMethods.Count];
+            foreach (var virtualMethod in checkedClass.VirtualMethods)
+            {
+                int index = virtualMethod.IndexInVirtualMethodTable!.Value;
+                var returnType = virtualMethod.ReturnType.IsAllocated
+                    ? (LLVMTypeRef)LLVM.PointerType(LLVM.VoidType(), 0)
+                    : ToLlvmType(virtualMethod.ReturnType!);
+                elementTypes[index] = LLVM.PointerType(
+                    LLVM.FunctionType(returnType, null, 0, 1),
+                    0
+                );
+            }
+
+            var vtableType = LLVM.StructType(
+                ToCArray(elementTypes),
+                (uint)checkedClass.VirtualMethods.Count,
+                0
+            );
+            var vtableGlobal = LLVM.AddGlobal(_llvmModule, vtableType, "vtable".ToCString());
+            checkedClass.VirtualMethodTableLlvmType = LLVM.PointerType(vtableType, 0);
+            checkedClass.VirtualMethodTableLlvmValue = vtableGlobal;
+        }
+
+        private void FillVirtualMethodTableForClass(CheckedClassDeclStatement checkedClass)
+        {
+            if (checkedClass.VirtualMethods == null) return;
+
+            var vtableType = checkedClass.VirtualMethodTableLlvmType;
+            var vtableSize = checkedClass.VirtualMethods.Count;
+
+            fixed (LLVMOpaqueValue** vtableValues = new LLVMOpaqueValue*[vtableSize])
+            {
+                foreach (var (virtualMethod, i) in checkedClass.VirtualMethods.WithIndex())
+                {
+                    var returnType = virtualMethod.ReturnType.IsAllocated
+                        ? (LLVMTypeRef)LLVM.PointerType(LLVM.VoidType(), 0)
+                        : ToLlvmType(virtualMethod.ReturnType!);
+                    vtableValues[i]  = LLVM.ConstPointerCast(
+                        virtualMethod.LlvmValue!.Value,
+                        LLVM.PointerType(LLVM.FunctionType(returnType, null, 0, 1), 0)
+                    );
+                }
+
+
+                LLVM.SetInitializer(
+                    checkedClass.VirtualMethodTableLlvmValue!.Value,
+                    LLVM.ConstStruct(vtableValues, (uint)vtableSize, 0)
+                );
+            }
+        }*/
+
+        private LLVMValueRef BuildMalloc(LLVMTypeRef type, CheckedClassDeclStatement? checkedClass = null)
         {
             if (_mallocValue == null)
             {
@@ -985,12 +1083,125 @@ namespace Caique.CodeGeneration
                 true
             );
 
-            return LLVM.BuildBitCast(
+            var malloc = LLVM.BuildBitCast(
                 _builder,
                 call,
                 LLVM.PointerType(type, 0),
                 "cast".ToCString()
             );
+
+            // After instantiating an object, set it's id.
+            // This can't be done in the constructor, since
+            // inherited classes constructors are being called as well,
+            // which set the id too.
+            if (checkedClass != null)
+            {
+                var id = LLVM.BuildStructGEP(
+                    _builder,
+                    malloc,
+                    0,
+                    "idField".ToCString()
+                );
+                LLVM.BuildStore(
+                    _builder,
+                    LLVM.ConstInt(LLVM.Int32Type(), (ulong)checkedClass.Id!, 0),
+                    id
+                );
+            }
+
+            return malloc;
+        }
+
+        public static LLVMValueRef GetMethodObjectInstance(LLVMValueRef method)
+        {
+            return LLVM.GetParam(method, 0);
+        }
+
+        public LLVMValueRef BuildCallToVirtual(CheckedFunctionDeclStatement checkedFunction,
+                                               List<LLVMValueRef> arguments)
+        {
+            var objectIdPtr = LLVM.BuildStructGEP(
+                _builder,
+                GetMethodObjectInstance(_current.FunctionDecl!.LlvmValue!.Value),
+                0,
+                "".ToCString()
+            );
+            var objectId = LLVM.BuildLoad(
+                _builder,
+                objectIdPtr,
+                "objectId".ToCString()
+            );
+
+            var mergeBlock = LLVM.AppendBasicBlock(
+                LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(_builder)),
+                "switchcont".ToCString()
+            );
+            var switchValue = LLVM.BuildSwitch(
+                _builder,
+                objectId,
+                mergeBlock,
+                (uint)checkedFunction.Overrides!.Count
+            );
+
+            foreach (var (id, overrideFunction) in checkedFunction.Overrides)
+            {
+                var callBlock = LLVM.AppendBasicBlock(
+                    _current.FunctionDecl!.LlvmValue!.Value,
+                    $"id{id}".ToCString()
+                );
+                LLVM.AddCase(
+                    switchValue,
+                    LLVM.ConstInt(LLVM.Int32Type(), (ulong)id, 0),
+                    callBlock
+                );
+                LLVM.PositionBuilderAtEnd(_builder, callBlock);
+
+                if (overrideFunction != checkedFunction)
+                {
+                    arguments[0] = LLVM.BuildBitCast(
+                        _builder,
+                        arguments[0],
+                        LLVM.PointerType(overrideFunction.ParentObject!.LlvmType!.Value, 0),
+                        "cast".ToCString()
+                    );
+                }
+
+                BuildCall(
+                    overrideFunction.LlvmValue!.Value,
+                    overrideFunction.LlvmType!.Value,
+                    arguments,
+                    overrideFunction.Module != _module
+                );
+                LLVM.BuildBr(_builder, mergeBlock);
+            }
+
+            SetCurrentBlock(mergeBlock);
+
+            return switchValue;
+            /*var vtablePtr = LLVM.BuildStructGEP(
+                _builder,
+                GetMethodObjectInstance(checkedFunction.LlvmValue!.Value),
+                (uint)checkedFunction.ParentObject!.InternalFieldCount! - 1,
+                "".ToCString()
+            );
+            var vtable = LLVM.BuildLoad(
+                _builder,
+                vtablePtr,
+                "vtable".ToCString()
+            );
+
+            var functionPtrPtr = LLVM.BuildStructGEP(
+                _builder,
+                vtable,
+                (uint)checkedFunction.IndexInVirtualMethodTable!,
+                "".ToCString()
+            );
+
+            return LLVM.BuildLoad(
+                _builder,
+                functionPtrPtr,
+                "functionPtr".ToCString()
+            );*/
         }
 
         private void SetCurrentBlock(LLVMBasicBlockRef basicBlock)
@@ -1010,7 +1221,7 @@ namespace Caique.CodeGeneration
             LLVM.PositionBuilderAtEnd(_builder, _current.BlockLlvmValue!.Value);
         }
 
-        public unsafe LLVMOpaqueType* ToLlvmType(IDataType dataType)
+        private unsafe LLVMTypeRef ToLlvmType(IDataType dataType)
         {
             var keyword = dataType.Type;
 
@@ -1037,7 +1248,7 @@ namespace Caique.CodeGeneration
                 : type;
         }
 
-        public unsafe LLVMOpaqueType** ToLlvmTypeArray(ICollection<IDataType> dataTypes)
+        private unsafe LLVMOpaqueType** ToLlvmTypeArray(ICollection<IDataType> dataTypes)
         {
             var llvmTypes = new LLVMOpaqueType*[dataTypes.Count];
             foreach (var (dataType, i) in dataTypes.WithIndex())
@@ -1048,6 +1259,17 @@ namespace Caique.CodeGeneration
             fixed (LLVMOpaqueType** llvmTypesPointer = llvmTypes)
             {
                 return llvmTypesPointer;
+            }
+        }
+
+        private static unsafe LLVMOpaqueType** ToCArray(ICollection<LLVMTypeRef> collection)
+        {
+            fixed(LLVMOpaqueType** values = new LLVMOpaqueType*[collection.Count])
+            {
+                foreach (var (value, i) in collection.WithIndex())
+                    values[i] = value;
+
+                return values;
             }
         }
     }

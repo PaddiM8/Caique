@@ -173,9 +173,19 @@ namespace Caique.Semantics
                     similarFunction.ExtensionOf
                 );
 
-                if (functionDeclStatement.Identifier.Value != "init")
+                if (!functionDeclStatement.IsInitFunction)
                 {
                     symbol!.AddChecked(newCheckedFunction);
+                }
+
+                if (functionDeclStatement.IsVirtual && _current.CurrentCheckedClass != null)
+                {
+                    _current.CurrentCheckedClass.RegisterVirtualMethod(newCheckedFunction);
+                }
+
+                if (functionDeclStatement.IsOverride)
+                {
+                    inheritedFunction?.RegisterOverride(newCheckedFunction);
                 }
 
                 return newCheckedFunction;
@@ -248,9 +258,19 @@ namespace Caique.Semantics
                 extensionOf
             );
 
-            if (functionDeclStatement.Identifier.Value != "init")
+            if (!functionDeclStatement.IsInitFunction)
             {
                 symbol!.AddChecked(checkedFunction);
+            }
+
+            if (functionDeclStatement.IsVirtual && _current.CurrentCheckedClass != null)
+            {
+                _current.CurrentCheckedClass.RegisterVirtualMethod(checkedFunction);
+            }
+
+            if (functionDeclStatement.IsOverride)
+            {
+                inheritedFunction?.RegisterOverride(checkedFunction);
             }
 
             return checkedFunction;
@@ -270,7 +290,7 @@ namespace Caique.Semantics
                 classDeclStatement.Body.Environment,
                 _module,
                 classDeclStatement.InheritedType != null
-                    ? Next(classDeclStatement.InheritedType).DataType
+                    ? (StructType)Next(classDeclStatement.InheritedType).DataType
                     : null
             );
             symbol.AddChecked(checkedClass);

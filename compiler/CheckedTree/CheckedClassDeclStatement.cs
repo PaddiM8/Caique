@@ -7,8 +7,10 @@ using Caique.Semantics;
 
 namespace Caique.CheckedTree
 {
-    public class CheckedClassDeclStatement : CheckedStatement
+    public partial class CheckedClassDeclStatement : CheckedStatement
     {
+        public int Id { get; }
+
         public Token Identifier { get; }
 
         public string FullName => DataType.ToString();
@@ -21,19 +23,23 @@ namespace Caique.CheckedTree
 
         public CheckedFunctionDeclStatement? InitFunction { get; set; }
 
-        public CheckedClassDeclStatement? Inherited => ((StructType?)InheritedType)?.StructDecl;
+        public CheckedClassDeclStatement? Inherited => InheritedType?.StructDecl;
 
         public ModuleEnvironment Module { get; }
 
-        public IDataType? InheritedType { get; }
+        public List<CheckedFunctionDeclStatement>? VirtualMethods { get; private set; }
+
+        public StructType? InheritedType { get; }
 
         public IDataType DataType { get; }
+
+        private int _highestClassId;
 
         public CheckedClassDeclStatement(Token identifier,
                                          List<IDataType>? typeArguments,
                                          SymbolEnvironment environment,
                                          ModuleEnvironment module,
-                                         IDataType? ancestor = null)
+                                         StructType? ancestor = null)
         {
             Identifier = identifier;
             TypeArguments = typeArguments;
@@ -41,6 +47,16 @@ namespace Caique.CheckedTree
             InheritedType = ancestor;
             Module = module;
             DataType = new StructType(TypeKeyword.Identifier, typeArguments, this);
+
+            CheckedClassDeclStatement? inheritedClass = this;
+            while (inheritedClass.Inherited != null)
+            {
+                inheritedClass = inheritedClass.Inherited;
+            }
+
+            Id = inheritedClass == this
+                ? 0
+                : ++inheritedClass._highestClassId;
         }
 
         /// <summary>
@@ -88,6 +104,13 @@ namespace Caique.CheckedTree
 
             return Inherited?.HasAncestor(identifier)
                 ?? false; // Return false if "Inherited" is null (there are no more ancestors to compare)
+        }
+
+        public void RegisterVirtualMethod(CheckedFunctionDeclStatement method)
+        {
+            if (VirtualMethods == null) VirtualMethods = new();
+            method.IndexInVirtualMethodTable = VirtualMethods.Count;
+            VirtualMethods.Add(method);
         }
     }
 }

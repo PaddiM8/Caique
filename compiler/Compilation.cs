@@ -48,7 +48,6 @@ namespace Caique
                 preludePath,
                 targetPath,
                 new Dictionary<string, string>(),
-                PrintLlvm ? OutputType.IntermediateRepresentation : OutputType.ObjectFile,
                 Diagnostics,
                 null
             );
@@ -63,7 +62,6 @@ namespace Caique
                 _rootPath,
                 targetPath,
                 _libraryPaths,
-                PrintLlvm ? OutputType.IntermediateRepresentation : OutputType.ObjectFile,
                 Diagnostics,
                 prelude
             );
@@ -74,6 +72,18 @@ namespace Caique
                 "main",
                 Path.Combine(_rootPath, "main.cq")
             );
+
+            // Code generation
+            prelude.GenerateSymbols();
+            rootModule.GenerateSymbols();
+            prelude.GenerateContent();
+            rootModule.GenerateContent();
+
+            var outputType = PrintLlvm
+                ? OutputType.IntermediateRepresentation
+                : OutputType.ObjectFile;
+            prelude.Emit(outputType);
+            rootModule.Emit(outputType);
 
             if (PrintTokens) ObjectPrinter.PrintTokens(rootModule);
             if (PrintAst) ObjectPrinter.PrintAst(rootModule);

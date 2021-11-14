@@ -50,6 +50,10 @@ namespace Caique.CheckedTree
 
         public bool IsExtensionFunction => ExtensionOf != null;
 
+        public int? IndexInVirtualMethodTable { get; set; }
+
+        public Dictionary<int, CheckedFunctionDeclStatement>? Overrides { get; }
+
         public CheckedFunctionDeclStatement(Token identifier,
                                             List<CheckedVariableDeclStatement> parameters,
                                             CheckedBlockExpression? body,
@@ -71,6 +75,18 @@ namespace Caique.CheckedTree
             ParentObject = parentObject;
             Module = module;
             ExtensionOf = extensionOf;
+
+            if (isVirtual)
+            {
+                Overrides = new();
+                Overrides.Add(parentObject!.Id, this);
+            }
+        }
+
+        public void RegisterOverride(CheckedFunctionDeclStatement checkedFunction)
+        {
+            if (!IsVirtual) throw new InvalidOperationException("Can't add an override function to a non-virtual function.");
+            Overrides!.Add(checkedFunction.ParentObject!.Id, checkedFunction);
         }
     }
 }

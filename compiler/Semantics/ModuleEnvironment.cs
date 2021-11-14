@@ -65,8 +65,7 @@ namespace Caique.Semantics
         private readonly string _outputDirectory;
         private readonly Dictionary<string, string> _libraryPaths;
 
-        private readonly OutputType _outputType;
-        private readonly LlvmGenerator? _codeGenerator;
+        private LlvmGenerator? _codeGenerator;
 
         /// <summary>
         /// Create a child module
@@ -82,7 +81,6 @@ namespace Caique.Semantics
             IsCodeModule = filePath!.EndsWith(".cq");
             _outputDirectory = Parent._outputDirectory;
             _libraryPaths = Root._libraryPaths;
-            _outputType = Root._outputType;
             Diagnostics = Root.Diagnostics;
             Prelude = Parent.Prelude;
 
@@ -105,22 +103,6 @@ namespace Caique.Semantics
                 // Type checking
                 TypeTree = TypeChecker.Analyse(this);
 
-                // Code generation
-                if (!Diagnostics.Any())
-                {
-                    _codeGenerator = new LlvmGenerator(this);
-                    _codeGenerator.Generate();
-
-                    if (_outputType == OutputType.ObjectFile)
-                    {
-                        _codeGenerator.GenerateObjectFile(_outputDirectory);
-                    }
-                    else if (_outputType == OutputType.IntermediateRepresentation)
-                    {
-                        _codeGenerator.GenerateLlvmFile(_outputDirectory);
-                    }
-                }
-
                 Diagnostics.CurrentFile = previousDiagnosticsFile;
             }
         }
@@ -132,7 +114,6 @@ namespace Caique.Semantics
                                  string filePath,
                                  string outputDirectory,
                                  Dictionary<string, string> libraryPaths,
-                                 OutputType outputType,
                                  DiagnosticBag diagnostics,
                                  ModuleEnvironment? prelude)
         {
@@ -142,9 +123,61 @@ namespace Caique.Semantics
             IsCodeModule = false;
             _outputDirectory = outputDirectory;
             _libraryPaths = libraryPaths;
-            _outputType = outputType;
             Diagnostics = diagnostics;
             Prelude = prelude;
+        }
+
+        public void GenerateSymbols()
+        {
+            if (Diagnostics.Any()) return;
+
+            if (IsCodeModule)
+            {
+                _codeGenerator = new LlvmGenerator(this);
+                _codeGenerator.GenerateSymbols();
+            }
+
+            foreach (var child in Modules.Values)
+            {
+                child.GenerateSymbols();
+            }
+        }
+
+        public void GenerateContent()
+        {
+            if (Diagnostics.Any()) return;
+
+            if (IsCodeModule)
+            {
+                _codeGenerator!.GenerateContent();
+            }
+
+            foreach (var child in Modules.Values)
+            {
+                child.GenerateContent();
+            }
+        }
+
+        public void Emit(OutputType outputType)
+        {
+            if (Diagnostics.Any()) return;
+
+            if (IsCodeModule)
+            {
+                if (outputType == OutputType.ObjectFile)
+                {
+                    _codeGenerator!.GenerateObjectFile(_outputDirectory);
+                }
+                else if (outputType == OutputType.IntermediateRepresentation)
+                {
+                    _codeGenerator!.GenerateLlvmFile(_outputDirectory);
+                }
+            }
+
+            foreach (var child in Modules.Values)
+            {
+                child.Emit(outputType);
+            }
         }
 
         /// <summary>

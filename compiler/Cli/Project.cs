@@ -115,13 +115,13 @@ namespace Caique.Cli
                 LinkLlvmFiles(targetPath);
             }
             else if (LinkObjectFiles(targetPath, options.ShowLinkerOutput))
+            {
                 // Run the generated executable
-                using (var process = new Process())
-                {
-                    process.StartInfo.FileName = targetPath + "/main";
-                    process.Start();
-                    process.WaitForExit();
-                }
+                using var process = new Process();
+                process.StartInfo.FileName = targetPath + "/main";
+                process.Start();
+                process.WaitForExit();
+            }
         }
 
         private static void LinkLlvmFiles(string targetPath)

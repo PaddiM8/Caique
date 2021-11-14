@@ -16,6 +16,15 @@ namespace Caique.CheckedTree
         public LLVMTypeRef? LlvmType { get; set; }
     }
 
+    public partial class CheckedClassDeclStatement
+    {
+        public LLVMValueRef? VirtualMethodTableLlvmValue { get; set; }
+
+        public LLVMTypeRef? VirtualMethodTableLlvmType { get; set; }
+
+        public int? InternalFieldCount { get; set; }
+    }
+
     public partial class CheckedFunctionDeclStatement
     {
         public LLVMBasicBlockRef? BlockLlvmValue { get; set; }
