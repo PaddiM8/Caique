@@ -3,9 +3,7 @@ class object
     Id: i32;
     ReferenceCount: isize = 0;
 
-    virtual fn @deinit() {
-        printf("oop gon. %d\n", Id);
-    }
+    virtual fn @deinit() {}
 
     fn retain() {
         ReferenceCount = ReferenceCount + 1;
