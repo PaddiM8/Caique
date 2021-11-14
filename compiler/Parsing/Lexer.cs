@@ -239,7 +239,7 @@ namespace Caique.Parsing
                         value = NextCharLiteral();
                         kind = TokenKind.CharLiteral;
                     }
-                    else if (char.IsLetterOrDigit(Current) || Current == '_')
+                    else if (char.IsLetterOrDigit(Current) || Current == '_' || Current == '@')
                     {
                         (value, kind) = NextIdentifier();
                     }
@@ -366,7 +366,7 @@ namespace Caique.Parsing
             int start = _position.index;
             int length = 0;
 
-            while (char.IsLetterOrDigit(Current) || Current == '_')
+            while (char.IsLetterOrDigit(Current) || Current == '_' || Current == '@')
             {
                 Advance();
                 length++;
@@ -389,6 +389,7 @@ namespace Caique.Parsing
                 "let" => TokenKind.Let,
                 "class" => TokenKind.Class,
                 "init" => TokenKind.Init,
+                "deinit" => TokenKind.Deinit,
                 "ext" => TokenKind.Ext,
                 "self" => TokenKind.Self,
                 "super" => TokenKind.Super,
@@ -409,6 +410,9 @@ namespace Caique.Parsing
                 "false" => TokenKind.False,
                 _ => TokenKind.Identifier,
             };
+
+            if (value.StartsWith("@"))
+                value = value[1..];
 
             return (value, kind);
         }

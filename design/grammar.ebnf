@@ -6,7 +6,7 @@ useStmt = "use" , identifier , [{ "." , identifier }] , ";" ;
 declaration = classDecl
             | functionDecl
             | varDecl ;
-classDecl = "class" , identifier, [ typeParameters ] , parameters , [ ":" , type , { ", " type } ] , blockStmt ;
+classDecl = "class" , identifier, [ typeParameters ] , [ ":" , type , { ", " type } ] , blockStmt ;
 functionDecl = [( "virtual" | "override" )] , "fn" , identifier , parameters , [ ":" , type ] , blockStmt ;
 varDecl = "let" , identifier [ ":",  type ] , "=" , expression , ";" ;
 objVarDecl = identifier ":" , type , [ "=" , expression ] , ";" ;
@@ -17,9 +17,10 @@ statement = expressionStmt
           | returnStmt ;
 expressionStmt = expression , ";" ;
 blockStmt = [{ varDecl | statement }] ;
-classBlody = [{ objectVarDecl | initStmt | statement }] ;
+classBlody = [{ objectVarDecl | initStmt | deinitStmt | statement }] ;
 assignmentStmt = expression , ( "=" | "+=" | "-=" | "*=" | "/=" ) , expressionStmt ;
-initStmt = "init" , blockStmt ;
+initStmt = "init" , parameters , blockStmt ;
+deinitStmt = "deinit" , blockStmt ;
 returnStmt = "ret" , expression ;
 
 expression = precedenceExpr ;
@@ -47,7 +48,7 @@ self = "self" ;
 super = "super" , [ arguments ] ;
 
 parameters = "(" , [ parameter , [{ "," , parameter }] ] , ")" ;
-parameter = identifier , ":" , type ;
+parameter = identifier , [ ":" , type ] ;
 arguments = "(" , [ expression , [{ "," , expression }] ] , ")" ;
 typeArguments = "[" , type , [{ "," , type }] , "]" ;
 typeParameters = "[" , identifier , [{ "," , identifier }] , "]" ;

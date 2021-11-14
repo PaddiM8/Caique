@@ -3,7 +3,7 @@ class object
     Id: i32;
     ReferenceCount: isize = 0;
 
-    virtual fn deinit() {
+    virtual fn @deinit() {
         printf("oop gon. %d\n", Id);
     }
 
@@ -19,7 +19,7 @@ class object
         //printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {
-            deinit();
+            @deinit();
             free(self);
         }
     }

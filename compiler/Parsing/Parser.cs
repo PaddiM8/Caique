@@ -328,6 +328,10 @@ namespace Caique.Parsing
 
                     initFunction = ParseInit();
                 }
+                else if (Match(TokenKind.Deinit))
+                {
+                    statements.Add(ParseDeinit());
+                }
                 else
                 {
                     statements.Add(ParseObjectVariableDecl(variableDeclIndex++));
@@ -449,6 +453,27 @@ namespace Caique.Parsing
                 false,
                 keyword.Span
             );
+        }
+
+        private FunctionDeclStatement ParseDeinit()
+        {
+            var keyword = Expect(TokenKind.Deinit);
+            var block = ParseBlock();
+
+            var statement = new FunctionDeclStatement(
+                keyword,
+                new(),
+                block,
+                null,
+                true,
+                false,
+                false,
+                true,
+                keyword.Span
+            );
+            _symbolEnvironment.Add(statement);
+
+            return statement;
         }
 
         private ExpressionStatement ParseExpressionStatement()
