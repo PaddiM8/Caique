@@ -1160,7 +1160,7 @@ namespace Caique.CodeGeneration
                 {
                     arguments[0] = LLVM.BuildBitCast(
                         _builder,
-                        arguments[0],
+                        GetMethodObjectInstance(_current.FunctionDecl!.LlvmValue!.Value),
                         LLVM.PointerType(overrideFunction.ParentObject!.LlvmType!.Value, 0),
                         "cast".ToCString()
                     );
