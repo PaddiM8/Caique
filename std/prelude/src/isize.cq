@@ -1,0 +1,11 @@
+use string;
+
+ext isize toString(): String {
+    let size: isize = sizeof(isize);
+    let out = malloc(size);
+    let length = snprintf(out, size, "%d", self);
+    new String(out, length, true)
+}
+
+fn snprintf(out: i8*, size: isize, format: i8*, input: isize): isize;
+fn malloc(size: isize): i8*;

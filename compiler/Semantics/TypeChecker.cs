@@ -20,6 +20,7 @@ namespace Caique.Semantics
         private StructSymbol? _stringObj;
         private static readonly PrimitiveType _voidType = new(TypeKeyword.Void);
         private static readonly PrimitiveType _boolType = new(TypeKeyword.Bool);
+        private static readonly PrimitiveType _isizeType = new(TypeKeyword.isize);
         private static readonly PrimitiveType _unknownType = new(TypeKeyword.Unknown);
 
         public TypeChecker(ModuleEnvironment module)
@@ -429,7 +430,7 @@ namespace Caique.Semantics
                     new(),
                     checkedClass.Inherited.InitFunction!,
                     checkedClass.Inherited.InitFunction!.ReturnType,
-                    new CheckedKeywordValueExpression(TokenKind.Self, checkedClass.DataType)
+                    new CheckedKeywordValueExpression(TokenKind.Self, null, checkedClass.DataType)
                 );
                 checkedClass.InitFunction.Body!.Statements.Insert(
                     0,
@@ -788,7 +789,7 @@ namespace Caique.Semantics
                 checkedFunction,
                 callExpression.Arguments,
                 checkedFunction!.IsMethod
-                    ? new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentCheckedClass!.DataType)
+                    ? new CheckedKeywordValueExpression(TokenKind.Self, null, _current.CurrentCheckedClass!.DataType)
                     : null
             );
 
@@ -958,12 +959,14 @@ namespace Caique.Semantics
 
         public CheckedExpression Visit(KeywordValueExpression keywordValueExpression)
         {
-            if (keywordValueExpression.Token.Kind == TokenKind.Self)
+            var kind = keywordValueExpression.Token.Kind;
+            if (kind == TokenKind.Self)
             {
                 if (_current.CurrentCheckedClass != null)
                 {
                     return new CheckedKeywordValueExpression(
-                        keywordValueExpression.Token.Kind,
+                        kind,
+                        null,
                         _current.CurrentCheckedClass!.DataType
                     );
                 }
@@ -971,7 +974,8 @@ namespace Caique.Semantics
                 if (_current.CurrentExtendedType != null)
                 {
                     return new CheckedKeywordValueExpression(
-                        keywordValueExpression.Token.Kind,
+                        kind,
+                        null,
                         _current.CurrentExtendedType
                     );
                 }
@@ -980,7 +984,7 @@ namespace Caique.Semantics
 
                 return new CheckedUnknownExpression();
             }
-            else if (keywordValueExpression.Token.Kind == TokenKind.Super)
+            else if (kind == TokenKind.Super)
             {
                 if (keywordValueExpression.Arguments != null && keywordValueExpression.Arguments.Count > 0)
                 {
@@ -1002,15 +1006,43 @@ namespace Caique.Semantics
                         keywordValueExpression.Token,
                         _current.CurrentCheckedClass.Inherited.InitFunction,
                         keywordValueExpression.Arguments,
-                        new CheckedKeywordValueExpression(TokenKind.Self, _current.CurrentCheckedClass.DataType)
+                        new CheckedKeywordValueExpression(
+                            TokenKind.Self,
+                            null,
+                            _current.CurrentCheckedClass.DataType
+                        )
                     )!;
                 }
             }
-            else if (keywordValueExpression.Token.Kind == TokenKind.True ||
-                     keywordValueExpression.Token.Kind == TokenKind.False)
+            else if (kind == TokenKind.Sizeof)
+            {
+                if (keywordValueExpression.Arguments?.Count != 1)
+                {
+                    _diagnostics.ReportWrongNumberOfArguments(
+                        keywordValueExpression.Token,
+                        keywordValueExpression.Arguments?.Count ?? 0,
+                        1
+                    );
+
+                    // Return 0
+                    return new CheckedLiteralExpression(
+                        new Token(TokenKind.NumberLiteral, "0", new(new(0, 0), new(0, 0))),
+                        _isizeType
+                    );
+                }
+
+                return new CheckedKeywordValueExpression(
+                    kind,
+                    new() { Next(keywordValueExpression.Arguments![0]) },
+                    _isizeType
+                );
+            }
+            else if (kind == TokenKind.True ||
+                     kind == TokenKind.False)
             {
                 return new CheckedKeywordValueExpression(
-                    keywordValueExpression.Token.Kind,
+                    kind,
+                    null,
                     _boolType
                 );
             }

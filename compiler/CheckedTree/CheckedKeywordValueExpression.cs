@@ -10,9 +10,14 @@ namespace Caique.CheckedTree
     {
         public TokenKind TokenKind { get; }
 
-        public CheckedKeywordValueExpression(TokenKind tokenKind, IDataType dataType) : base(dataType)
+        public List<CheckedExpression>? Arguments { get; }
+
+        public CheckedKeywordValueExpression(TokenKind tokenKind,
+                                             List<CheckedExpression>? arguments,
+                                             IDataType dataType) : base(dataType)
         {
             TokenKind = tokenKind;
+            Arguments = arguments;
         }
     }
 }

@@ -393,6 +393,7 @@ namespace Caique.Parsing
                 "ext" => TokenKind.Ext,
                 "self" => TokenKind.Self,
                 "super" => TokenKind.Super,
+                "sizeof" => TokenKind.Sizeof,
                 "new" => TokenKind.New,
                 "use" => TokenKind.Use,
                 "while" => TokenKind.While,

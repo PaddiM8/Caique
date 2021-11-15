@@ -571,6 +571,14 @@ namespace Caique.Parsing
                 var (arguments, _) = ParseArguments(false);
                 return new KeywordValueExpression(keyword, arguments);
             }
+            else if (Match(TokenKind.Sizeof))
+            {
+                var keyword = Advance();
+                Expect(TokenKind.OpenParenthesis, "", false);
+                var argument = ParseType();
+                Expect(TokenKind.ClosedParenthesis, "", false);
+                return new KeywordValueExpression(keyword, new() { argument });
+            }
             else if (Match(TokenKind.Identifier))
             {
                 return ParseIdentifier();
@@ -861,12 +869,27 @@ namespace Caique.Parsing
         /// <param name="kind">Token kind to expect.</param>
         /// <param name="description">Description of the expected token.</param>
         /// <returns>The consumed token.</returns>
-        private Token Expect(TokenKind kind, string description)
+        private Token Expect(TokenKind kind, string description = "", bool tryRecover = true)
         {
             if (Current.Kind == kind) return Advance();
-            _diagnostics.ReportUnexpectedToken(Current, description);
 
-            return new Token(kind, "", Peek(0)!.Span);
+            if (description == "")
+            {
+                _diagnostics.ReportUnexpectedToken(Current, new[] { kind });
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current, description);
+            }
+
+            if (tryRecover)
+            {
+                return new Token(kind, "", Peek(0)!.Span);
+            }
+            else
+            {
+                throw new ParsingErrorException();
+            }
         }
 
         /// <summary>

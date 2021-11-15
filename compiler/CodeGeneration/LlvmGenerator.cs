@@ -54,7 +54,12 @@ namespace Caique.CodeGeneration
             foreach (var classSymbol in _module.SymbolEnvironment.Classes)
             {
                 foreach (var checkedClass in classSymbol.AllChecked)
+                {
+                    if (classSymbol.Syntax.TypeParameters != null && checkedClass.TypeArguments == null)
+                        continue;
+
                     GenerateClassContent(checkedClass);
+                }
             }
 
             foreach (var checkedFunction in _functions)
@@ -95,6 +100,8 @@ namespace Caique.CodeGeneration
 
         public void GenerateClassContent(CheckedClassDeclStatement checkedClass)
         {
+            _current.ClassDecl = checkedClass;
+
             // Set the struct field types
             var fieldTypeMap = new Dictionary<int, LLVMTypeRef>();
 
@@ -137,9 +144,6 @@ namespace Caique.CodeGeneration
                 fieldTypes[i] = dataType;
             }
 
-            // Class id
-            //fieldTypes.Add(LLVM.Int32Type());
-
             checkedClass.InternalFieldCount = fieldTypeMap.Count;
 
             LLVM.StructSetBody(
@@ -149,11 +153,7 @@ namespace Caique.CodeGeneration
                 0
             );
 
-            /*if (checkedClass.InitFunction != null &&
-                _current.Parent?.Expression is not CheckedTypeExpression)
-            {
-                Next(checkedClass.InitFunction);
-            }*/
+            _current.ClassDecl = null;
         }
 
         public void GenerateFunctionSymbol(FunctionSymbol symbol)
@@ -916,17 +916,25 @@ namespace Caique.CodeGeneration
 
         public LLVMValueRef Visit(CheckedKeywordValueExpression keywordValueExpression)
         {
-            if (keywordValueExpression.TokenKind == TokenKind.Self)
+            var kind = keywordValueExpression.TokenKind;
+            if (kind == TokenKind.Self)
             {
                 var function = _current.FunctionDecl!.LlvmValue!.Value;
 
                 return GetMethodObjectInstance(function);
             }
-            else if (keywordValueExpression.TokenKind == TokenKind.True)
+            else if (kind == TokenKind.Sizeof)
+            {
+                var argument = keywordValueExpression.Arguments![0];
+                return argument.DataType.IsAllocated
+                    ? LLVM.SizeOf(ToLlvmType(new PrimitiveType(TypeKeyword.isize)))
+                    : LLVM.SizeOf(ToLlvmType(argument.DataType));
+            }
+            else if (kind == TokenKind.True)
             {
                 return LLVM.ConstInt(LLVM.Int1Type(), 1, 0);
             }
-            else if (keywordValueExpression.TokenKind == TokenKind.False)
+            else if (kind == TokenKind.False)
             {
                 return LLVM.ConstInt(LLVM.Int1Type(), 0, 0);
             }
