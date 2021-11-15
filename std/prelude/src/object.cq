@@ -6,13 +6,13 @@ class object
     virtual fn @deinit() {}
 
     fn retain() {
-        ReferenceCount = ReferenceCount + 1;
+        ReferenceCount += 1;
         //printf("[%d] ", Id);
         //printf("Retain -> %d\n", ReferenceCount);
     }
 
     fn release() {
-        ReferenceCount = ReferenceCount - 1;
+        ReferenceCount -= 1;
         //printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {
