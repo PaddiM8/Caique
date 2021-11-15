@@ -7,7 +7,7 @@ declaration = classDecl
             | functionDecl
             | varDecl ;
 classDecl = "class" , identifier, [ typeParameters ] , [ ":" , type , { ", " type } ] , blockStmt ;
-functionDecl = [( "virtual" | "override" )] , "fn" , identifier , parameters , [ ":" , type ] , blockStmt ;
+functionDecl = [( "virtual" | "override" )] , "fn" , identifier , typeParameters , parameters , [ ":" , type ] , blockStmt ;
 varDecl = "let" , identifier [ ":",  type ] , "=" , expression , ";" ;
 objVarDecl = identifier ":" , type , [ "=" , expression ] , ";" ;
 
@@ -39,7 +39,7 @@ primaryExpr = variableExpr
             | super ;
 
 variableExpr = identifier ;
-callExpr = modulePath , arguments ;
+callExpr = modulePath , typeArguments , arguments ;
 groupExpr = "(" , expression , ")" ;
 newExpr = "new" , type , arguments ;
 literal = bool | number | string | char ;

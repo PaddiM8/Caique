@@ -229,6 +229,9 @@ namespace Caique.Parsing
             }
 
             var identifier = Expect(TokenKind.Identifier);
+            var typeParameters = Match(TokenKind.OpenSquareBracket)
+                ? ParseTypeParameters()
+                : null;
             var parameters = ParseParameters();
             TypeExpression? returnType = Consume(TokenKind.Colon)
                 ? ParseType()
@@ -249,6 +252,7 @@ namespace Caique.Parsing
 
             var statement = new FunctionDeclStatement(
                 identifier,
+                typeParameters,
                 parameters,
                 body,
                 returnType,
@@ -444,6 +448,7 @@ namespace Caique.Parsing
 
             return new FunctionDeclStatement(
                 keyword,
+                null,
                 parameters,
                 block,
                 null,
@@ -462,6 +467,7 @@ namespace Caique.Parsing
 
             var statement = new FunctionDeclStatement(
                 keyword,
+                null,
                 new(),
                 block,
                 null,
@@ -684,13 +690,18 @@ namespace Caique.Parsing
         {
             var lookahead = Peek(1)!.Kind;
             if (lookahead == TokenKind.Arrow ||
-                lookahead == TokenKind.OpenParenthesis)
+                lookahead == TokenKind.OpenParenthesis ||
+                lookahead == TokenKind.OpenSquareBracket)
             {
                 var modulePath = ParseModulePath();
+                var typeArguments = Match(TokenKind.OpenSquareBracket)
+                    ? ParseTypeArguments()
+                    : null;
                 var (arguments, argumentsSpan) = ParseArguments();
 
                 return new CallExpression(
                     modulePath,
+                    typeArguments,
                     arguments,
                     modulePath[0].Span.Add(argumentsSpan)
                 );

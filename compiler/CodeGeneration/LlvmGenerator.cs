@@ -89,9 +89,11 @@ namespace Caique.CodeGeneration
 
                 foreach (var function in checkedClass.Body!.Environment.Functions)
                 {
-                    var checkedFunction = checkedClass.GetFunction(function.Syntax.FullName);
+                    GenerateFunctionSymbol(function);
+                    /*var checkedFunction = checkedClass.GetFunction(function.Syntax.FullName);
+
                     Next(checkedFunction!);
-                    if (checkedFunction!.Body != null) _functions.Add(checkedFunction);
+                    if (checkedFunction!.Body != null) _functions.Add(checkedFunction);*/
                 }
             }
 
@@ -160,13 +162,18 @@ namespace Caique.CodeGeneration
         {
             foreach (var checkedFunction in symbol.AllChecked)
             {
+                if (symbol.Syntax.TypeParameters != null && checkedFunction.TypeArguments == null)
+                    continue;
+
                 _current.ClassDecl = checkedFunction.ParentObject;
+                _current.FunctionDecl = checkedFunction;
                 Next(checkedFunction);
 
                 if (checkedFunction.Body != null)
                     _functions.Add(checkedFunction);
                 
                 _current.ClassDecl = null;
+                _current.FunctionDecl = null;
             }
         }
 
@@ -1242,10 +1249,18 @@ namespace Caique.CodeGeneration
                 TypeKeyword.f32 => LLVM.FloatType(),
                 TypeKeyword.f64 => LLVM.FloatType(),
                 TypeKeyword.Bool => LLVM.Int1Type(),
-                TypeKeyword.Generic => ToLlvmType(_current.ClassDecl!.TypeArguments![((GenericType)dataType).ParameterIndex]),
+                TypeKeyword.Generic => ToLlvmType(
+                    ((GenericType)dataType).Origin == GenericTypeOrigin.Class
+                        ? _current.ClassDecl!.TypeArguments![((GenericType)dataType).ParameterIndex]
+                        : _current.FunctionDecl!.TypeArguments![((GenericType)dataType).ParameterIndex]
+                ),
                 TypeKeyword.Void => LLVM.VoidType(),
-                TypeKeyword.Identifier => LLVM.PointerType(((StructType)dataType).StructDecl.LlvmType!.Value, 0),
-                TypeKeyword.StringConstant => _module.Prelude!.Modules["string"].GetClass("String")!.AllChecked.First().LlvmType!.Value,
+                TypeKeyword.Identifier => LLVM.PointerType(
+                    ((StructType)dataType).StructDecl.LlvmType!.Value,
+                    0
+                ),
+                TypeKeyword.StringConstant => _module.Prelude!.Modules["string"]
+                    .GetClass("String")!.AllChecked.First().LlvmType!.Value,
                 TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };

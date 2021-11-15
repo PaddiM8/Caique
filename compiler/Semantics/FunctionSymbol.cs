@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Caique.Ast;
 using Caique.CheckedTree;
 
@@ -25,16 +26,22 @@ namespace Caique.Semantics
             _checkedFunctions.Add(checkedFunction.FullName, checkedFunction);
         }
 
-        public CheckedFunctionDeclStatement? GetChecked(string fullName)
+        public CheckedFunctionDeclStatement? GetChecked(string nameWithExtension, List<IDataType>? typeArguments = null)
         {
-            _checkedFunctions.TryGetValue(fullName, out CheckedFunctionDeclStatement? result);
+            _checkedFunctions.TryGetValue(
+                nameWithExtension + SemanticUtils.GetTypeArgumentString(typeArguments),
+                out CheckedFunctionDeclStatement? result
+            );
 
             return result;
         }
 
-        public CheckedFunctionDeclStatement? GetCheckedFromClass(CheckedClassDeclStatement checkedClass)
+        public CheckedFunctionDeclStatement? GetCheckedFromClass(CheckedClassDeclStatement checkedClass,
+                                                                 List<IDataType>? typeArguments = null)
         {
-            return GetChecked($"{checkedClass.FullName}.{Syntax.Identifier.Value}");
+            string typeArgumentString = SemanticUtils.GetTypeArgumentString(typeArguments);
+
+            return GetChecked($"{checkedClass.FullName}.{Syntax.Identifier.Value}{typeArgumentString}");
         }
     }
 }

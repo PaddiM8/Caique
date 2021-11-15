@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Caique.Ast;
 using Caique.CheckedTree;
+using Caique.Parsing;
 
 namespace Caique.Semantics
 {
@@ -31,6 +32,10 @@ namespace Caique.Semantics
 
         public List<IDataType>? TypeArgumentsForClass { get; set; }
 
+        public List<IDataType>? TypeArgumentsForFunction { get; set; }
+
+        public List<Token>? CurrentFunctionTypeParameters { get; set; }
+
         public TypeCheckerContext CreateChild()
         {
             return new TypeCheckerContext
@@ -42,6 +47,8 @@ namespace Caique.Semantics
                 CurrentClassDecl = CurrentClassDecl,
                 CurrentFunctionDecl = CurrentFunctionDecl,
                 TypeArgumentsForClass = TypeArgumentsForClass,
+                TypeArgumentsForFunction = TypeArgumentsForFunction,
+                CurrentFunctionTypeParameters = CurrentFunctionTypeParameters,
             };
         }
 
@@ -57,6 +64,8 @@ namespace Caique.Semantics
                 CurrentFunctionDecl = CurrentFunctionDecl,
                 Expression = expression,
                 TypeArgumentsForClass = TypeArgumentsForClass,
+                TypeArgumentsForFunction = TypeArgumentsForFunction,
+                CurrentFunctionTypeParameters = CurrentFunctionTypeParameters,
             };
         }
 
@@ -72,6 +81,8 @@ namespace Caique.Semantics
                 CurrentFunctionDecl = CurrentFunctionDecl,
                 Statement = statement,
                 TypeArgumentsForClass = TypeArgumentsForClass,
+                TypeArgumentsForFunction = TypeArgumentsForFunction,
+                CurrentFunctionTypeParameters = CurrentFunctionTypeParameters,
             };
         }
     }

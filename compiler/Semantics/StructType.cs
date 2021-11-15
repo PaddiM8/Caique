@@ -70,14 +70,9 @@ namespace Caique.Semantics
 
         public override string ToString()
         {
-            string typeArguments = "";
-            string pointer = IsExplicitPointer ? "*" : "";
-            if (TypeArguments != null && TypeArguments.Any())
-            {
-                typeArguments = "[" + string.Join(",", TypeArguments.Select(x => x.ToString())) + "]";
-            }
-
-            return StructDecl.Identifier.Value + typeArguments + pointer;
+            return StructDecl.Identifier.Value
+                + SemanticUtils.GetTypeArgumentString(TypeArguments)
+                + (IsExplicitPointer ? "*" : "");
         }
     }
 }

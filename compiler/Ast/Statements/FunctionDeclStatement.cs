@@ -12,6 +12,8 @@ namespace Caique.Ast
             ? ExtensionOf!.FullName + "." + Identifier.Value
             : Identifier.Value;
 
+        public List<Token>? TypeParameters { get; }
+
         public List<VariableDeclStatement> Parameters { get; }
 
         public BlockExpression? Body { get; }
@@ -30,6 +32,7 @@ namespace Caique.Ast
         public bool IsExtensionFunction => ExtensionOf != null;
 
         public FunctionDeclStatement(Token identifier,
+                                     List<Token>? typeParameters,
                                      List<VariableDeclStatement> parameters,
                                      BlockExpression? body,
                                      TypeExpression? returnType,
@@ -40,6 +43,7 @@ namespace Caique.Ast
                                      TextSpan span) : base(span)
         {
             Identifier = identifier;
+            TypeParameters = typeParameters;
             Parameters = parameters;
             Body = body;
             IsMethod = isMethod;

@@ -26,19 +26,16 @@ namespace Caique.Semantics
             _checkedClasses.Add(checkedClass.FullName, checkedClass);
         }
 
-        public CheckedClassDeclStatement? GetChecked(string fullName)
+        public CheckedClassDeclStatement? GetChecked(List<IDataType>? typeArguments = null)
         {
-            _checkedClasses.TryGetValue(fullName, out CheckedClassDeclStatement? result);
+            if (typeArguments == null) return AllChecked.FirstOrDefault();
+
+            _checkedClasses.TryGetValue(
+                Syntax.Identifier.Value + SemanticUtils.GetTypeArgumentString(typeArguments),
+                out CheckedClassDeclStatement? result
+            );
 
             return result;
-        }
-
-        public CheckedClassDeclStatement? GetCheckedFromTypeArguments(List<IDataType> typeArguments)
-        {
-            string typeArgumentString = string.Join(",", typeArguments.Select(x => x.ToString()));
-            string fullName = $"{Syntax.Identifier.Value}[{typeArgumentString}]";
-
-            return GetChecked(fullName);
         }
     }
 }

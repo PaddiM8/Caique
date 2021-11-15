@@ -9,7 +9,10 @@ namespace Caique.CheckedTree
     {
         public Token Identifier { get; }
 
-        public string FullName
+        public string FullName => FullNameWithoutTypeArguments
+            + SemanticUtils.GetTypeArgumentString(TypeArguments);
+
+        public string FullNameWithoutTypeArguments
         {
             get
             {
@@ -27,6 +30,8 @@ namespace Caique.CheckedTree
                 }
             }
         }
+
+        public List<IDataType>? TypeArguments { get; }
 
         public List<CheckedVariableDeclStatement> Parameters { get; }
 
@@ -55,6 +60,7 @@ namespace Caique.CheckedTree
         public Dictionary<int, CheckedFunctionDeclStatement>? Overrides { get; }
 
         public CheckedFunctionDeclStatement(Token identifier,
+                                            List<IDataType>? typeArguments,
                                             List<CheckedVariableDeclStatement> parameters,
                                             CheckedBlockExpression? body,
                                             IDataType returnType,
@@ -66,6 +72,7 @@ namespace Caique.CheckedTree
                                             IDataType? extensionOf = null)
         {
             Identifier = identifier;
+            TypeArguments = typeArguments;
             Parameters = parameters;
             Body = body;
             IsInitFunction = isInitFunction;

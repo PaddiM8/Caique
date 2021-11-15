@@ -1,9 +1,16 @@
 ﻿using System;
 using Caique.Ast;
+using Caique.CheckedTree;
 using Caique.Parsing;
 
 namespace Caique.Semantics
 {
+    public enum GenericTypeOrigin
+    {
+        Class,
+        Function,
+    }
+
     /// <summary>
     /// Represents a Caique type.
     /// </summary>
@@ -14,6 +21,8 @@ namespace Caique.Semantics
         public Token Identifier { get; set; }
 
         public int ParameterIndex { get; set; }
+
+        public GenericTypeOrigin Origin { get; }
 
         public bool IsExplicitPointer { get; set; }
 
@@ -27,17 +36,22 @@ namespace Caique.Semantics
 
         public bool IsInt => false;
 
-        public GenericType(Token identifier, int parameterIndex, bool isExplicitPointer = false)
+        public GenericType(Token identifier,
+                           int parameterIndex,
+                           GenericTypeOrigin origin,
+                           bool isExplicitPointer = false)
         {
             Identifier = identifier;
             ParameterIndex = parameterIndex;
+            Origin = origin;
             IsExplicitPointer = isExplicitPointer;
         }
 
         public bool IsCompatible(IDataType expected)
         {
             return expected is GenericType expectedGenericType &&
-                ParameterIndex == expectedGenericType.ParameterIndex;
+                ParameterIndex == expectedGenericType.ParameterIndex &&
+                Origin == expectedGenericType.Origin;
         }
 
         public override string ToString()
