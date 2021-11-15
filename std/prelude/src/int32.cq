@@ -5,7 +5,7 @@ ext i32 toString(): String {
     let out = malloc(size);
     let length = snprintf(out, size, "%d", self);
 
-    new String(out, length)
+    new String(out, length, true)
 }
 
 fn snprintf(out: i8*, size: isize, format: i8*, input: i32): isize;

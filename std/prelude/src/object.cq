@@ -1,7 +1,7 @@
 class object
 {
     Id: i32;
-    ReferenceCount: isize = 0;
+    ReferenceCount: isize = 1;
 
     virtual fn @deinit() {}
 
@@ -13,10 +13,10 @@ class object
 
     fn release() {
         ReferenceCount = ReferenceCount - 1;
-        //printf("[%d] ", Id);
         //printf("Release -> %d\n", ReferenceCount);
 
         if ReferenceCount == 0 {
+            //printf("[%d] Destructing\n", Id);
             @deinit();
             free(self);
         }

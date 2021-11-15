@@ -862,6 +862,7 @@ namespace Caique.Semantics
                     TokenKind.f8 => TypeKeyword.f8,
                     TokenKind.f32 => TypeKeyword.f32,
                     TokenKind.f64 => TypeKeyword.f64,
+                    TokenKind.Bool => TypeKeyword.Bool,
                     _ => TypeKeyword.Identifier,
                 };
 

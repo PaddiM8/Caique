@@ -4,8 +4,13 @@ class String
 {
     Bytes: i8*;
     Length: isize;
+    ShouldFree: bool;
 
-    init(Bytes, Length) {}
+    init(Bytes, Length, ShouldFree) {}
+
+    deinit {
+        if ShouldFree: free(Bytes);
+    }
 
     fn concat(str: String): String {
         Length = Length + str.Length;
@@ -13,7 +18,7 @@ class String
         strcat(newStr, Bytes);
         strcat(newStr, str.Bytes);
 
-        new String(newStr, Length)
+        new String(newStr, Length, true)
     }
 }
 

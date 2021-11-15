@@ -14,5 +14,5 @@ fn readln(): String {
     let out = malloc(256);
     gets(out); // TODO: Don't use gets.
 
-    new String(out, 256)
+    new String(out, 256, true)
 }

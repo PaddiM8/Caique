@@ -28,6 +28,7 @@ namespace Caique.Parsing
         // Types
         i8, i32, i64, isize,
         f8, f32, f64,
+        Bool,
         Void,
 
         // Other

@@ -576,15 +576,15 @@ namespace Caique.CodeGeneration
                         (ulong)literalExpression.Value.Value.Length,
                         1
                     );
+                    var shouldFree = LLVM.ConstInt(LLVM.Int1Type(), 0, 0);
 
                     BuildCall(
                         structType.StructDecl.InitFunction!.LlvmValue!.Value,
                         structType.StructDecl.InitFunction!.LlvmType!.Value,
-                        new List<LLVMValueRef>() { malloc, stringPtr, length },
+                        new List<LLVMValueRef>() { malloc, stringPtr, length, shouldFree },
                         structType.StructDecl.Module != _module
                     );
 
-                    ArcRetain(malloc);
                     _current.Block!.ValuesToRelease.Add(malloc);
 
                     return malloc;
@@ -904,7 +904,6 @@ namespace Caique.CodeGeneration
                 );
             }
 
-            ArcRetain(malloc);
             _current.Block!.ValuesToRelease.Add(malloc);
 
             return malloc;
