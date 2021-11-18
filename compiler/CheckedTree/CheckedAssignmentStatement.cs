@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.CheckedTree
 {
@@ -15,6 +16,14 @@ namespace Caique.CheckedTree
         {
             Assignee = left;
             Value = value;
+        }
+
+        public override CheckedStatement Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedAssignmentStatement(
+                Assignee.Clone(cloningInfo),
+                Value.Clone(cloningInfo)
+            );
         }
     }
 }

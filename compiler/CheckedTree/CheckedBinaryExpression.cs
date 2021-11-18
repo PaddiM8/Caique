@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 using Caique.Semantics;
 
@@ -18,6 +19,16 @@ namespace Caique.CheckedTree
             Left = left;
             Operator = op;
             Right = right;
+        }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedBinaryExpression(
+                Left.Clone(cloningInfo),
+                Operator,
+                Right.Clone(cloningInfo),
+                DataType.Clone(cloningInfo)
+            );
         }
     }
 }

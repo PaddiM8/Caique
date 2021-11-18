@@ -15,5 +15,13 @@ namespace Caique.CheckedTree
         {
             Expressions = expressions;
         }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedDotExpression(
+                Expressions.CloneExpressions(cloningInfo),
+                DataType.Clone(cloningInfo)
+            );
+        }
     }
 }

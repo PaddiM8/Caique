@@ -19,5 +19,14 @@ namespace Caique.CheckedTree
             TokenKind = tokenKind;
             Arguments = arguments;
         }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedKeywordValueExpression(
+                TokenKind,
+                Arguments?.CloneExpressions(cloningInfo),
+                DataType.Clone(cloningInfo)
+            );
+        }
     }
 }

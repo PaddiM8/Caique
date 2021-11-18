@@ -26,5 +26,6 @@ namespace Caique.Diagnostics
         UnknownEscapeSequence,
         UnknownToken,
         WrongNumberOfArguments,
+        WrongNumberOfTypeArguments,
     }
 }

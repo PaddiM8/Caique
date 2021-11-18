@@ -58,5 +58,15 @@ namespace Caique.Semantics
         {
             return Identifier.Value;
         }
+
+        public IDataType Clone(CheckedCloningInfo cloningInfo)
+        {
+            if (cloningInfo.TypeParameters == null || cloningInfo.TypeArguments == null)
+                return new GenericType(Identifier, ParameterIndex, Origin, IsExplicitPointer);
+
+            int typeArgumentIndex = cloningInfo.TypeParameters.FindIndex(x => x.Value == Identifier.Value);
+
+            return cloningInfo.TypeArguments[typeArgumentIndex].Clone(cloningInfo);
+        }
     }
 }

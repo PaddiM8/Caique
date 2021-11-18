@@ -11,7 +11,7 @@ using Caique.Util;
 
 namespace Caique.Semantics
 {
-    class TypeChecker : IAstTraverser<CheckedStatement, CheckedExpression>
+    public class TypeChecker : IAstTraverser<CheckedStatement, CheckedExpression>
     {
         private readonly ModuleEnvironment _module;
         private readonly DiagnosticBag _diagnostics;
@@ -135,67 +135,55 @@ namespace Caique.Semantics
                 if (alreadyChecked != null) return alreadyChecked;
             }
 
-            if (functionDeclStatement.IsVirtual && !functionDeclStatement.IsMethod)
-            {
-                _diagnostics.ReportMisplacedVirtual(functionDeclStatement.Span);
-            }
+            // If a function is analysed without context, eg. while simply looping
+            // through the AST, there will be no type arguments supplied. In this
+            // case the types won't be swapped out yet, so it's fine that there
+            // are none supplied.
+            bool allowLackOfTypeArguments = _current.Parent?.Expression is not CallExpression;
 
-            if (functionDeclStatement.IsOverride && !functionDeclStatement.IsMethod)
+            if (!allowLackOfTypeArguments &&
+                functionDeclStatement.TypeParameters?.Count != _current.TypeArgumentsForFunction?.Count)
             {
-                _diagnostics.ReportMisplacedOverride(functionDeclStatement.Span);
-            }
+                _diagnostics.ReportWrongNumberOfTypeArguments(
+                    functionDeclStatement.Identifier,
+                    _current.CurrentFunctionTypeParameters?.Count ?? 0,
+                    functionDeclStatement.TypeParameters?.Count ?? 0
+                );
 
-            var inheritedFunction = _current.CurrentCheckedClass?.Inherited?.GetFunction(functionDeclStatement.FullName);
-            if (inheritedFunction != null)
-            {
-                if (!inheritedFunction.IsVirtual)
-                {
-                    _diagnostics.ReportCannotOverrideNonVirtual(functionDeclStatement.Span);
-                }
-
-                if (!functionDeclStatement.IsOverride)
-                {
-                    _diagnostics.ReportExpectedOverride(functionDeclStatement.Span);
-                }
+                return new CheckedUnknownStatement();
             }
 
             // Should only be null if it's an init function
             var symbol = _current.CurrentCheckedClass?.Environment.GetFunction(functionDeclStatement.FullName) ??
                 _module.GetFunction(functionDeclStatement.FullName);
-            if (symbol?.HasChecked ?? false)
+
+            var inheritedFunction = _current.CurrentCheckedClass?.Inherited?.GetFunction(functionDeclStatement.FullName);
+            if (_current.TypeArgumentsForFunction != null)
             {
-                // If it's from the same syntactical scope but belongs to
-                // another class signature. For example for different
-                // type arguments.
-                var similarFunction = symbol.AllChecked.First();
-                var newCheckedFunction = new CheckedFunctionDeclStatement(
-                    functionDeclStatement.Identifier,
-                    _current.TypeArgumentsForFunction,
-                    similarFunction.Parameters,
-                    similarFunction.Body,
-                    similarFunction.ReturnType,
-                    functionDeclStatement.IsInitFunction,
-                    functionDeclStatement.IsVirtual,
-                    functionDeclStatement.IsOverride,
-                    _current.CurrentCheckedClass,
-                    _module,
-                    similarFunction.ExtensionOf
+                // If it hasn't been checked without any type arguments yet,
+                // that needs to happen before. It can then use that as a 
+                // base.
+                var similarFunction = symbol!.AllChecked.FirstOrDefault();
+                if (similarFunction == null)
+                {
+                    var previousTypeArguments = _current.TypeArgumentsForFunction;
+                    _current.TypeArgumentsForFunction = null;
+                    similarFunction = (CheckedFunctionDeclStatement)Next(functionDeclStatement);
+                    _current.TypeArgumentsForFunction = previousTypeArguments;
+                }
+
+                var newCheckedFunction = CheckFunctionDeclWithTypeArguments(
+                    functionDeclStatement,
+                    symbol!,
+                    similarFunction!,
+                    _current.TypeArgumentsForFunction!,
+                    inheritedFunction
                 );
 
-                if (!functionDeclStatement.IsInitFunction)
-                {
-                    symbol!.AddChecked(newCheckedFunction);
-                }
-
-                if (functionDeclStatement.IsVirtual && _current.CurrentCheckedClass != null)
-                {
-                    _current.CurrentCheckedClass.RegisterVirtualMethod(newCheckedFunction);
-                }
-
-                if (functionDeclStatement.IsOverride)
-                {
-                    inheritedFunction?.RegisterOverride(newCheckedFunction);
-                }
+                // Remove the version that doesn't have any type arguments,
+                // since it isn't needed anymore. The new checked one can
+                // be used as a "template" for future variations.
+                symbol!.TryRemovedChecked(functionDeclStatement.FullName);
 
                 return newCheckedFunction;
             }
@@ -233,10 +221,11 @@ namespace Caique.Semantics
                 CheckedVariableDeclStatement checkedParameter;
                 if (functionDeclStatement.Body == null)
                 {
+                    var specifiedType = (CheckedTypeExpression)Next(uncheckedParameter.SpecifiedType!);
                     checkedParameter = new CheckedVariableDeclStatement(
                         uncheckedParameter.Identifier,
                         null,
-                        Next(uncheckedParameter.SpecifiedType!).DataType,
+                        specifiedType.DataType,
                         VariableType.FunctionParameter
                     );
                 }
@@ -254,7 +243,6 @@ namespace Caique.Semantics
             var extensionOf = functionDeclStatement.IsExtensionFunction
                 ? Next(functionDeclStatement.ExtensionOf!).DataType
                 : null;
-            _current.CurrentFunctionTypeParameters = null;
 
             var checkedFunction = new CheckedFunctionDeclStatement(
                 functionDeclStatement.Identifier,
@@ -270,7 +258,31 @@ namespace Caique.Semantics
                 extensionOf
             );
 
-            if (!functionDeclStatement.IsInitFunction)
+            if (functionDeclStatement.IsVirtual && !functionDeclStatement.IsMethod)
+            {
+                _diagnostics.ReportMisplacedVirtual(functionDeclStatement.Span);
+            }
+
+            if (functionDeclStatement.IsOverride && !functionDeclStatement.IsMethod)
+            {
+                _diagnostics.ReportMisplacedOverride(functionDeclStatement.Span);
+            }
+
+            if (inheritedFunction != null)
+            {
+                if (!inheritedFunction.IsVirtual)
+                {
+                    _diagnostics.ReportCannotOverrideNonVirtual(functionDeclStatement.Span);
+                }
+
+                if (!functionDeclStatement.IsOverride)
+                {
+                    _diagnostics.ReportExpectedOverride(functionDeclStatement.Span);
+                }
+            }
+
+            if (!functionDeclStatement.IsInitFunction &&
+                functionDeclStatement.TypeParameters?.Count == _current.TypeArgumentsForFunction?.Count)
             {
                 symbol!.AddChecked(checkedFunction);
             }
@@ -285,7 +297,57 @@ namespace Caique.Semantics
                 inheritedFunction?.RegisterOverride(checkedFunction);
             }
 
+            _current.CurrentFunctionTypeParameters = null;
+
             return checkedFunction;
+        }
+
+        private CheckedFunctionDeclStatement CheckFunctionDeclWithTypeArguments(FunctionDeclStatement functionDeclStatement,
+                                                                                FunctionSymbol symbol,
+                                                                                CheckedFunctionDeclStatement similarFunction,
+                                                                                List<IDataType> typeArguments,
+                                                                                CheckedFunctionDeclStatement? inheritedFunction)
+        {
+            var cloningInfo = new CheckedCloningInfo
+            {
+                TypeParameters = functionDeclStatement.TypeParameters,
+                TypeArguments = typeArguments
+            };
+
+            // Parameters
+            var newParameters = new List<CheckedVariableDeclStatement>(similarFunction.Parameters.Count);
+            foreach (var parameter in similarFunction.Parameters)
+                newParameters.Add((CheckedVariableDeclStatement)parameter.Clone(cloningInfo));
+
+            // Body
+            var newBody = similarFunction.Body?.Clone(cloningInfo) as CheckedBlockExpression;
+
+            var newCheckedFunction = new CheckedFunctionDeclStatement(
+                functionDeclStatement.Identifier,
+                typeArguments,
+                newParameters,
+                newBody,
+                similarFunction.ReturnType,
+                functionDeclStatement.IsInitFunction,
+                functionDeclStatement.IsVirtual,
+                functionDeclStatement.IsOverride,
+                _current.CurrentCheckedClass,
+                _module,
+                similarFunction.ExtensionOf
+            );
+            symbol!.AddChecked(newCheckedFunction);
+
+            if (functionDeclStatement.IsVirtual && _current.CurrentCheckedClass != null)
+            {
+                _current.CurrentCheckedClass.RegisterVirtualMethod(newCheckedFunction);
+            }
+
+            if (functionDeclStatement.IsOverride)
+            {
+                inheritedFunction?.RegisterOverride(newCheckedFunction);
+            }
+
+            return newCheckedFunction;
         }
 
         public CheckedStatement Visit(ClassDeclStatement classDeclStatement)
@@ -812,8 +874,8 @@ namespace Caique.Semantics
             _current.TypeArgumentsForFunction = callExpression.TypeArguments?
                 .Select(x => Next(x).DataType).ToList();
             var checkedFunction = (CheckedFunctionDeclStatement)Next(symbol!.Syntax);
-            _current.TypeArgumentsForFunction = null;
             _current.CurrentCheckedClass = previousObject;
+            _current.TypeArgumentsForFunction = null;
 
             var checkedCall = CheckCall(
                 lastIdentifier,
@@ -921,7 +983,8 @@ namespace Caique.Semantics
                 typeArguments = new List<IDataType>();
                 foreach (var argument in typeExpression.TypeArguments)
                 {
-                    typeArguments.Add(Next(argument).DataType);
+                    var typeArgumentType = Next(argument).DataType;
+                    typeArguments.Add(typeArgumentType);
                 }
             }
 
@@ -953,7 +1016,7 @@ namespace Caique.Semantics
                 {
                     if (typeParameter.Value == lastIdentifier.Value)
                     {
-                        return new CheckedTypeExpression(
+                        var checkedType = new CheckedTypeExpression(
                             new GenericType(
                                 lastIdentifier,
                                 i,
@@ -961,6 +1024,8 @@ namespace Caique.Semantics
                                 typeExpression.IsExplicitPointer
                             )
                         );
+
+                        return checkedType;
                     }
                 }
             }
@@ -1135,9 +1200,11 @@ namespace Caique.Semantics
             IDataType dataType;
 
             // If a type was specified
+            CheckedTypeExpression? specifiedTypeExpression = null;
             if (variableDeclStatement.SpecifiedType != null)
             {
-                var specifiedType = Next(variableDeclStatement.SpecifiedType).DataType;
+                specifiedTypeExpression = (CheckedTypeExpression)Next(variableDeclStatement.SpecifiedType);
+                var specifiedType = specifiedTypeExpression.DataType;
                 dataType = specifiedType;
                 _current.DataType = specifiedType;
 

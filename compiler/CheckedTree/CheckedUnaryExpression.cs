@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.CheckedTree
 {
@@ -14,6 +16,11 @@ namespace Caique.CheckedTree
         {
             Operator = op;
             Value = value;
+        }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedUnaryExpression(Operator, Value.Clone(cloningInfo));
         }
     }
 }

@@ -1261,7 +1261,6 @@ namespace Caique.CodeGeneration
                 ),
                 TypeKeyword.StringConstant => _module.Prelude!.Modules["string"]
                     .GetClass("String")!.AllChecked.First().LlvmType!.Value,
-                TypeKeyword.Unknown => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };
 

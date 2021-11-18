@@ -1,5 +1,6 @@
 ﻿using System;
 using Caique.Ast;
+using Caique.CheckedTree;
 using Caique.Parsing;
 
 namespace Caique.Semantics
@@ -54,5 +55,10 @@ namespace Caique.Semantics
 
         public override string ToString() =>
             Type.ToString().ToLower() + (IsExplicitPointer ? "*" : "");
+
+        public IDataType Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new PrimitiveType(Type, IsExplicitPointer);
+        }
     }
 }

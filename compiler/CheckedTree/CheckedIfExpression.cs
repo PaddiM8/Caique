@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 using Caique.Semantics;
 
@@ -19,6 +20,15 @@ namespace Caique.CheckedTree
             Condition = condition;
             Branch = branch;
             ElseBranch = elseBranch;
+        }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedIfExpression(
+                Condition.Clone(cloningInfo),
+                (CheckedBlockExpression)Branch.Clone(cloningInfo),
+                ElseBranch?.Clone(cloningInfo) as CheckedBlockExpression
+            );
         }
     }
 }

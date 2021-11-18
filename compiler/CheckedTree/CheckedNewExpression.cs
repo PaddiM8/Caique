@@ -14,5 +14,13 @@ namespace Caique.CheckedTree
         {
             Arguments = arguments;
         }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedNewExpression(
+                Arguments.CloneExpressions(cloningInfo),
+                DataType.Clone(cloningInfo)
+            );
+        }
     }
 }

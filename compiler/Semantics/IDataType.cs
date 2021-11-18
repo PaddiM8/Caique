@@ -1,5 +1,6 @@
 ﻿using System;
 using Caique.Ast;
+using Caique.CheckedTree;
 using Caique.Parsing;
 
 namespace Caique.Semantics
@@ -26,5 +27,6 @@ namespace Caique.Semantics
         bool IsCompatible(IDataType expected);
 
         string ToString();
+        IDataType Clone(CheckedCloningInfo cloningInfo);
     }
 }

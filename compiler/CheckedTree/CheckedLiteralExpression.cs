@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Caique.Parsing;
 using Caique.Semantics;
 
@@ -12,6 +13,11 @@ namespace Caique.CheckedTree
             : base(dataType)
         {
             Value = value;
+        }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedLiteralExpression(Value, DataType.Clone(cloningInfo));
         }
     }
 }

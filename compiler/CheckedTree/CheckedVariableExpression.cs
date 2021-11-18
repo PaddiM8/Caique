@@ -23,5 +23,15 @@ namespace Caique.CheckedTree
             VariableDecl = variableDecl;
             ObjectInstance = objectInstance;
         }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedVariableExpression(
+                Identifier,
+                VariableDecl,
+                DataType.Clone(cloningInfo),
+                ObjectInstance?.Clone(cloningInfo)
+            );
+        }
     }
 }

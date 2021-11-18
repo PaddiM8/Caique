@@ -80,8 +80,8 @@ namespace Caique
             rootModule.GenerateContent();
 
             var outputType = PrintLlvm
-                ? OutputType.IntermediateRepresentation
-                : OutputType.ObjectFile;
+                ? OutputKind.IntermediateRepresentation
+                : OutputKind.ObjectFile;
             prelude.Emit(outputType);
             rootModule.Emit(outputType);
 

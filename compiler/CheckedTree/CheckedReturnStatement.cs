@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.CheckedTree
 {
@@ -7,9 +9,14 @@ namespace Caique.CheckedTree
     {
         public CheckedExpression? Expression { get; }
 
-        public CheckedReturnStatement(CheckedExpression? expr)
+        public CheckedReturnStatement(CheckedExpression? expression)
         {
-            Expression = expr;
+            Expression = expression;
+        }
+
+        public override CheckedStatement Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedReturnStatement(Expression?.Clone(cloningInfo));
         }
     }
 }

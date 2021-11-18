@@ -95,5 +95,26 @@ namespace Caique.CheckedTree
             if (!IsVirtual) throw new InvalidOperationException("Can't add an override function to a non-virtual function.");
             Overrides!.Add(checkedFunction.ParentObject!.Id, checkedFunction);
         }
+
+        public override CheckedStatement Clone(CheckedCloningInfo cloningInfo)
+        {
+            var clonedParameters = new List<CheckedVariableDeclStatement>(Parameters.Count);
+            foreach (var parameter in Parameters)
+                clonedParameters.Add((CheckedVariableDeclStatement)parameter.Clone(cloningInfo));
+
+            return new CheckedFunctionDeclStatement(
+                Identifier,
+                TypeArguments,
+                clonedParameters,
+                Body?.Clone(cloningInfo) as CheckedBlockExpression,
+                ReturnType.Clone(cloningInfo),
+                IsInitFunction,
+                IsVirtual,
+                IsOverride,
+                ParentObject,
+                Module,
+                ExtensionOf?.Clone(cloningInfo)
+            );
+        }
     }
 }

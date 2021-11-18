@@ -74,5 +74,37 @@ namespace Caique.Semantics
                 + SemanticUtils.GetTypeArgumentString(TypeArguments)
                 + (IsExplicitPointer ? "*" : "");
         }
+
+        public IDataType Clone(CheckedCloningInfo cloningInfo)
+        {
+            var newTypeArguments = new List<IDataType>(TypeArguments?.Count ?? 0);
+            var newStructDecl = StructDecl;
+            if (TypeArguments != null)
+            {
+                foreach (var typeArgument in TypeArguments)
+                {
+                    newTypeArguments.Add(typeArgument.Clone(cloningInfo));
+                }
+
+                newStructDecl = new CheckedClassDeclStatement(
+                    StructDecl.Identifier,
+                    newTypeArguments,
+                    StructDecl.Environment,
+                    StructDecl.Module,
+                    StructDecl.Inherited?.DataType as StructType
+                );
+
+                var symbol = StructDecl.Module.GetClass(StructDecl.Identifier.Value, false);
+                if (symbol!.GetChecked(newTypeArguments) == null)
+                    symbol.AddChecked(newStructDecl);
+            }
+
+            return new StructType(
+                Type,
+                newTypeArguments,
+                newStructDecl,
+                IsExplicitPointer
+            );
+        }
     }
 }

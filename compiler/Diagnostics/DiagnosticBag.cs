@@ -278,6 +278,16 @@ namespace Caique.Diagnostics
             );
         }
 
+        public void ReportWrongNumberOfTypeArguments(Token identifier, int got, int expected)
+        {
+            Report(
+                DiagnosticIdentifier.WrongNumberOfArguments,
+                $"Wrong number of type arguments for '{identifier.Value}'. Got {got}, but expected {expected}.",
+                identifier.Span,
+                DiagnosticType.Error
+            );
+        }
+
         private void Report(DiagnosticIdentifier identifier,
                             string message,
                             TextSpan span,

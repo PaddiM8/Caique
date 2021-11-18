@@ -22,5 +22,15 @@ namespace Caique.CheckedTree
             FunctionDecl = functionDecl;
             ObjectInstance = objectInstance;
         }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedCallExpression(
+                Arguments.CloneExpressions(cloningInfo),
+                FunctionDecl,
+                DataType.Clone(cloningInfo),
+                ObjectInstance?.Clone(cloningInfo)
+            );
+        }
     }
 }

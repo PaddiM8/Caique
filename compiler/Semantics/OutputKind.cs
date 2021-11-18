@@ -1,6 +1,6 @@
 namespace Caique.Semantics
 {
-    public enum OutputType
+    public enum OutputKind
     {
         ObjectFile,
         IntermediateRepresentation,

@@ -22,5 +22,15 @@ namespace Caique.CheckedTree
             Environment = environment;
             ReturnsLastExpression = returnsLastExpression;
         }
+
+        public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedBlockExpression(
+                Statements.CloneStatements(cloningInfo),
+                Environment,
+                DataType.Clone(cloningInfo),
+                ReturnsLastExpression
+            );
+        }
     }
 }

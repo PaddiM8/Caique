@@ -43,5 +43,10 @@ namespace Caique.Semantics
 
             return GetChecked($"{checkedClass.FullName}.{Syntax.Identifier.Value}{typeArgumentString}");
         }
+
+        public void TryRemovedChecked(string nameWithExtension)
+        {
+            _checkedFunctions.Remove(nameWithExtension);
+        }
     }
 }

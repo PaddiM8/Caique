@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Caique.Ast;
 using Caique.Parsing;
 using Caique.Semantics;
@@ -21,15 +22,26 @@ namespace Caique.CheckedTree
 
         public CheckedVariableDeclStatement(Token identifier,
                                             CheckedExpression? value,
-                                            IDataType type,
+                                            IDataType dataType,
                                             VariableType variableType = VariableType.Local,
                                             int indexInObject = 0)
         {
             Identifier = identifier;
             Value = value;
-            DataType = type;
+            DataType = dataType;
             VariableType = variableType;
             IndexInObject = indexInObject;
+        }
+
+        public override CheckedStatement Clone(CheckedCloningInfo cloningInfo)
+        {
+            return new CheckedVariableDeclStatement(
+                Identifier,
+                Value?.Clone(cloningInfo),
+                DataType.Clone(cloningInfo),
+                VariableType,
+                IndexInObject
+            );
         }
     }
 }

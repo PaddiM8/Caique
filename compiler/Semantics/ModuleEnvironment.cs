@@ -158,17 +158,17 @@ namespace Caique.Semantics
             }
         }
 
-        public void Emit(OutputType outputType)
+        public void Emit(OutputKind outputType)
         {
             if (Diagnostics.Any()) return;
 
             if (IsCodeModule)
             {
-                if (outputType == OutputType.ObjectFile)
+                if (outputType == OutputKind.ObjectFile)
                 {
                     _codeGenerator!.GenerateObjectFile(_outputDirectory);
                 }
-                else if (outputType == OutputType.IntermediateRepresentation)
+                else if (outputType == OutputKind.IntermediateRepresentation)
                 {
                     _codeGenerator!.GenerateLlvmFile(_outputDirectory);
                 }
