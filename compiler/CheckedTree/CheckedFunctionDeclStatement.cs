@@ -53,6 +53,8 @@ namespace Caique.CheckedTree
 
         public IDataType? ExtensionOf { get; }
 
+        public bool ShouldBeEmitted { get; }
+
         public bool IsExtensionFunction => ExtensionOf != null;
 
         public int? IndexInVirtualMethodTable { get; set; }
@@ -69,7 +71,8 @@ namespace Caique.CheckedTree
                                             bool isOverride,
                                             CheckedClassDeclStatement? parentObject,
                                             ModuleEnvironment? module,
-                                            IDataType? extensionOf = null)
+                                            IDataType? extensionOf = null,
+                                            bool shouldBeEmitted = true)
         {
             Identifier = identifier;
             TypeArguments = typeArguments;
@@ -82,6 +85,7 @@ namespace Caique.CheckedTree
             ParentObject = parentObject;
             Module = module;
             ExtensionOf = extensionOf;
+            ShouldBeEmitted = shouldBeEmitted;
 
             if (isVirtual)
             {
@@ -102,7 +106,8 @@ namespace Caique.CheckedTree
             foreach (var parameter in Parameters)
                 clonedParameters.Add((CheckedVariableDeclStatement)parameter.Clone(cloningInfo));
 
-            return new CheckedFunctionDeclStatement(
+            var parentClass = cloningInfo.CheckedParentClass ?? ParentObject;
+            var newCheckedFunction = new CheckedFunctionDeclStatement(
                 Identifier,
                 TypeArguments,
                 clonedParameters,
@@ -111,10 +116,21 @@ namespace Caique.CheckedTree
                 IsInitFunction,
                 IsVirtual,
                 IsOverride,
-                ParentObject,
+                parentClass,
                 Module,
-                ExtensionOf?.Clone(cloningInfo)
+                ExtensionOf?.Clone(cloningInfo),
+                cloningInfo.CheckedParentClass?.ShouldBeEmitted ?? true
             );
+
+            if (!IsInitFunction)
+            {
+                FunctionSymbol symbol = parentClass != null
+                    ? parentClass.Environment.GetFunction(newCheckedFunction.Identifier.Value, false)!
+                    : Module!.SymbolEnvironment.GetFunction(newCheckedFunction.Identifier.Value, false)!;
+                symbol.AddChecked(newCheckedFunction);
+            }
+
+            return newCheckedFunction;
         }
     }
 }

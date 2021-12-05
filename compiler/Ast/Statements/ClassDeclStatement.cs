@@ -5,7 +5,7 @@ using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public partial class ClassDeclStatement : Statement
+    public partial class ClassDeclStatement : Statement, IGenericTypeOrigin
     {
         public Token Identifier { get; }
 

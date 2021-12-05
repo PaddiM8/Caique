@@ -27,6 +27,8 @@ namespace Caique.CheckedTree
 
         public ModuleEnvironment Module { get; }
 
+        public bool ShouldBeEmitted { get; }
+
         public List<CheckedFunctionDeclStatement>? VirtualMethods { get; private set; }
 
         public StructType? InheritedType { get; }
@@ -39,7 +41,8 @@ namespace Caique.CheckedTree
                                          List<IDataType>? typeArguments,
                                          SymbolEnvironment environment,
                                          ModuleEnvironment module,
-                                         StructType? ancestor = null)
+                                         StructType? ancestor = null,
+                                         bool shouldBeEmitted = true)
         {
             Identifier = identifier;
             TypeArguments = typeArguments;
@@ -47,6 +50,7 @@ namespace Caique.CheckedTree
             InheritedType = ancestor;
             Module = module;
             DataType = new StructType(TypeKeyword.Identifier, typeArguments, this);
+            ShouldBeEmitted = shouldBeEmitted;
 
             CheckedClassDeclStatement? inheritedClass = this;
             while (inheritedClass.Inherited != null)

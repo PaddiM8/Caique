@@ -66,6 +66,26 @@ namespace Caique.Semantics
             return value;
         }
 
+        public CheckedClassDeclStatement NextClassDecl(ClassDeclStatement classDeclStatement, List<IDataType>? typeArguments)
+        {
+            var previousTypeArguments = _current.TypeArgumentsForClass;
+            _current.TypeArgumentsForClass = typeArguments;
+            var value = Next(classDeclStatement);
+            _current.TypeArgumentsForClass = previousTypeArguments;
+
+            return (CheckedClassDeclStatement)value;
+        }
+
+        public CheckedFunctionDeclStatement NextFunctionDecl(FunctionDeclStatement functionDeclStatement, List<IDataType>? typeArguments)
+        {
+            var previousTypeArguments = _current.TypeArgumentsForFunction;
+            _current.TypeArgumentsForFunction = typeArguments;
+            var value = Next(functionDeclStatement);
+            _current.TypeArgumentsForFunction = previousTypeArguments;
+
+            return (CheckedFunctionDeclStatement)value;
+        }
+
         public CheckedStatement Visit(ExpressionStatement expressionStatement)
         {
             return new CheckedExpressionStatement(Next(expressionStatement.Expression));
@@ -166,10 +186,7 @@ namespace Caique.Semantics
                 var similarFunction = symbol!.AllChecked.FirstOrDefault();
                 if (similarFunction == null)
                 {
-                    var previousTypeArguments = _current.TypeArgumentsForFunction;
-                    _current.TypeArgumentsForFunction = null;
-                    similarFunction = (CheckedFunctionDeclStatement)Next(functionDeclStatement);
-                    _current.TypeArgumentsForFunction = previousTypeArguments;
+                    similarFunction = NextFunctionDecl(functionDeclStatement, null);
                 }
 
                 var newCheckedFunction = CheckFunctionDeclWithTypeArguments(
@@ -183,7 +200,7 @@ namespace Caique.Semantics
                 // Remove the version that doesn't have any type arguments,
                 // since it isn't needed anymore. The new checked one can
                 // be used as a "template" for future variations.
-                symbol!.TryRemovedChecked(functionDeclStatement.FullName);
+                //symbol!.TryRemovedChecked(functionDeclStatement.FullName);
 
                 return newCheckedFunction;
             }
@@ -243,6 +260,9 @@ namespace Caique.Semantics
             var extensionOf = functionDeclStatement.IsExtensionFunction
                 ? Next(functionDeclStatement.ExtensionOf!).DataType
                 : null;
+            bool shouldBeEmitted = functionDeclStatement.TypeParameters?.Count ==
+                _current.TypeArgumentsForFunction?.Count &&
+                (_current.CurrentCheckedClass?.ShouldBeEmitted ?? true);
 
             var checkedFunction = new CheckedFunctionDeclStatement(
                 functionDeclStatement.Identifier,
@@ -255,7 +275,8 @@ namespace Caique.Semantics
                 functionDeclStatement.IsOverride,
                 _current.CurrentCheckedClass,
                 _module,
-                extensionOf
+                extensionOf,
+                shouldBeEmitted
             );
 
             if (functionDeclStatement.IsVirtual && !functionDeclStatement.IsMethod)
@@ -308,10 +329,21 @@ namespace Caique.Semantics
                                                                                 List<IDataType> typeArguments,
                                                                                 CheckedFunctionDeclStatement? inheritedFunction)
         {
-            var cloningInfo = new CheckedCloningInfo
+            var allTypeParameters = new List<Token>();
+            var allTypeArguments = new List<IDataType>();
+            if (_current.CurrentClassDecl?.TypeParameters != null)
             {
-                TypeParameters = functionDeclStatement.TypeParameters,
-                TypeArguments = typeArguments
+                allTypeParameters.AddRange(_current.CurrentClassDecl.TypeParameters);
+                allTypeArguments.AddRange(_current.TypeArgumentsForClass ?? new());
+            }
+
+            allTypeParameters.AddRange(functionDeclStatement.TypeParameters!);
+            allTypeArguments.AddRange(typeArguments);
+
+            var cloningInfo = new CheckedCloningInfo(this)
+            {
+                TypeParameters = allTypeParameters.Any() ? allTypeParameters : null,
+                TypeArguments = allTypeArguments.Any() ? allTypeArguments : null
             };
 
             // Parameters
@@ -356,6 +388,27 @@ namespace Caique.Semantics
             var alreadyChecked = symbol.GetChecked(_current.TypeArgumentsForClass);
             if (alreadyChecked != null) return alreadyChecked;
 
+            if (_current.TypeArgumentsForClass != null)
+            {
+                var similarClass = symbol.AllChecked.FirstOrDefault();
+                if (similarClass == null)
+                {
+                    similarClass = NextClassDecl(classDeclStatement, null);
+                }
+
+                var newCheckedClass = CheckClassDeclWithTypeArguments(
+                    classDeclStatement,
+                    symbol,
+                    similarClass,
+                    _current.TypeArgumentsForClass
+                );
+                //symbol.TryRemovedChecked(classDeclStatement.Identifier.Value);
+
+                return newCheckedClass;
+            }
+
+            var shouldBeEmitted = classDeclStatement.TypeParameters?.Count ==
+                _current.TypeArgumentsForClass?.Count;
             var checkedClass = new CheckedClassDeclStatement(
                 classDeclStatement.Identifier,
                 _current.TypeArgumentsForClass,
@@ -363,7 +416,8 @@ namespace Caique.Semantics
                 _module,
                 classDeclStatement.InheritedType != null
                     ? (StructType)Next(classDeclStatement.InheritedType).DataType
-                    : null
+                    : null,
+                shouldBeEmitted
             );
             symbol.AddChecked(checkedClass);
             _current.CurrentCheckedClass = checkedClass;
@@ -388,7 +442,7 @@ namespace Caique.Semantics
             // Constructor
             if (classDeclStatement.InitFunction != null)
             {
-                var initFunction = (CheckedFunctionDeclStatement)Next(classDeclStatement.InitFunction);
+                var initFunction = NextFunctionDecl(classDeclStatement.InitFunction, null);
                 checkedClass.InitFunction = initFunction;
 
                 foreach (var (uncheckedParameter, checkedParameter) in
@@ -450,12 +504,15 @@ namespace Caique.Semantics
                     false,
                     false,
                     checkedClass,
-                    _module
+                    _module,
+                    null,
+                    shouldBeEmitted
                 );
             }
 
             checkedClass.Body = (CheckedBlockExpression)Next(classDeclStatement.Body);
             _current.CurrentClassDecl = previousClassDecl;
+            _current.CurrentCheckedClass = null;
 
             // Add super() to the top of the constructor
             if (checkedClass.Inherited != null)
@@ -483,7 +540,43 @@ namespace Caique.Semantics
             return checkedClass;
         }
 
-        public void InsertSuper(CheckedClassDeclStatement checkedClass, TextSpan span)
+        private CheckedClassDeclStatement CheckClassDeclWithTypeArguments(ClassDeclStatement classDeclStatement,
+                                                                          StructSymbol symbol,
+                                                                          CheckedClassDeclStatement similarClass,
+                                                                          List<IDataType> typeArguments)
+        {
+            var cloningInfo = new CheckedCloningInfo(this)
+            {
+                TypeParameters = classDeclStatement.TypeParameters,
+                TypeArguments = typeArguments
+            };
+
+            // Fields
+            var newFields = new List<CheckedVariableDeclStatement>(similarClass.Environment.Variables.Count);
+            foreach (var field in similarClass.Environment.Variables)
+            {
+                var newField = (CheckedVariableDeclStatement)field!.Checked!.Clone(cloningInfo);
+                newFields.Add(newField);
+            }
+            
+            var newCheckedClass = new CheckedClassDeclStatement(
+                classDeclStatement.Identifier,
+                typeArguments,
+                similarClass.Environment,
+                similarClass.Module,
+                similarClass.Inherited?.DataType as StructType,
+                !typeArguments.Any(x => x is GenericType)
+            );
+
+            cloningInfo.CheckedParentClass = newCheckedClass;
+            newCheckedClass.Body = similarClass.Body?.Clone(cloningInfo) as CheckedBlockExpression;
+            newCheckedClass.InitFunction = similarClass.InitFunction?.Clone(cloningInfo) as CheckedFunctionDeclStatement;
+            symbol.AddChecked(newCheckedClass);
+
+            return newCheckedClass;
+        }
+
+        private void InsertSuper(CheckedClassDeclStatement checkedClass, TextSpan span)
         {
             if (checkedClass.Inherited == null) return;
 
@@ -611,6 +704,7 @@ namespace Caique.Semantics
                     {
                         var checkedCall = CheckCall(
                             identifier,
+                            extSymbol.Syntax,
                             checkedExt,
                             extCall.Arguments,
                             left
@@ -665,6 +759,7 @@ namespace Caique.Semantics
 
                     var call = CheckCall(
                         identifier,
+                        symbol!.Syntax,
                         checkedFunction,
                         callExpression.Arguments,
                         left
@@ -879,6 +974,7 @@ namespace Caique.Semantics
 
             var checkedCall = CheckCall(
                 lastIdentifier,
+                symbol!.Syntax,
                 checkedFunction,
                 callExpression.Arguments,
                 checkedFunction!.IsMethod
@@ -1000,7 +1096,7 @@ namespace Caique.Semantics
                             new GenericType(
                                 lastIdentifier,
                                 i,
-                                GenericTypeOrigin.Class,
+                                _current.CurrentClassDecl!,
                                 typeExpression.IsExplicitPointer
                             )
                         );
@@ -1020,7 +1116,7 @@ namespace Caique.Semantics
                             new GenericType(
                                 lastIdentifier,
                                 i,
-                                GenericTypeOrigin.Function,
+                                _current.CurrentFunctionDecl!,
                                 typeExpression.IsExplicitPointer
                             )
                         );
@@ -1034,9 +1130,7 @@ namespace Caique.Semantics
             var checkedClass = classSymbol?.GetChecked(typeArguments);
             if (classSymbol != null && checkedClass == null)
             {
-                _current.TypeArgumentsForClass = typeArguments;
-                checkedClass = (CheckedClassDeclStatement)Next(classSymbol.Syntax);
-                _current.TypeArgumentsForClass = null;
+                checkedClass = NextClassDecl(classSymbol.Syntax, typeArguments);
             }
 
             if (classSymbol == null)
@@ -1123,6 +1217,7 @@ namespace Caique.Semantics
 
                     return CheckCall(
                         keywordValueExpression.Token,
+                        null,
                         _current.CurrentCheckedClass.Inherited.InitFunction,
                         keywordValueExpression.Arguments,
                         new CheckedKeywordValueExpression(
@@ -1200,11 +1295,9 @@ namespace Caique.Semantics
             IDataType dataType;
 
             // If a type was specified
-            CheckedTypeExpression? specifiedTypeExpression = null;
             if (variableDeclStatement.SpecifiedType != null)
             {
-                specifiedTypeExpression = (CheckedTypeExpression)Next(variableDeclStatement.SpecifiedType);
-                var specifiedType = specifiedTypeExpression.DataType;
+                var specifiedType = ((CheckedTypeExpression)Next(variableDeclStatement.SpecifiedType)).DataType;
                 dataType = specifiedType;
                 _current.DataType = specifiedType;
 
@@ -1247,6 +1340,7 @@ namespace Caique.Semantics
         }
 
         private CheckedCallExpression? CheckCall(Token identifier,
+                                                 FunctionDeclStatement? functionDecl,
                                                  CheckedFunctionDeclStatement? checkedFunction,
                                                  List<Expression> arguments,
                                                  CheckedExpression? objectInstance = null)
@@ -1277,13 +1371,13 @@ namespace Caique.Semantics
                 var parameterType = parameter.DataType;
                 if (parameter.DataType is GenericType parameterTypeGeneric)
                 {
-                    if (parameterTypeGeneric.Origin == GenericTypeOrigin.Class &&
+                    if (parameterTypeGeneric.Origin is ClassDeclStatement &&
+                        parameterTypeGeneric.Origin == objectInstance &&
                         objectInstance?.DataType is StructType objectType)
                     {
                         parameterType = objectType.TypeArguments![parameterTypeGeneric.ParameterIndex];
                     }
-                    else
-                    if (parameterTypeGeneric.Origin == GenericTypeOrigin.Function)
+                    else if (parameterTypeGeneric.Origin == functionDecl)
                     {
                         parameterType = checkedFunction.TypeArguments![parameterTypeGeneric.ParameterIndex];
                     }
@@ -1297,12 +1391,13 @@ namespace Caique.Semantics
             var returnType = checkedFunction.ReturnType;
             if (returnType is GenericType returnTypeGeneric)
             {
-                if (returnTypeGeneric.Origin == GenericTypeOrigin.Class &&
+                if (returnTypeGeneric.Origin is ClassDeclStatement &&
+                    returnTypeGeneric.Origin == objectInstance &&
                     objectInstance?.DataType is StructType objectInstanceType)
                 {
                     returnType = objectInstanceType.TypeArguments![returnTypeGeneric.ParameterIndex];
                 }
-                else if (returnTypeGeneric.Origin == GenericTypeOrigin.Function)
+                else if (returnTypeGeneric.Origin == functionDecl)
                 {
                     returnType = checkedFunction.TypeArguments![returnTypeGeneric.ParameterIndex];
                 }

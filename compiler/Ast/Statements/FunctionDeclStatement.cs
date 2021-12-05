@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using Caique.Parsing;
+using Caique.Semantics;
 
 namespace Caique.Ast
 {
-    public partial class FunctionDeclStatement : Statement
+    public partial class FunctionDeclStatement : Statement, IGenericTypeOrigin
     {
         public Token Identifier { get; }
 

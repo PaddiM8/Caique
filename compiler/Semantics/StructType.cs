@@ -86,17 +86,11 @@ namespace Caique.Semantics
                     newTypeArguments.Add(typeArgument.Clone(cloningInfo));
                 }
 
-                newStructDecl = new CheckedClassDeclStatement(
-                    StructDecl.Identifier,
-                    newTypeArguments,
-                    StructDecl.Environment,
-                    StructDecl.Module,
-                    StructDecl.Inherited?.DataType as StructType
-                );
-
                 var symbol = StructDecl.Module.GetClass(StructDecl.Identifier.Value, false);
-                if (symbol!.GetChecked(newTypeArguments) == null)
-                    symbol.AddChecked(newStructDecl);
+                newStructDecl = cloningInfo.TypeChecker.NextClassDecl(
+                    symbol!.Syntax,
+                    newTypeArguments.Any() ? newTypeArguments : null
+                );
             }
 
             return new StructType(

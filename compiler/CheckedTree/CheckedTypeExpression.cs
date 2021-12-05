@@ -15,15 +15,6 @@ namespace Caique.CheckedTree
 
         public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
         {
-            /*if (cloningInfo.TypeParameters != null && DataType is GenericType genericType)
-            {
-                foreach (var (typeParameter, typeArgument) in cloningInfo.TypeParameters.Zip(cloningInfo.TypeArguments!))
-                {
-                    if (genericType.Identifier.Value == typeParameter.Value)
-                        return new CheckedTypeExpression(typeArgument);
-                }
-            }*/
-
             return new CheckedTypeExpression(DataType.Clone(cloningInfo));
         }
     }

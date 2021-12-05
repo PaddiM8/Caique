@@ -35,13 +35,15 @@ namespace Caique.CheckedTree
 
         public override CheckedStatement Clone(CheckedCloningInfo cloningInfo)
         {
-            return new CheckedVariableDeclStatement(
+            var newCheckedVariable = new CheckedVariableDeclStatement(
                 Identifier,
                 Value?.Clone(cloningInfo),
                 DataType.Clone(cloningInfo),
                 VariableType,
                 IndexInObject
             );
+
+            return newCheckedVariable;
         }
     }
 }

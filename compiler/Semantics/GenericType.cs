@@ -1,16 +1,11 @@
 ﻿using System;
+using System.Linq;
 using Caique.Ast;
 using Caique.CheckedTree;
 using Caique.Parsing;
 
 namespace Caique.Semantics
 {
-    public enum GenericTypeOrigin
-    {
-        Class,
-        Function,
-    }
-
     /// <summary>
     /// Represents a Caique type.
     /// </summary>
@@ -22,7 +17,7 @@ namespace Caique.Semantics
 
         public int ParameterIndex { get; set; }
 
-        public GenericTypeOrigin Origin { get; }
+        public IGenericTypeOrigin Origin { get; }
 
         public bool IsExplicitPointer { get; set; }
 
@@ -38,7 +33,7 @@ namespace Caique.Semantics
 
         public GenericType(Token identifier,
                            int parameterIndex,
-                           GenericTypeOrigin origin,
+                           IGenericTypeOrigin origin,
                            bool isExplicitPointer = false)
         {
             Identifier = identifier;
@@ -61,10 +56,9 @@ namespace Caique.Semantics
 
         public IDataType Clone(CheckedCloningInfo cloningInfo)
         {
-            if (cloningInfo.TypeParameters == null || cloningInfo.TypeArguments == null)
+            int typeArgumentIndex = cloningInfo.TypeParameters?.FindIndex(x => x.Value == Identifier.Value) ?? -1;
+            if (typeArgumentIndex == -1 || cloningInfo.TypeArguments == null || !cloningInfo.TypeArguments.Any())
                 return new GenericType(Identifier, ParameterIndex, Origin, IsExplicitPointer);
-
-            int typeArgumentIndex = cloningInfo.TypeParameters.FindIndex(x => x.Value == Identifier.Value);
 
             return cloningInfo.TypeArguments[typeArgumentIndex].Clone(cloningInfo);
         }

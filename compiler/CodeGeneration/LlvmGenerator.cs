@@ -55,7 +55,7 @@ namespace Caique.CodeGeneration
             {
                 foreach (var checkedClass in classSymbol.AllChecked)
                 {
-                    if (classSymbol.Syntax.TypeParameters != null && checkedClass.TypeArguments == null)
+                    if (!checkedClass.ShouldBeEmitted)
                         continue;
 
                     GenerateClassContent(checkedClass);
@@ -70,7 +70,7 @@ namespace Caique.CodeGeneration
         {
             foreach (var checkedClass in symbol.AllChecked)
             {
-                if (symbol.Syntax.TypeParameters != null && checkedClass.TypeArguments == null)
+                if (!checkedClass.ShouldBeEmitted)
                     continue;
 
                 _current.ClassDecl = checkedClass;
@@ -162,7 +162,7 @@ namespace Caique.CodeGeneration
         {
             foreach (var checkedFunction in symbol.AllChecked)
             {
-                if (symbol.Syntax.TypeParameters != null && checkedFunction.TypeArguments == null)
+                if (!checkedFunction.ShouldBeEmitted)
                     continue;
 
                 _current.ClassDecl = checkedFunction.ParentObject;
@@ -1250,7 +1250,7 @@ namespace Caique.CodeGeneration
                 TypeKeyword.f64 => LLVM.FloatType(),
                 TypeKeyword.Bool => LLVM.Int1Type(),
                 TypeKeyword.Generic => ToLlvmType(
-                    ((GenericType)dataType).Origin == GenericTypeOrigin.Class
+                    ((GenericType)dataType).Origin is ClassDeclStatement
                         ? _current.ClassDecl!.TypeArguments![((GenericType)dataType).ParameterIndex]
                         : _current.FunctionDecl!.TypeArguments![((GenericType)dataType).ParameterIndex]
                 ),

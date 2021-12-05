@@ -37,5 +37,10 @@ namespace Caique.Semantics
 
             return result;
         }
+
+        public void TryRemovedChecked(string nameWithExtension)
+        {
+            _checkedClasses.Remove(nameWithExtension);
+        }
     }
 }

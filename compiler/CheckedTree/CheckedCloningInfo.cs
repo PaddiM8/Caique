@@ -9,5 +9,14 @@ namespace Caique.CheckedTree
         public List<Token>? TypeParameters { get; init; }
 
         public List<IDataType>? TypeArguments { get; init; }
+
+        public CheckedClassDeclStatement? CheckedParentClass { get; set; }
+
+        public TypeChecker TypeChecker { get; }
+
+        public CheckedCloningInfo(TypeChecker typeChecker)
+        {
+            TypeChecker = typeChecker;
+        }
     }
 }

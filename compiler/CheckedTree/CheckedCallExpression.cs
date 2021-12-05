@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Caique.Parsing;
 using Caique.Semantics;
 
@@ -25,11 +26,18 @@ namespace Caique.CheckedTree
 
         public override CheckedExpression Clone(CheckedCloningInfo cloningInfo)
         {
+            var newObjectInstance = ObjectInstance?.Clone(cloningInfo);
+            var parentClass = (newObjectInstance?.DataType as StructType)?.StructDecl;
+            var newFunctionDecl = parentClass?.GetFunction(
+                FunctionDecl.Identifier.Value,
+                FunctionDecl.TypeArguments?.Select(x => x.Clone(cloningInfo)).ToList(),
+                false
+            );
             return new CheckedCallExpression(
                 Arguments.CloneExpressions(cloningInfo),
-                FunctionDecl,
+                newFunctionDecl ?? FunctionDecl,
                 DataType.Clone(cloningInfo),
-                ObjectInstance?.Clone(cloningInfo)
+                newObjectInstance
             );
         }
     }
