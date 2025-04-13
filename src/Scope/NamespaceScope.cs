@@ -1,0 +1,77 @@
+namespace Caique.Scope;
+
+public class NamespaceScope(string name, string filePath, IScope? parent, Project project) : IScope
+{
+    public string Name { get; } = name;
+
+    public string FilePath { get; } = filePath;
+
+    public IScope? Parent { get; } = parent;
+
+    public Project Project { get; } = project;
+
+    public NamespaceScope Namespace
+        => this;
+
+    private readonly Dictionary<string, NamespaceScope> _namespaceScopes = [];
+    private readonly Dictionary<string, FileScope> _fileScopes = [];
+    private readonly Dictionary<string, StructureSymbol> _typeSymbols = [];
+
+    public override string ToString()
+    {
+        if (Parent == null)
+            return Name;
+
+        return $"{Parent}::{name}";
+    }
+
+    public void AddScope(NamespaceScope scope)
+    {
+        _namespaceScopes[scope.Name] = scope;
+    }
+
+    public void AddScope(FileScope scope)
+    {
+        _fileScopes[scope.Name] = scope;
+    }
+
+    public void AddSymbol(StructureSymbol symbol)
+    {
+        _typeSymbols[symbol.Name] = symbol;
+    }
+
+    public StructureSymbol? FindType(string name)
+    {
+        if (_typeSymbols.TryGetValue(name, out StructureSymbol? symbol))
+            return symbol;
+
+        return (Parent as NamespaceScope)?.FindType(name);
+    }
+
+    public StructureSymbol? ResolveType(List<string> typeNames)
+    {
+        if (typeNames.Count == 0)
+            return null;
+
+        if (typeNames.Count == 1)
+            return FindType(typeNames.Single());
+
+        if (_namespaceScopes.TryGetValue(typeNames.First(), out var foundScope))
+            return foundScope.ResolveType(typeNames[1..]);
+
+        return Project.ResolveType(typeNames);
+    }
+
+    public void Traverse(Action<FileScope> callback)
+    {
+        foreach (var child in _fileScopes.Values)
+        {
+            callback(child);
+        }
+
+        foreach (var child in _namespaceScopes.Values)
+        {
+            child.Traverse(callback);
+        }
+    }
+}

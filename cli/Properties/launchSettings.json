@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "ConsoleApp": {
+      "commandName": "Project",
+      "commandLineArgs": "../experiments",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "AAA_TEST": "testing"
+      }
+    }
+  }
+}
