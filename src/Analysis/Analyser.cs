@@ -81,19 +81,50 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxIdentifierNode node)
     {
-        var variableSymbol = _syntaxTree.GetLocalScope(node)?.FindSymbol(node.Identifier.Value);
-        if (variableSymbol != null)
-            return new SemanticVariableNode(node.Identifier, variableSymbol);
+        if (node.IdentifierList.Count > 1)
+        {
+            var namespaceNames = node.IdentifierList
+                .Take(node.IdentifierList.Count - 1)
+                .Select(x => x.Value)
+                .ToList();
+            var structureSymbol = _syntaxTree.Namespace.ResolveStructure(namespaceNames);
+            if (structureSymbol == null)
+            {
+                _diagnostics.ReportNotFound(node.IdentifierList[..^1]);
+                throw Recover();
+            }
 
-        var symbolFromStructure = _syntaxTree.GetStructureScope(node)?.FindSymbol(node.Identifier.Value);
+            var identifierSymbol = structureSymbol.Node.Scope.FindSymbol(node.IdentifierList.Last().Value);
+            if (identifierSymbol == null)
+            {
+                _diagnostics.ReportNotFound(node.IdentifierList);
+                throw Recover();
+            }
+
+            if (identifierSymbol is FunctionSymbol symbol)
+            {
+                var dataType = new FunctionDataType(symbol);
+
+                return new SemanticFunctionReferenceNode(node.IdentifierList.Last(), symbol, dataType);
+            }
+
+            throw new NotImplementedException();
+        }
+
+        var identifier = node.IdentifierList.Single();
+        var variableSymbol = _syntaxTree.GetLocalScope(node)?.FindSymbol(identifier.Value);
+        if (variableSymbol != null)
+            return new SemanticVariableNode(identifier, variableSymbol);
+
+        var symbolFromStructure = _syntaxTree.GetStructureScope(node)?.FindSymbol(identifier.Value);
         if (symbolFromStructure is FunctionSymbol functionSymbol)
         {
             var dataType = new FunctionDataType(functionSymbol);
 
-            return new SemanticFunctionReferenceNode(node.Identifier, functionSymbol, dataType);
+            return new SemanticFunctionReferenceNode(identifier, functionSymbol, dataType);
         }
 
-        _diagnostics.ReportNotFound(node.Identifier);
+        _diagnostics.ReportNotFound(identifier);
         throw Recover();
     }
 
@@ -243,7 +274,7 @@ public class Analyser
         if (node.ResolvedSymbol == null)
         {
             var typeNames = node.TypeNames.Select(x => x.Value).ToList();
-            symbol = _syntaxTree.Namespace.ResolveType(typeNames);
+            symbol = _syntaxTree.Namespace.ResolveStructure(typeNames);
         }
 
         if (symbol == null)

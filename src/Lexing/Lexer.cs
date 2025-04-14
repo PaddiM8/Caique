@@ -250,7 +250,7 @@ public class Lexer
         var consumed = _input[_index..(_index + count)];
         foreach (var consumedChar in consumed)
         {
-            _index += count;
+            _index++;
 
             if (consumedChar == '\n')
             {

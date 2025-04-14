@@ -75,7 +75,7 @@ public class Resolver
             return;
 
         var typeNames = typeNode.TypeNames.Select(x => x.Value).ToList();
-        var resolvedType = _syntaxTree.Namespace.ResolveType(typeNames);
+        var resolvedType = _syntaxTree.Namespace.ResolveStructure(typeNames);
         typeNode.ResolvedSymbol = resolvedType;
     }
 

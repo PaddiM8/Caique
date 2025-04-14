@@ -18,7 +18,7 @@ public class Project()
             return null;
 
         if (ProjectNamespace?.Name == typeNames.First())
-            return ProjectNamespace.ResolveType(typeNames[1..]);
+            return ProjectNamespace.ResolveStructure(typeNames[1..]);
 
         // TODO: Libraries
 

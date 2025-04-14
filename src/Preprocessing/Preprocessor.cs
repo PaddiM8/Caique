@@ -24,7 +24,7 @@ public class Preprocessor
 
         foreach (var childDirectoryPath in Directory.GetDirectories(directoryPath))
         {
-            string? directoryName = Path.GetDirectoryName(childDirectoryPath);
+            string? directoryName = new DirectoryInfo(childDirectoryPath).Name;
             if (directoryName == null)
             {
                 continue;

@@ -368,9 +368,15 @@ public class Parser
 
     private SyntaxIdentifierNode ParseIdentifier()
     {
-        var identifier = EatExpected(TokenKind.Identifier);
+        var identifierList = new List<Token>()
+        {
+            EatExpected(TokenKind.Identifier),
+        };
 
-        return new SyntaxIdentifierNode(identifier);
+        while (AdvanceIf(TokenKind.ColonColon))
+            identifierList.Add(EatExpected(TokenKind.Identifier));
+
+        return new SyntaxIdentifierNode(identifierList);
     }
 
     private List<SyntaxNode> ParseArguments()

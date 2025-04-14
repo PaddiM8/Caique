@@ -45,14 +45,9 @@ public class DiagnosticReporter
         ReportError($"Wrong number of arguments. Expected {expected} but got {got}.", span);
     }
 
-    public void ReportNotFound(Token token)
+    public void ReportNotFound(Token identifier)
     {
-        ReportError($"Symbol not found: {token.Value}.", token.Span);
-    }
-
-    public void ReportSymbolAlreadyExists(Token token)
-    {
-        ReportError($"A symbol with the name '{token.Value}' already exists.", token.Span);
+        ReportError($"Symbol not found: '{identifier.Value}'.", identifier.Span);
     }
 
     public void ReportNotFound(List<Token> typeNames)
@@ -60,6 +55,11 @@ public class DiagnosticReporter
         var fullName = string.Join("::", typeNames.Select(x => x.Value));
         var span = typeNames.First().Span.Combine(typeNames.Last().Span);
         ReportError($"Symbol not found: {fullName}.", span);
+    }
+
+    public void ReportSymbolAlreadyExists(Token token)
+    {
+        ReportError($"A symbol with the name '{token.Value}' already exists.", token.Span);
     }
 
     public void ReportIncompatibleType(string expected, IDataType got, TextSpan span)

@@ -75,10 +75,10 @@ public class SyntaxLiteralNode(Token value)
     public Token Value { get; } = value;
 }
 
-public class SyntaxIdentifierNode(Token identifier)
-    : SyntaxNode(identifier.Span)
+public class SyntaxIdentifierNode(List<Token> identifierList)
+    : SyntaxNode(identifierList.First().Span.Combine(identifierList.Last().Span))
 {
-    public Token Identifier { get; } = identifier;
+    public List<Token> IdentifierList { get; } = identifierList;
 }
 
 public class SyntaxUnaryNode(TokenKind op, SyntaxNode value, TextSpan span)

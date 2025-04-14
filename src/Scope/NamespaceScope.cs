@@ -15,14 +15,14 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
 
     private readonly Dictionary<string, NamespaceScope> _namespaceScopes = [];
     private readonly Dictionary<string, FileScope> _fileScopes = [];
-    private readonly Dictionary<string, StructureSymbol> _typeSymbols = [];
+    private readonly Dictionary<string, StructureSymbol> _structureSymbols = [];
 
     public override string ToString()
     {
         if (Parent == null)
             return Name;
 
-        return $"{Parent}::{name}";
+        return $"{Parent}::{Name}";
     }
 
     public void AddScope(NamespaceScope scope)
@@ -37,18 +37,18 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
 
     public void AddSymbol(StructureSymbol symbol)
     {
-        _typeSymbols[symbol.Name] = symbol;
+        _structureSymbols[symbol.Name] = symbol;
     }
 
     public StructureSymbol? FindType(string name)
     {
-        if (_typeSymbols.TryGetValue(name, out StructureSymbol? symbol))
+        if (_structureSymbols.TryGetValue(name, out StructureSymbol? symbol))
             return symbol;
 
         return (Parent as NamespaceScope)?.FindType(name);
     }
 
-    public StructureSymbol? ResolveType(List<string> typeNames)
+    public StructureSymbol? ResolveStructure(List<string> typeNames)
     {
         if (typeNames.Count == 0)
             return null;
@@ -57,7 +57,7 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
             return FindType(typeNames.Single());
 
         if (_namespaceScopes.TryGetValue(typeNames.First(), out var foundScope))
-            return foundScope.ResolveType(typeNames[1..]);
+            return foundScope.ResolveStructure(typeNames[1..]);
 
         return Project.ResolveType(typeNames);
     }

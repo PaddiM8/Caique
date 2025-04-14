@@ -11,8 +11,8 @@ public class Compilation
     public static IEnumerable<Diagnostic> Compile(string projectFilePath)
     {
         // TODO: The actual project name should be defined in the project file
-        var directoryPath = Path.GetDirectoryName(projectFilePath)!;
-        var project = Preprocessor.Process("root", directoryPath);
+        // var directoryPath = Path.GetDirectoryName(projectFilePath)!;
+        var project = Preprocessor.Process("root", projectFilePath);
         var context = new CompilationContext();
         project.ProjectNamespace!.Traverse(scope =>
         {
