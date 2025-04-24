@@ -21,7 +21,7 @@ public class SemanticLiteralNode(Token value, IDataType dataType)
     public Token Value { get; } = value;
 }
 
-public class SemanticVariableNode(Token identifier, VariableSymbol symbol)
+public class SemanticVariableReferenceNode(Token identifier, VariableSymbol symbol)
     : SemanticNode(symbol.Declaration.DataType, identifier.Span)
 {
     public Token Identifier { get; } = identifier;
@@ -33,6 +33,22 @@ public class SemanticFunctionReferenceNode(Token identifier, FunctionSymbol symb
     public Token Identifier { get; } = identifier;
 
     public FunctionSymbol Symbol { get; } = symbol;
+}
+
+public class SemanticStructureReferenceNode(Token identifier, StructureSymbol symbol, IDataType dataType)
+    : SemanticNode(dataType, identifier.Span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public StructureSymbol Symbol { get; } = symbol;
+}
+
+public class SemanticFieldReferenceNode(Token identifier, FieldSymbol symbol, IDataType dataType)
+    : SemanticNode(dataType, identifier.Span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public FieldSymbol Symbol { get; } = symbol;
 }
 
 public class SemanticUnaryNode(TokenKind op, SemanticNode value, IDataType dataType, TextSpan span)
@@ -53,11 +69,25 @@ public class SemanticBinaryNode(SemanticNode left, TokenKind op, SemanticNode ri
     public SemanticNode Right { get; } = right;
 }
 
+public class SemanticAssignmentNode(ISymbol leftSymbol, SemanticNode right, TextSpan span)
+    : SemanticNode(right.DataType, span)
+{
+    public ISymbol Left { get; } = leftSymbol;
+
+    public SemanticNode Right { get; } = right;
+}
+
 public class SemanticCallNode(SemanticNode left, List<SemanticNode> arguments, IDataType dataType, TextSpan span)
     : SemanticNode(dataType, span)
 {
     public SemanticNode Left { get; } = left;
 
+    public List<SemanticNode> Arguments { get; } = arguments;
+}
+
+public class SemanticNewNode(List<SemanticNode> arguments, IDataType dataType, TextSpan span)
+    : SemanticNode(dataType, span)
+{
     public List<SemanticNode> Arguments { get; } = arguments;
 }
 
@@ -92,6 +122,7 @@ public class SemanticFunctionDeclarationNode(
     List<SemanticParameterNode> parameters,
     IDataType returnType,
     SemanticBlockNode body,
+    bool isStatic,
     TextSpan span
 )
     : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
@@ -103,6 +134,8 @@ public class SemanticFunctionDeclarationNode(
     public IDataType ReturnType { get; } = returnType;
 
     public SemanticBlockNode Body { get; } = body;
+
+    public bool IsStatic { get; } = isStatic;
 }
 
 public class SemanticParameterNode(Token identifier, IDataType dataType, TextSpan span)
@@ -117,4 +150,30 @@ public class SemanticClassDeclarationNode(Token identifier, List<SemanticNode> d
     public Token Identifier { get; } = identifier;
 
     public List<SemanticNode> Declarations { get; } = declarations;
+}
+
+public class SemanticFieldDeclarationNode(Token identifier, SemanticNode? value, bool isStatic, IDataType dataType, TextSpan span)
+    : SemanticNode(dataType, span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public SemanticNode? Value { get; } = value;
+
+    public bool IsStatic { get; } = isStatic;
+}
+
+public class SemanticInitNode(List<SemanticParameterNode> parameters, SemanticBlockNode body, TextSpan span)
+    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
+{
+    public List<SemanticParameterNode> Parameters { get; } = parameters;
+
+    public SemanticBlockNode Body { get; } = body;
+}
+
+public class SemanticInitParameterNode(Token identifier, IDataType dataType, TextSpan span)
+    : SemanticNode(dataType, span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public StructureSymbol? ResolvedSymbol { get; set; }
 }

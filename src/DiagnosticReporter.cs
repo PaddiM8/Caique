@@ -78,6 +78,26 @@ public class DiagnosticReporter
         ReportError($"Incompatible type. Expected {expected} but got {got}.", span);
     }
 
+    public void ReportNonStaticSymbolReferencedAsStatic(Token identifier)
+    {
+        ReportError($"Non-static symbol was referenced as if it was static.", identifier.Span);
+    }
+
+    public void ReportStaticSymbolReferencedAsNonStatic(Token identifier)
+    {
+        ReportError($"Static symbol was referenced as if it was non-static.", identifier.Span);
+    }
+
+    public void ReportConstructorAlreadyExists(Token structureIdentifier, TextSpan span)
+    {
+        ReportError($"A constructor is already present in '{structureIdentifier.Value}'.", span);
+    }
+
+    public void ReportInitParameterFieldNotFound(Token identifier)
+    {
+        ReportError($"The constructor parameter was treated as a field reference, since it lacks a type, but a field with the name '{identifier.Value}' was not found.", identifier.Span);
+    }
+
     private void ReportHint(string message, TextSpan span)
     {
         var diagnostic = new Diagnostic(DiagnosticSeverity.Hint, message, span);

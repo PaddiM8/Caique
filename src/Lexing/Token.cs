@@ -20,6 +20,8 @@ public enum TokenKind
 {
     Unknown,
     Let, Fn, Class,
+    Static,
+    New,
     Equals, Colon, ColonColon, Semicolon, Comma,
     Identifier,
     OpenParenthesis, ClosedParenthesis, OpenBracket, ClosedBracket, OpenBrace, ClosedBrace,

@@ -34,36 +34,46 @@ public class Resolver
         switch (node)
         {
             case SyntaxStatementNode statementNode:
-                Next(statementNode.Expression, statementNode);
+                Next(statementNode.Expression, node);
                 break;
             case SyntaxUnaryNode unaryNode:
-                Next(unaryNode.Value, unaryNode);
+                Next(unaryNode.Value, node);
                 break;
             case SyntaxBinaryNode binaryNode:
-                Next(binaryNode.Left, binaryNode);
-                Next(binaryNode.Right, binaryNode);
+                Next(binaryNode.Left, node);
+                Next(binaryNode.Right, node);
+                break;
+            case SyntaxAssignmentNode assignmentNode:
+                Next(assignmentNode.Left, node);
+                Next(assignmentNode.Right, node);
                 break;
             case SyntaxCallNode callNode:
-                Next(callNode.Left, callNode);
-                foreach (var argument in callNode.Arguments)
-                    Next(argument, callNode);
-
+                Visit(callNode);
+                break;
+            case SyntaxNewNode newNode:
+                Visit(newNode);
                 break;
             case SyntaxBlockNode blockNode:
                 Visit(blockNode);
                 break;
             case SyntaxVariableDeclarationNode variableDeclarationNode:
-                Next(variableDeclarationNode.Value, variableDeclarationNode);
+                Next(variableDeclarationNode.Value, node);
                 break;
             case SyntaxFunctionDeclarationNode functionDeclarationNode:
                 Visit(functionDeclarationNode);
                 break;
             case SyntaxParameterNode parameterNode:
-                Next(parameterNode.Type, parameterNode);
+                Next(parameterNode.Type, node);
                 ResolveNode(parameterNode.Type);
                 break;
             case SyntaxClassDeclarationNode classDeclarationNode:
                 Visit(classDeclarationNode);
+                break;
+            case SyntaxFieldDeclarationNode fieldDeclarationNode:
+                Visit(fieldDeclarationNode);
+                break;
+            default:
+                Debug.Assert(false);
                 break;
         }
     }
@@ -77,6 +87,20 @@ public class Resolver
         var typeNames = typeNode.TypeNames.Select(x => x.Value).ToList();
         var resolvedType = _syntaxTree.Namespace.ResolveStructure(typeNames);
         typeNode.ResolvedSymbol = resolvedType;
+    }
+
+    private void Visit(SyntaxCallNode node)
+    {
+        Next(node.Left, node);
+        foreach (var argument in node.Arguments)
+            Next(argument, node);
+    }
+
+    private void Visit(SyntaxNewNode node)
+    {
+        Next(node.Type, node);
+        foreach (var argument in node.Arguments)
+            Next(argument, node);
     }
 
     private void Visit(SyntaxBlockNode node)
@@ -110,10 +134,53 @@ public class Resolver
         Next(node.Body, node);
     }
 
-    private void Visit(SyntaxClassDeclarationNode classDeclarationNode)
+    private void Visit(SyntaxClassDeclarationNode node)
     {
-        // TODO: When fields exist, resolve the types of public ones here
-        foreach (var declaration in classDeclarationNode.Declarations)
-            Next(declaration, classDeclarationNode);
+        foreach (var declaration in node.Declarations)
+            Next(declaration, node);
+
+        // This needs to be done after the declarations since
+        // init parameters may refer to fields
+        if (node.Constructor != null)
+            Next(node.Constructor, node);
+    }
+
+    private void Visit(SyntaxFieldDeclarationNode node)
+    {
+        ResolveNode(node.Type);
+        if (node.Value != null)
+            Next(node.Value, node);
+    }
+
+    private void Visit(SyntaxInitNode node, StructureScope structureScope)
+    {
+        foreach (var parameter in node.Parameters)
+        {
+            parameter.Parent = node;
+            Visit(parameter, structureScope);
+        }
+
+        Next(node.Body, node);
+    }
+
+    private void Visit(SyntaxInitParameterNode node, StructureScope structureScope)
+    {
+        if (node.Type != null)
+        {
+            Next(node.Type, node);
+            ResolveNode(node.Type);
+
+            return;
+        }
+
+        var symbol = structureScope.FindSymbol(node.Identifier.Value);
+        if (symbol is not FieldSymbol fieldSymbol)
+        {
+            _diagnostics.ReportInitParameterFieldNotFound(node.Identifier);
+
+            return;
+        }
+
+        node.LinkedField = fieldSymbol.Declaration;
     }
 }

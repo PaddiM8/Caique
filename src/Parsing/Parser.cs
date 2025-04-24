@@ -71,7 +71,7 @@ public class Parser
         return _current?.Kind switch
         {
             TokenKind.Let => ParseLet(),
-            _ => ParseOr(),
+            _ => ParseAssignment(),
         };
     }
 
@@ -125,12 +125,23 @@ public class Parser
 
         var declarations = new List<SyntaxNode>();
         var scope = new StructureScope(_fileScope.Namespace);
+        SyntaxInitNode? constructor = null;
         while (!_reachedEnd && !Match(TokenKind.ClosedBrace))
         {
             try
             {
                 var declaration = ParseStructureDeclaration(scope);
-                declarations.Add(declaration);
+                if (declaration is SyntaxInitNode initNode)
+                {
+                    if (constructor != null)
+                        _diagnostics.ReportConstructorAlreadyExists(identifier, declaration.Span);
+
+                    constructor = initNode;
+                }
+                else
+                {
+                    declarations.Add(declaration);
+                }
             }
             catch (ParserRecoveryException ex)
             {
@@ -140,7 +151,13 @@ public class Parser
 
         var end = EatExpected(TokenKind.ClosedBrace).Span;
 
-        var node = new SyntaxClassDeclarationNode(identifier, declarations, scope, start.Combine(end));
+        var node = new SyntaxClassDeclarationNode(
+            identifier,
+            constructor,
+            declarations,
+            scope,
+            start.Combine(end)
+        );
         if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
             _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
 
@@ -153,13 +170,27 @@ public class Parser
 
     private SyntaxNode ParseStructureDeclaration(StructureScope scope)
     {
+        bool isStatic = AdvanceIf(TokenKind.Static);
+
         if (Match(TokenKind.Fn))
-            return ParseFunction(scope);
+        {
+            if (_peek is { Kind: TokenKind.Identifier, Value: "init" })
+            {
+                return ParseInit();
+            }
+            else
+            {
+                return ParseFunction(isStatic, scope);
+            }
+        }
+
+        if (Match(TokenKind.Identifier))
+            return ParseField(isStatic, scope);
 
         throw new NotImplementedException();
     }
 
-    private SyntaxFunctionDeclarationNode ParseFunction(StructureScope? scope = null)
+    private SyntaxFunctionDeclarationNode ParseFunction(bool isStatic, StructureScope? scope = null)
     {
         var start = EatExpected(TokenKind.Fn).Span;
         var identifier = EatExpected(TokenKind.Identifier);
@@ -174,6 +205,7 @@ public class Parser
             parameters,
             returnType,
             body,
+            isStatic,
             start.Combine(body.Span)
         );
 
@@ -183,6 +215,65 @@ public class Parser
         var symbol = new FunctionSymbol(node);
         node.Symbol = symbol;
         scope?.AddSymbol(symbol);
+
+        return node;
+    }
+
+    private SyntaxInitNode ParseInit()
+    {
+        var start = EatExpected(TokenKind.Fn).Span;
+        var parameters = ParseInitParameters();
+        var body = ParseBlock();
+
+        var node = new SyntaxInitNode(
+            parameters,
+            body,
+            start.Combine(body.Span)
+        );
+
+        return node;
+    }
+
+    private List<SyntaxInitParameterNode> ParseInitParameters()
+    {
+        EatExpected(TokenKind.OpenParenthesis);
+
+        var parameters = new List<SyntaxInitParameterNode>();
+
+        do
+        {
+            if (Match(TokenKind.ClosedParenthesis))
+                break;
+
+            var identifier = EatExpected(TokenKind.Identifier);
+            SyntaxTypeNode? type = null;
+            if (AdvanceIf(TokenKind.Colon))
+                type = ParseType();
+
+            parameters.Add(new SyntaxInitParameterNode(identifier, type));
+        }
+        while (!_reachedEnd && Match(TokenKind.Comma));
+
+        EatExpected(TokenKind.ClosedParenthesis);
+
+        return parameters;
+    }
+
+    private SyntaxFieldDeclarationNode ParseField(bool isStatic, StructureScope scope)
+    {
+        var identifier = EatExpected(TokenKind.Identifier);
+        EatExpected(TokenKind.Colon);
+        var type = ParseType();
+
+        SyntaxNode? value = null;
+        if (AdvanceIf(TokenKind.Equals))
+            value = ParseExpression();
+
+        var end = EatExpected(TokenKind.Semicolon).Span;
+        var node = new SyntaxFieldDeclarationNode(identifier, type, value, isStatic, identifier.Span.Combine(end));
+
+        var symbol = new FieldSymbol(node);
+        scope.AddSymbol(symbol);
 
         return node;
     }
@@ -202,6 +293,18 @@ public class Parser
         EatExpected(TokenKind.ClosedParenthesis);
 
         return parameters;
+    }
+
+    private SyntaxNode ParseAssignment()
+    {
+        var left = ParseOr();
+        while (AdvanceIf(TokenKind.Equals))
+        {
+            var right = ParseOr();
+            left = new SyntaxAssignmentNode(left, right);
+        }
+
+        return left;
     }
 
     private SyntaxNode ParseOr()
@@ -315,6 +418,9 @@ public class Parser
         if (Match(TokenKind.Identifier))
             return ParseIdentifier();
 
+        if (Match(TokenKind.New))
+            return ParseNew();
+
         _diagnostics.ReportUnexpectedToken(_current!);
         throw Recover();
     }
@@ -377,6 +483,15 @@ public class Parser
             identifierList.Add(EatExpected(TokenKind.Identifier));
 
         return new SyntaxIdentifierNode(identifierList);
+    }
+
+    private SyntaxNewNode ParseNew()
+    {
+        var start = EatExpected(TokenKind.New).Span;
+        var type = ParseType();
+        var arguments = ParseArguments();
+
+        return new SyntaxNewNode(type, arguments, start.Combine(_previous!.Span));
     }
 
     private List<SyntaxNode> ParseArguments()

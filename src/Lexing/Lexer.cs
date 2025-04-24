@@ -145,6 +145,8 @@ public class Lexer
             "let" => TokenKind.Let,
             "fn" => TokenKind.Fn,
             "class" => TokenKind.Class,
+            "static" => TokenKind.Static,
+            "new" => TokenKind.New,
             "true" => TokenKind.True,
             "false" => TokenKind.False,
             "void" => TokenKind.Void,

@@ -1,3 +1,4 @@
+using Caique.Analysis;
 using Caique.Lexing;
 using Caique.Scope;
 
@@ -99,10 +100,26 @@ public class SyntaxBinaryNode(SyntaxNode left, TokenKind op, SyntaxNode right)
     public SyntaxNode Right { get; } = right;
 }
 
+public class SyntaxAssignmentNode(SyntaxNode left, SyntaxNode right)
+    : SyntaxNode(left.Span.Combine(right.Span))
+{
+    public SyntaxNode Left { get; } = left;
+
+    public SyntaxNode Right { get; } = right;
+}
+
 public class SyntaxCallNode(SyntaxNode left, List<SyntaxNode> arguments, TextSpan span)
     : SyntaxNode(span)
 {
     public SyntaxNode Left { get; } = left;
+
+    public List<SyntaxNode> Arguments { get; } = arguments;
+}
+
+public class SyntaxNewNode(SyntaxTypeNode identifier, List<SyntaxNode> arguments, TextSpan span)
+    : SyntaxNode(span)
+{
+    public SyntaxTypeNode Type { get; } = identifier;
 
     public List<SyntaxNode> Arguments { get; } = arguments;
 }
@@ -146,6 +163,7 @@ public class SyntaxFunctionDeclarationNode(
     List<SyntaxParameterNode> parameters,
     SyntaxTypeNode? returnType,
     SyntaxBlockNode body,
+    bool isStatic,
     TextSpan span
 )
     : SyntaxNode(span)
@@ -158,6 +176,8 @@ public class SyntaxFunctionDeclarationNode(
 
     public SyntaxBlockNode Body { get; } = body;
 
+    public bool IsStatic { get; } = isStatic;
+
     public FunctionSymbol? Symbol { get; set; }
 }
 
@@ -168,14 +188,52 @@ public interface ISyntaxStructure
     StructureScope Scope { get; }
 }
 
-public class SyntaxClassDeclarationNode(Token identifier, List<SyntaxNode> declarations, StructureScope scope, TextSpan span)
+public class SyntaxClassDeclarationNode(
+    Token identifier,
+    SyntaxInitNode? constructor,
+    List<SyntaxNode> declarations,
+    StructureScope scope,
+    TextSpan span
+)
     : SyntaxNode(span), ISyntaxStructure
 {
     public Token Identifier { get; } = identifier;
+
+    public SyntaxInitNode? Constructor { get; } = constructor;
 
     public List<SyntaxNode> Declarations { get; } = declarations;
 
     public StructureScope Scope { get; } = scope;
 
     public StructureSymbol? Symbol { get; set; }
+}
+
+public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)
+    : SyntaxNode(span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public SyntaxTypeNode Type { get; } = type;
+
+    public SyntaxNode? Value { get; } = value;
+
+    public bool IsStatic { get; } = isStatic;
+}
+
+public class SyntaxInitNode(List<SyntaxInitParameterNode> parameters, SyntaxBlockNode body, TextSpan span)
+    : SyntaxNode(span)
+{
+    public List<SyntaxInitParameterNode> Parameters { get; } = parameters;
+
+    public SyntaxBlockNode Body { get; } = body;
+}
+
+public class SyntaxInitParameterNode(Token identifier, SyntaxTypeNode? type)
+    : SyntaxNode(identifier.Span.Combine(type?.Span ?? identifier.Span))
+{
+    public Token Identifier { get; } = identifier;
+
+    public SyntaxTypeNode? Type { get; } = type;
+
+    public SyntaxFieldDeclarationNode? LinkedField { get; set; }
 }
