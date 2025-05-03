@@ -8,20 +8,22 @@ namespace Caique.Backend;
 public class LlvmHeaderEmitter
 {
     private readonly SemanticTree _tree;
-    private readonly LLVMContextRef _llvmContext;
-    private readonly LLVMBuilderRef _llvmBuilder;
-    private readonly LLVMModuleRef _llvmModule;
-    private readonly LlvmTypeBuilder _llvmTypeBuilder;
-    private readonly LlvmCache _globalCache;
+    private readonly LlvmContextCache _contextCache;
+    private readonly LlvmModuleCache _moduleCache;
+    private readonly LlvmTypeBuilder _typeBuilder;
+    private readonly LLVMContextRef _context;
+    private readonly LLVMBuilderRef _builder;
+    private readonly LLVMModuleRef _module;
 
     private LlvmHeaderEmitter(SemanticTree tree, LlvmEmitterContext emitterContext)
     {
         _tree = tree;
-        _llvmContext = emitterContext.LlvmContext;
-        _llvmBuilder = emitterContext.LlvmBuilder;
-        _llvmModule = emitterContext.LlvmModule;
-        _llvmTypeBuilder = emitterContext.LlvmTypeBuilder;
-        _globalCache = emitterContext.GlobalCache;
+        _contextCache = emitterContext.ContextCache;
+        _moduleCache = emitterContext.ModuleCache;
+        _typeBuilder = emitterContext.LlvmTypeBuilder;
+        _context = emitterContext.LlvmContext;
+        _builder = emitterContext.LlvmBuilder;
+        _module = emitterContext.LlvmModule;
     }
 
     public static void Emit(SemanticTree tree, LlvmEmitterContext emitterContext)
@@ -54,9 +56,10 @@ public class LlvmHeaderEmitter
 
     private void Visit(SemanticFunctionDeclarationNode node)
     {
-        var functionType = _llvmTypeBuilder.BuildType(new FunctionDataType(node.Symbol));
-        var functionValue = _llvmModule.AddFunction(node.Identifier.Value, functionType);
-        _globalCache.SetNodeLlvmValue(node, functionValue);
+        var functionType = _typeBuilder.BuildType(new FunctionDataType(node.Symbol));
+        var function = _module.AddFunction(node.Identifier.Value, functionType);
+        _moduleCache.SetNodeLlvmValue(node, function);
+        _contextCache.SetSymbolName(node, node.Identifier.Value);
     }
 
     private void Visit(SemanticClassDeclarationNode node)
@@ -69,16 +72,10 @@ public class LlvmHeaderEmitter
 
     private void Visit(SemanticInitNode node, ISemanticStructureDeclaration parentStructure)
     {
-        var parameterTypes = node.Parameters
-            .Select(x => x.DataType)
-            .Select(x => _llvmTypeBuilder.BuildType(x))
-            .ToArray();
-        var returnType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Void, 0);
-
-        var functionType = LLVMTypeRef.CreateFunction(returnType, parameterTypes);
+        var functionType = _typeBuilder.BuildInitType(node);
         var identifier = $"{parentStructure.Identifier.Value}::{parentStructure.Identifier.Value}";
-        var functionValue = _llvmModule.AddFunction(identifier, functionType);
-        _globalCache.SetNodeLlvmValue(node, functionValue);
-        _globalCache.SetNodeLlvmType(node, functionType);
+        var function = _module.AddFunction(identifier, functionType);
+        _moduleCache.SetNodeLlvmValue(node, function);
+        _contextCache.SetSymbolName(node, identifier);
     }
 }

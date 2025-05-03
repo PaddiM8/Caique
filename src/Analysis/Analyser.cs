@@ -419,12 +419,13 @@ public class Analyser
     private SemanticNode Visit(SyntaxFunctionDeclarationNode node)
     {
         var parameters = new List<SemanticParameterNode>();
-        var scope = (LocalScope)node.Body.Scope!;
         foreach (var parameter in node.Parameters)
         {
             var semanticParameter = (SemanticParameterNode)Next(parameter);
             parameters.Add(semanticParameter);
-            scope.AddSymbol(new VariableSymbol(semanticParameter));
+
+            if (node.Body?.Scope is LocalScope scope)
+                scope.AddSymbol(new VariableSymbol(semanticParameter));
         }
 
         IDataType returnType;
@@ -437,7 +438,9 @@ public class Analyser
             returnType = new PrimitiveDataType(Primitive.Void);
         }
 
-        var body = (SemanticBlockNode)Next(node.Body);
+        var body = node.Body == null
+            ? null
+            : (SemanticBlockNode)Next(node.Body);
         var semanticNode = new SemanticFunctionDeclarationNode(
             node.Identifier,
             parameters,

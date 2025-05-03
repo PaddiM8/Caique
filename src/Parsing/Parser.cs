@@ -198,7 +198,9 @@ public class Parser
         var returnType = AdvanceIf(TokenKind.Colon)
             ? ParseType()
             : null;
-        var body = ParseBlock();
+        var body = AdvanceIf(TokenKind.Semicolon)
+            ? null
+            : ParseBlock();
 
         var node = new SyntaxFunctionDeclarationNode(
             identifier,
@@ -206,7 +208,7 @@ public class Parser
             returnType,
             body,
             isStatic,
-            start.Combine(body.Span)
+            start.Combine(_previous!.Span)
         );
 
         if (scope?.FindSymbol(node.Identifier.Value) != null)

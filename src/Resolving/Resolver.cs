@@ -134,7 +134,8 @@ public class Resolver
             ResolveNode(node.ReturnType);
         }
 
-        Next(node.Body, node);
+        if (node.Body != null)
+            Next(node.Body, node);
     }
 
     private void Visit(SyntaxClassDeclarationNode node)

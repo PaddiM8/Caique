@@ -6,32 +6,32 @@ namespace Caique.Backend;
 
 public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmTypeBuilder llvmTypeBuilder)
 {
-    private readonly LLVMContextRef _llvmContext = emitterContext.LlvmContext;
-    private readonly LLVMModuleRef _llvmModule = emitterContext.LlvmModule;
-    private readonly LLVMBuilderRef _llvmBuilder = emitterContext.LlvmBuilder;
-    private readonly LlvmTypeBuilder _llvmTypeBuilder = llvmTypeBuilder;
+    private readonly LLVMContextRef _context = emitterContext.LlvmContext;
+    private readonly LLVMModuleRef _module = emitterContext.LlvmModule;
+    private readonly LLVMBuilderRef _builder = emitterContext.LlvmBuilder;
+    private readonly LlvmTypeBuilder _typeBuilder = llvmTypeBuilder;
 
     public LLVMValueRef BuildLogicalAnd(LLVMValueRef left, Func<LLVMValueRef> getRight)
     {
-        var function = _llvmBuilder.InsertBlock.Parent;
+        var function = _builder.InsertBlock.Parent;
         var thenBlock = function.AppendBasicBlock("and.then");
         var elseBlock = function.AppendBasicBlock("and.else");
         var mergeBlock = function.AppendBasicBlock("and.merge");
 
-        _llvmBuilder.BuildCondBr(left, thenBlock, elseBlock);
+        _builder.BuildCondBr(left, thenBlock, elseBlock);
 
         // Then
-        _llvmBuilder.PositionAtEnd(thenBlock);
+        _builder.PositionAtEnd(thenBlock);
         var right = getRight();
-        _llvmBuilder.BuildBr(mergeBlock);
+        _builder.BuildBr(mergeBlock);
 
         // Else
-        _llvmBuilder.PositionAtEnd(elseBlock);
-        _llvmBuilder.BuildBr(mergeBlock);
+        _builder.PositionAtEnd(elseBlock);
+        _builder.BuildBr(mergeBlock);
 
         // Merge
-        _llvmBuilder.PositionAtEnd(mergeBlock);
-        var phi = _llvmBuilder.BuildPhi(LLVMTypeRef.Int1, "and.result");
+        _builder.PositionAtEnd(mergeBlock);
+        var phi = _builder.BuildPhi(LLVMTypeRef.Int1, "and.result");
         phi.AddIncoming([right], [thenBlock], 1);
         phi.AddIncoming([LlvmUtils.CreateConstBool(false)], [elseBlock], 1);
 
@@ -40,25 +40,25 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
 
     public LLVMValueRef BuildLogicalOr(LLVMValueRef left, Func<LLVMValueRef> getRight)
     {
-        var function = _llvmBuilder.InsertBlock.Parent;
+        var function = _builder.InsertBlock.Parent;
         var thenBlock = function.AppendBasicBlock("or.then");
         var elseBlock = function.AppendBasicBlock("or.else");
         var mergeBlock = function.AppendBasicBlock("or.merge");
 
-        _llvmBuilder.BuildCondBr(left, thenBlock, elseBlock);
+        _builder.BuildCondBr(left, thenBlock, elseBlock);
 
         // Then
-        _llvmBuilder.PositionAtEnd(thenBlock);
-        _llvmBuilder.BuildBr(mergeBlock);
+        _builder.PositionAtEnd(thenBlock);
+        _builder.BuildBr(mergeBlock);
 
         // Else
-        _llvmBuilder.PositionAtEnd(elseBlock);
+        _builder.PositionAtEnd(elseBlock);
         var right = getRight();
-        _llvmBuilder.BuildBr(mergeBlock);
+        _builder.BuildBr(mergeBlock);
 
         // Merge
-        _llvmBuilder.PositionAtEnd(mergeBlock);
-        var phi = _llvmBuilder.BuildPhi(LLVMTypeRef.Int1, "or.result");
+        _builder.PositionAtEnd(mergeBlock);
+        var phi = _builder.BuildPhi(LLVMTypeRef.Int1, "or.result");
         phi.AddIncoming([LlvmUtils.CreateConstBool(true)], [thenBlock], 1);
         phi.AddIncoming([right], [elseBlock], 1);
 
@@ -67,7 +67,7 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
 
     public LLVMValueRef BuildDefaultValueForType(IDataType dataType)
     {
-        var type = _llvmTypeBuilder.BuildType(dataType);
+        var type = _typeBuilder.BuildType(dataType);
 
         return dataType switch
         {
@@ -81,21 +81,21 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
 
     public LLVMValueRef BuildMalloc(LLVMTypeRef type)
     {
-        var sizeType = _llvmTypeBuilder.BuildType(new PrimitiveDataType(Primitive.Int64));
+        var sizeType = _typeBuilder.BuildType(new PrimitiveDataType(Primitive.Int64));
         LLVMTypeRef mallocType;
         mallocType = LLVMTypeRef.CreateFunction(
             LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0),
             [sizeType]
         );
 
-        var mallocValue = _llvmModule.AddFunction("malloc", mallocType);
-        var call = _llvmBuilder.BuildCall2(
+        var mallocValue = _module.AddFunction("malloc", mallocType);
+        var call = _builder.BuildCall2(
             mallocType,
             mallocValue,
             new LLVMValueRef[] { type.SizeOf },
             "malloc"
         );
 
-        return _llvmBuilder.BuildBitCast(call, LLVMTypeRef.CreatePointer(mallocType, 0), "cast");
+        return _builder.BuildBitCast(call, LLVMTypeRef.CreatePointer(mallocType, 0), "cast");
     }
 }

@@ -245,7 +245,7 @@ public class SemanticFunctionDeclarationNode(
     Token identifier,
     List<SemanticParameterNode> parameters,
     IDataType returnType,
-    SemanticBlockNode body,
+    SemanticBlockNode? body,
     bool isStatic,
     FunctionSymbol symbol,
     TextSpan span
@@ -258,7 +258,7 @@ public class SemanticFunctionDeclarationNode(
 
     public IDataType ReturnType { get; } = returnType;
 
-    public SemanticBlockNode Body { get; } = body;
+    public SemanticBlockNode? Body { get; } = body;
 
     public bool IsStatic { get; } = isStatic;
 
@@ -272,8 +272,11 @@ public class SemanticFunctionDeclarationNode(
             callback(parameter, this);
         }
 
-        Body.Traverse(callback);
-        callback(Body, this);
+        if (Body != null)
+        {
+            Body.Traverse(callback);
+            callback(Body, this);
+        }
     }
 }
 

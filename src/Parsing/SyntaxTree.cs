@@ -182,7 +182,7 @@ public class SyntaxFunctionDeclarationNode(
     Token identifier,
     List<SyntaxParameterNode> parameters,
     SyntaxTypeNode? returnType,
-    SyntaxBlockNode body,
+    SyntaxBlockNode? body,
     bool isStatic,
     TextSpan span
 )
@@ -194,7 +194,7 @@ public class SyntaxFunctionDeclarationNode(
 
     public SyntaxTypeNode? ReturnType { get; } = returnType;
 
-    public SyntaxBlockNode Body { get; } = body;
+    public SyntaxBlockNode? Body { get; } = body;
 
     public bool IsStatic { get; } = isStatic;
 

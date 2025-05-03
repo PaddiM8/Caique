@@ -82,11 +82,11 @@ public class Compilation
     {
         using var llvmContext = LLVMContextRef.Create();
         var emitterContextMap = new Dictionary<SemanticTree, LlvmEmitterContext>();
-        var llvmCache = new LlvmCache();
+        var llvmContextCache = new LlvmContextCache();
         foreach (var (semanticTree, scope) in semanticTrees)
         {
             var moduleName = scope.Namespace.ToString() + "_" + Path.GetFileNameWithoutExtension(scope.FilePath);
-            var emitterContext = new LlvmEmitterContext(moduleName, llvmContext, llvmCache);
+            var emitterContext = new LlvmEmitterContext(moduleName, llvmContext, llvmContextCache);
             LlvmHeaderEmitter.Emit(semanticTree, emitterContext);
 
             emitterContextMap[semanticTree] = emitterContext;

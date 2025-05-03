@@ -8,7 +8,7 @@ namespace Caique.Backend;
 
 public class LlvmTypeBuilder(LLVMContextRef llvmContext)
 {
-    private readonly LLVMContextRef _llvmContext = llvmContext;
+    private readonly LLVMContextRef _context = llvmContext;
     private readonly Dictionary<IDataType, LLVMTypeRef> _cache = [];
     private readonly Dictionary<StructureDataType, LLVMTypeRef> _namedStructCache = [];
 
@@ -30,6 +30,17 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         return built;
     }
 
+    public LLVMTypeRef BuildInitType(SemanticInitNode node)
+    {
+        var parameterTypes = node.Parameters
+            .Select(x => x.DataType)
+            .Select(BuildType)
+            .ToList();
+        var returnType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Void, 0);
+
+        return LLVMTypeRef.CreateFunction(returnType, parameterTypes.ToArray());
+    }
+
     public LLVMTypeRef BuildNamedStructType(StructureDataType dataType)
     {
         if (_namedStructCache.TryGetValue(dataType, out var llvmType))
@@ -42,7 +53,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
             .Select(x => BuildType(x.DataType))
             .ToArray();
 
-        var structValue = _llvmContext.CreateNamedStruct($"class.{dataType.Symbol.SyntaxDeclaration.Identifier.Value}");
+        var structValue = _context.CreateNamedStruct($"class.{dataType.Symbol.SyntaxDeclaration.Identifier.Value}");
         structValue.StructSetBody(fieldTypes, Packed: false);
 
         _namedStructCache[dataType] = structValue;

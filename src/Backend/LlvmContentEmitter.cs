@@ -11,24 +11,24 @@ namespace Caique.Backend;
 public class LlvmContentEmitter
 {
     private readonly SemanticTree _semanticTree;
-    private readonly LLVMContextRef _llvmContext;
-    private readonly LLVMBuilderRef _llvmBuilder;
-    private readonly LLVMModuleRef _llvmModule;
-    private readonly LlvmTypeBuilder _llvmTypeBuilder;
-    private readonly LlvmCache _globalCache;
-    private readonly LlvmCache _localCache;
-    private readonly LlvmSpecialValueBuilder _llvmSpecialValueBuilder;
+    private readonly LLVMContextRef _context;
+    private readonly LLVMBuilderRef _builder;
+    private readonly LLVMModuleRef _module;
+    private readonly LlvmTypeBuilder _typeBuilder;
+    private readonly LlvmContextCache _contextCache;
+    private readonly LlvmModuleCache _moduleCache;
+    private readonly LlvmSpecialValueBuilder _specialValueBuilder;
 
     private LlvmContentEmitter(SemanticTree semanticTree, LlvmEmitterContext emitterContext)
     {
         _semanticTree = semanticTree;
-        _llvmContext = emitterContext.LlvmContext;
-        _llvmBuilder = emitterContext.LlvmBuilder;
-        _llvmModule = emitterContext.LlvmModule;
-        _llvmTypeBuilder = emitterContext.LlvmTypeBuilder;
-        _globalCache = emitterContext.GlobalCache;
-        _localCache = new LlvmCache();
-        _llvmSpecialValueBuilder = new LlvmSpecialValueBuilder(emitterContext, _llvmTypeBuilder);
+        _context = emitterContext.LlvmContext;
+        _builder = emitterContext.LlvmBuilder;
+        _module = emitterContext.LlvmModule;
+        _typeBuilder = emitterContext.LlvmTypeBuilder;
+        _contextCache = emitterContext.ContextCache;
+        _moduleCache = emitterContext.ModuleCache;
+        _specialValueBuilder = new LlvmSpecialValueBuilder(emitterContext, _typeBuilder);
     }
 
     public static string Emit(
@@ -45,7 +45,7 @@ public class LlvmContentEmitter
         {
             Directory.CreateDirectory(Path.Combine(targetDirectory, "ir"));
             var dumpFilePath = Path.Combine(targetDirectory, "ir", $"{emitterContext.ModuleName}.ll");
-            emitter._llvmModule.PrintToFile(dumpFilePath);
+            emitter._module.PrintToFile(dumpFilePath);
         }
 
         Directory.CreateDirectory(Path.Combine(targetDirectory, "objects"));
@@ -78,7 +78,7 @@ public class LlvmContentEmitter
             LLVMCodeModel.LLVMCodeModelDefault
         );
 
-        var success = targetMachine.TryEmitToFile(_llvmModule, path, LLVMCodeGenFileType.LLVMObjectFile, out var error);
+        var success = targetMachine.TryEmitToFile(_module, path, LLVMCodeGenFileType.LLVMObjectFile, out var error);
         if (!success)
             throw new Exception(error);
     }
@@ -106,7 +106,7 @@ public class LlvmContentEmitter
 
     private LLVMValueRef GetSelf()
     {
-        var function = _llvmBuilder.InsertBlock.Parent;
+        var function = _builder.InsertBlock.Parent;
 
         return function.GetParam(0);
     }
@@ -119,12 +119,12 @@ public class LlvmContentEmitter
             Primitive.Void => throw new InvalidOperationException(),
             Primitive.Bool => LlvmUtils.CreateConstBool(node.Value.Kind == TokenKind.True),
             >= Primitive.Int8 and <= Primitive.Int128 => LLVMValueRef.CreateConstInt(
-                _llvmTypeBuilder.BuildType(node.DataType),
+                _typeBuilder.BuildType(node.DataType),
                 ulong.Parse(node.Value.Value),
                 SignExtend: true
             ),
             >= Primitive.Float16 and <= Primitive.Float64 => LLVMValueRef.CreateConstReal(
-                _llvmTypeBuilder.BuildType(node.DataType),
+                _typeBuilder.BuildType(node.DataType),
                 double.Parse(node.Value.Value)
             ),
         };
@@ -132,23 +132,23 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(SemanticVariableReferenceNode node)
     {
-        var type = _llvmTypeBuilder.BuildType(node.DataType);
-        var pointer = _localCache.GetNodeLlvmValue((SemanticNode)node.Symbol.SemanticDeclaration);
+        var type = _typeBuilder.BuildType(node.DataType);
+        var pointer = _moduleCache.GetNodeLlvmValue((SemanticNode)node.Symbol.SemanticDeclaration);
 
-        return _llvmBuilder.BuildLoad2(type, pointer, node.Identifier.Value);
+        return _builder.BuildLoad2(type, pointer, node.Identifier.Value);
     }
 
     private LLVMValueRef Visit(SemanticFunctionReferenceNode node)
     {
         Debug.Assert(node.Symbol.SemanticDeclaration != null);
 
-        var functionDefinition = _globalCache.GetNodeLlvmValue(node.Symbol.SemanticDeclaration);
-        var functionDeclaration = _llvmModule.GetNamedFunction(functionDefinition.Name);
+        var functionIdentifier = _contextCache.GetSymbolName(node.Symbol.SemanticDeclaration);
+        var functionDeclaration = _module.GetNamedFunction(functionIdentifier);
         if (string.IsNullOrEmpty(functionDeclaration.Name))
         {
-            var functionType = _llvmTypeBuilder.BuildType(new FunctionDataType(node.Symbol));
+            var functionType = _typeBuilder.BuildType(new FunctionDataType(node.Symbol));
 
-            return _llvmModule.AddFunction(functionDefinition.Name, functionType);
+            return _module.AddFunction(functionIdentifier, functionType);
         }
 
         return functionDeclaration;
@@ -156,7 +156,7 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(SemanticFieldReferenceNode node)
     {
-        var type = _llvmTypeBuilder.BuildType(node.DataType);
+        var type = _typeBuilder.BuildType(node.DataType);
         if (node.IsStatic)
         {
             throw new NotImplementedException();
@@ -169,9 +169,9 @@ public class LlvmContentEmitter
 
         Debug.Assert(node.Symbol.SemanticDeclaration != null);
         var index = (uint)structure!.FieldStartIndex + (uint)structure.Fields.IndexOf(node.Symbol.SemanticDeclaration);
-        var pointer = _llvmBuilder.BuildStructGEP2(type, objectInstance!.Value, index, $"{node.Identifier.Value}_pointer");
+        var pointer = _builder.BuildStructGEP2(type, objectInstance!.Value, index, $"{node.Identifier.Value}_pointer");
 
-        return _llvmBuilder.BuildLoad2(type, pointer, node.Identifier.Value);
+        return _builder.BuildLoad2(type, pointer, node.Identifier.Value);
     }
 
     private LLVMValueRef Visit(SemanticUnaryNode node)
@@ -181,15 +181,15 @@ public class LlvmContentEmitter
 
         if (node.Operator == TokenKind.Exclamation)
         {
-            return _llvmBuilder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(false), "not");
+            return _builder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(false), "not");
         }
 
         if (node.Operator == TokenKind.Minus)
         {
             return node.DataType switch
             {
-                var n when n.IsInteger() => _llvmBuilder.BuildNeg(value.Value, "neg"),
-                var n when n.IsFloat() => _llvmBuilder.BuildFNeg(value.Value, "neg"),
+                var n when n.IsInteger() => _builder.BuildNeg(value.Value, "neg"),
+                var n when n.IsFloat() => _builder.BuildFNeg(value.Value, "neg"),
                 _ => throw new InvalidOperationException(),
             };
         }
@@ -203,10 +203,10 @@ public class LlvmContentEmitter
         Debug.Assert(left.HasValue);
 
         if (node.Operator == TokenKind.AmpersandAmpersand)
-            return _llvmSpecialValueBuilder.BuildLogicalAnd(left.Value, () => Next(node.Right)!.Value);
+            return _specialValueBuilder.BuildLogicalAnd(left.Value, () => Next(node.Right)!.Value);
 
         if (node.Operator == TokenKind.PipePipe)
-            return _llvmSpecialValueBuilder.BuildLogicalOr(left.Value, () => Next(node.Right)!.Value);
+            return _specialValueBuilder.BuildLogicalOr(left.Value, () => Next(node.Right)!.Value);
 
         var right = Next(node.Right);
         Debug.Assert(right.HasValue);
@@ -242,7 +242,7 @@ public class LlvmContentEmitter
                     _ => throw new UnreachableException(),
                 };
 
-                return _llvmBuilder.BuildICmp(predicate, left.Value, right.Value, "cmp");
+                return _builder.BuildICmp(predicate, left.Value, right.Value, "cmp");
             }
             else if (node.DataType.IsFloat())
             {
@@ -257,7 +257,7 @@ public class LlvmContentEmitter
                     _ => throw new UnreachableException(),
                 };
 
-                return _llvmBuilder.BuildFCmp(predicate, left.Value, right.Value, "cmpf");
+                return _builder.BuildFCmp(predicate, left.Value, right.Value, "cmpf");
             }
         }
 
@@ -265,27 +265,27 @@ public class LlvmContentEmitter
         {
             TokenKind.Plus => node.DataType switch
             {
-                var n when n.IsInteger() => _llvmBuilder.BuildAdd(left.Value, right.Value, "add"),
-                var n when n.IsFloat() => _llvmBuilder.BuildFAdd(left.Value, right.Value, "addf"),
+                var n when n.IsInteger() => _builder.BuildAdd(left.Value, right.Value, "add"),
+                var n when n.IsFloat() => _builder.BuildFAdd(left.Value, right.Value, "addf"),
                 _ => throw new InvalidOperationException(),
             },
             TokenKind.Minus => node.DataType switch
             {
-                var n when n.IsInteger() => _llvmBuilder.BuildSub(left.Value, right.Value, "sub"),
-                var n when n.IsFloat() => _llvmBuilder.BuildFSub(left.Value, right.Value, "subf"),
+                var n when n.IsInteger() => _builder.BuildSub(left.Value, right.Value, "sub"),
+                var n when n.IsFloat() => _builder.BuildFSub(left.Value, right.Value, "subf"),
                 _ => throw new InvalidOperationException(),
             },
             TokenKind.Star => node.DataType switch
             {
-                var n when n.IsInteger() => _llvmBuilder.BuildMul(left.Value, right.Value, "mul"),
-                var n when n.IsFloat() => _llvmBuilder.BuildFMul(left.Value, right.Value, "mulf"),
+                var n when n.IsInteger() => _builder.BuildMul(left.Value, right.Value, "mul"),
+                var n when n.IsFloat() => _builder.BuildFMul(left.Value, right.Value, "mulf"),
                 _ => throw new InvalidOperationException(),
             },
             TokenKind.Slash => node.DataType switch
             {
-                var n when n.IsSignedInteger() => _llvmBuilder.BuildSDiv(left.Value, right.Value, "div"),
-                var n when n.IsUnsignedInteger() => _llvmBuilder.BuildUDiv(left.Value, right.Value, "div"),
-                var n when n.IsFloat() => _llvmBuilder.BuildFDiv(left.Value, right.Value, "divf"),
+                var n when n.IsSignedInteger() => _builder.BuildSDiv(left.Value, right.Value, "div"),
+                var n when n.IsUnsignedInteger() => _builder.BuildUDiv(left.Value, right.Value, "div"),
+                var n when n.IsFloat() => _builder.BuildFDiv(left.Value, right.Value, "divf"),
                 _ => throw new InvalidOperationException(),
             },
             _ => throw new NotImplementedException(),
@@ -295,42 +295,49 @@ public class LlvmContentEmitter
     private LLVMValueRef Visit(SemanticCallNode node)
     {
         var function = Next(node.Left)!.Value;
-        var functionType = _llvmTypeBuilder.BuildType(node.Left.DataType);
+        var functionType = _typeBuilder.BuildType(node.Left.DataType);
         var arguments = node.Arguments
             .Select(Next)
             .Select(x => x!.Value)
             .ToArray();
 
-        return _llvmBuilder.BuildCall2(functionType, function, arguments, "call");
+        return _builder.BuildCall2(functionType, function, arguments, "call");
     }
 
     private LLVMValueRef Visit(SemanticNewNode node)
     {
-        var returnType = _llvmTypeBuilder.BuildType(node.DataType);
+        var returnType = _typeBuilder.BuildType(node.DataType);
         var structure = (ISemanticInstantiableStructureDeclaration)((StructureDataType)node.DataType).Symbol.SemanticDeclaration!;
-        var function = _globalCache.GetNodeLlvmValue(structure.Init);
         var arguments = node.Arguments
             .Select(Next)
             .Select(x => x!.Value)
             .ToArray();
 
-        return _llvmBuilder.BuildCall2(returnType, function, arguments, "init_call");
+        var initIdentifier = _contextCache.GetSymbolName(structure.Init);
+        var functionDeclaration = _module.GetNamedFunction(initIdentifier);
+        if (string.IsNullOrEmpty(functionDeclaration.Name))
+        {
+            var functionType = _typeBuilder.BuildInitType(structure.Init);
+            functionDeclaration = _module.AddFunction(initIdentifier, functionType);
+        }
+
+        return _builder.BuildCall2(returnType, functionDeclaration, arguments, "init_call");
     }
 
     private LLVMValueRef Visit(SemanticReturnNode node)
     {
         var returnTypeNode = _semanticTree.GetEnclosingFunction(node)!.ReturnType;
-        var returnType = _llvmTypeBuilder.BuildType(returnTypeNode);
+        var returnType = _typeBuilder.BuildType(returnTypeNode);
 
         if (node.Value == null)
         {
-            _llvmBuilder.BuildRetVoid();
+            _builder.BuildRetVoid();
 
             return LLVMValueRef.CreateConstNull(returnType);
         }
 
         var value = Next(node.Value);
-        _llvmBuilder.BuildRet(value!.Value);
+        _builder.BuildRet(value!.Value);
 
         return value.Value;
     }
@@ -347,10 +354,10 @@ public class LlvmContentEmitter
             return null;
         }
 
-        var function = _llvmBuilder.InsertBlock.Parent;
+        var function = _builder.InsertBlock.Parent;
         var value = function.AppendBasicBlock("entry");
-        _localCache.SetBlockLlvmValue(node, value);
-        _llvmBuilder.PositionAtEnd(value);
+        _moduleCache.SetBlockLlvmValue(node, value);
+        _builder.PositionAtEnd(value);
 
         LLVMValueRef? lastValue = null;
         foreach (var expression in node.Expressions)
@@ -361,37 +368,40 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(SemanticVariableDeclarationNode node)
     {
-        var block = _llvmBuilder.InsertBlock;
+        var block = _builder.InsertBlock;
         var firstInstruction = block.FirstInstruction;
         if (firstInstruction != null)
-            _llvmBuilder.PositionBefore(firstInstruction);
+            _builder.PositionBefore(firstInstruction);
 
-        var alloca = _llvmBuilder.BuildAlloca(
-            _llvmTypeBuilder.BuildType(node.DataType),
+        var alloca = _builder.BuildAlloca(
+            _typeBuilder.BuildType(node.DataType),
             node.Identifier.Value
         );
 
-        _llvmBuilder.PositionAtEnd(block);
+        _builder.PositionAtEnd(block);
 
         var value = Next(node.Value);
-        _llvmBuilder.BuildStore(value!.Value, alloca);
+        _builder.BuildStore(value!.Value, alloca);
 
         return value.Value;
     }
 
     private LLVMValueRef? Visit(SemanticFunctionDeclarationNode node)
     {
-        var function = _globalCache.GetNodeLlvmValue(node);
+        var function = _moduleCache.GetNodeLlvmValue(node);
+        if (node.Body == null)
+            return function;
+
         var block = function.AppendBasicBlock("entry");
-        _localCache.SetBlockLlvmValue(node.Body, block);
-        _llvmBuilder.PositionAtEnd(block);
+        _moduleCache.SetBlockLlvmValue(node.Body, block);
+        _builder.PositionAtEnd(block);
 
         // Allocate parameters
         foreach (var parameter in node.Parameters)
         {
-            var parameterType = _llvmTypeBuilder.BuildType(parameter.DataType);
-            var parameterPointer = _llvmBuilder.BuildAlloca(parameterType, $"{parameter.Identifier.Value}.addr");
-            _localCache.SetNodeLlvmValue(parameter, parameterPointer);
+            var parameterType = _typeBuilder.BuildType(parameter.DataType);
+            var parameterPointer = _builder.BuildAlloca(parameterType, $"{parameter.Identifier.Value}.addr");
+            _moduleCache.SetNodeLlvmValue(parameter, parameterPointer);
         }
 
         // Store parameters
@@ -399,8 +409,8 @@ public class LlvmContentEmitter
         foreach (var (i, parameter) in node.Parameters.Index())
         {
             var parameterValue = function.GetParam((uint)i + parameterOffset);
-            var parameterPointer = _localCache.GetNodeLlvmValue(parameter);
-            _llvmBuilder.BuildStore(parameterValue, parameterPointer);
+            var parameterPointer = _moduleCache.GetNodeLlvmValue(parameter);
+            _builder.BuildStore(parameterValue, parameterPointer);
         }
 
         foreach (var expression in node.Body.Expressions.SkipLast(1))
@@ -413,18 +423,18 @@ public class LlvmContentEmitter
         }
         else if (last == null)
         {
-            _llvmBuilder.BuildRetVoid();
+            _builder.BuildRetVoid();
         }
         else if (node.ReturnType is PrimitiveDataType { Kind: Primitive.Void })
         {
             Next(last);
-            _llvmBuilder.BuildRetVoid();
+            _builder.BuildRetVoid();
         }
         else
         {
             var lastValue = Next(last);
             if (lastValue.HasValue)
-                _llvmBuilder.BuildRet(lastValue.Value);
+                _builder.BuildRet(lastValue.Value);
         }
 
         return function;
@@ -441,9 +451,9 @@ public class LlvmContentEmitter
         {
             // Create the entry function
             var entryFunctionType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, []);
-            var entryFunction = _llvmModule.AddFunction("main", entryFunctionType);
+            var entryFunction = _module.AddFunction("main", entryFunctionType);
             var block = entryFunction.AppendBasicBlock("entry");
-            _llvmBuilder.PositionAtEnd(block);
+            _builder.PositionAtEnd(block);
 
             // Find the user-defined main function
             var userEntryDeclaration = node.Functions.FirstOrDefault(x => x.Identifier.Value == "Main");
@@ -451,15 +461,15 @@ public class LlvmContentEmitter
                 return null;
 
             // Build a call to the user-defined main function
-            var userMainFunction = _globalCache.GetNodeLlvmValue(userEntryDeclaration);
-            var userMainFunctionType = _llvmTypeBuilder.BuildType(new FunctionDataType(userEntryDeclaration.Symbol));
-            var returnValue = _llvmBuilder.BuildCall2(
+            var userMainFunction = _moduleCache.GetNodeLlvmValue(userEntryDeclaration);
+            var userMainFunctionType = _typeBuilder.BuildType(new FunctionDataType(userEntryDeclaration.Symbol));
+            var returnValue = _builder.BuildCall2(
                 userMainFunctionType,
                 userMainFunction,
                 Array.Empty<LLVMValueRef>(),
                 "main"
             );
-            _llvmBuilder.BuildRet(returnValue);
+            _builder.BuildRet(returnValue);
         }
 
         return null;
@@ -467,13 +477,13 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(SemanticInitNode node, SemanticClassDeclarationNode parentStructure)
     {
-        var function = _globalCache.GetNodeLlvmValue(node);
+        var function = _moduleCache.GetNodeLlvmValue(node);
         var value = function.AppendBasicBlock("entry");
-        _localCache.SetBlockLlvmValue(node.Body, value);
-        _llvmBuilder.PositionAtEnd(value);
+        _moduleCache.SetBlockLlvmValue(node.Body, value);
+        _builder.PositionAtEnd(value);
 
-        var type = _llvmTypeBuilder.BuildNamedStructType(new StructureDataType(parentStructure.Symbol));
-        var instance = _llvmSpecialValueBuilder.BuildMalloc(type);
+        var type = _typeBuilder.BuildNamedStructType(new StructureDataType(parentStructure.Symbol));
+        var instance = _specialValueBuilder.BuildMalloc(type);
 
         foreach (var expression in node.Body.Expressions)
             Next(expression);
@@ -481,15 +491,15 @@ public class LlvmContentEmitter
         foreach (var (i, field) in parentStructure.Fields.Index())
         {
             var index = (uint)parentStructure.FieldStartIndex + (uint)i;
-            var fieldType = _llvmTypeBuilder.BuildType(field.DataType);
-            var fieldPointer = _llvmBuilder.BuildStructGEP2(fieldType, instance, index, field.Identifier.Value);
+            var fieldType = _typeBuilder.BuildType(field.DataType);
+            var fieldPointer = _builder.BuildStructGEP2(fieldType, instance, index, field.Identifier.Value);
             var fieldValue = field.Value == null
-                ? _llvmSpecialValueBuilder.BuildDefaultValueForType(field.DataType)
+                ? _specialValueBuilder.BuildDefaultValueForType(field.DataType)
                 : Next(field.Value);
-            _llvmBuilder.BuildStore(fieldValue!.Value, fieldPointer);
+            _builder.BuildStore(fieldValue!.Value, fieldPointer);
         }
 
-        _llvmBuilder.BuildRet(instance);
+        _builder.BuildRet(instance);
 
         return function;
     }

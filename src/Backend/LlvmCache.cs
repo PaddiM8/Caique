@@ -3,7 +3,7 @@ using LLVMSharp.Interop;
 
 namespace Caique.Backend;
 
-public class LlvmCache
+public class LlvmModuleCache
 {
     private readonly Dictionary<SemanticNode, LLVMValueRef> _llvmValueLookup = [];
     private readonly Dictionary<SemanticNode, LLVMTypeRef> _llvmTypeLookup = [];
@@ -17,16 +17,6 @@ public class LlvmCache
     public void SetNodeLlvmValue(SemanticNode node, LLVMValueRef value)
     {
         _llvmValueLookup[node] = value;
-    }
-
-    public LLVMTypeRef GetNodeLlvmType(SemanticNode node)
-    {
-        return _llvmTypeLookup[node];
-    }
-
-    public void SetNodeLlvmType(SemanticNode node, LLVMTypeRef type)
-    {
-        _llvmTypeLookup[node] = type;
     }
 
     public LLVMBasicBlockRef GetBlockLlvmValue(SemanticBlockNode node)
