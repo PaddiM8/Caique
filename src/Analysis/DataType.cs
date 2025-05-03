@@ -11,11 +11,9 @@ public enum Primitive
     Int32,
     Int64,
     Int128,
-    Float8,
     Float16,
     Float32,
     Float64,
-    Float128,
 }
 
 public interface IDataType
@@ -23,6 +21,18 @@ public interface IDataType
     bool IsEquivalent(IDataType other);
 
     bool IsNumber()
+        => false;
+
+    bool IsInteger()
+        => false;
+
+    bool IsSignedInteger()
+        => false;
+
+    bool IsUnsignedInteger()
+        => false;
+
+    bool IsFloat()
         => false;
 }
 
@@ -41,11 +51,9 @@ public class PrimitiveDataType(Primitive kind) : IDataType
             Primitive.Int32 => "i32",
             Primitive.Int64 => "i64",
             Primitive.Int128 => "i128",
-            Primitive.Float8 => "f8",
             Primitive.Float16 => "f16",
             Primitive.Float32 => "f32",
             Primitive.Float64 => "f64",
-            Primitive.Float128 => "f128",
         };
     }
 
@@ -53,7 +61,19 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         => other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind;
 
     public bool IsNumber()
-        => Kind >= Primitive.Int8 && Kind <= Primitive.Float128;
+        => Kind >= Primitive.Int8 && Kind <= Primitive.Float64;
+
+    public bool IsInteger()
+        => Kind >= Primitive.Int8 && Kind <= Primitive.Int128;
+
+    public bool IsSignedInteger()
+        => Kind >= Primitive.Int8 && Kind <= Primitive.Int128;
+
+    public bool IsFloat()
+        => Kind >= Primitive.Float16 && Kind <= Primitive.Float64;
+
+    public override int GetHashCode()
+        => Kind.GetHashCode();
 }
 
 public class StructureDataType(StructureSymbol symbol) : IDataType
@@ -65,6 +85,9 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
 
     public bool IsEquivalent(IDataType other)
         => other is StructureDataType otherStructure && otherStructure.Symbol == Symbol;
+
+    public override int GetHashCode()
+        => Symbol.SyntaxDeclaration.GetHashCode();
 }
 
 public class FunctionDataType(FunctionSymbol symbol) : IDataType
@@ -73,14 +96,17 @@ public class FunctionDataType(FunctionSymbol symbol) : IDataType
 
     public override string ToString()
     {
-        var parameters = Symbol.Declaration.Parameters
+        var parameters = Symbol.SyntaxDeclaration.Parameters
             .Select(x => x.Type.TypeNames)
             .Select(x => string.Join("::", x));
-        var returnType = string.Join("::", Symbol.Declaration.ReturnType?.TypeNames ?? []);
+        var returnType = string.Join("::", Symbol.SyntaxDeclaration.ReturnType?.TypeNames ?? []);
 
         return $"Fn({string.Join(", ", parameters)})({returnType})";
     }
 
     public bool IsEquivalent(IDataType other)
         => other is FunctionDataType otherFunction && otherFunction.Symbol == Symbol;
+
+    public override int GetHashCode()
+        => Symbol.SyntaxDeclaration.GetHashCode();
 }

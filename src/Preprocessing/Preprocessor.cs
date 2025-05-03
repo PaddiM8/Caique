@@ -4,9 +4,12 @@ namespace Caique.Preprocessing;
 
 public class Preprocessor
 {
-    public static Project Process(string projectName, string directoryPath)
+    public static Project Process(string projectName, string projectFilePath)
     {
-        var project = new Project();
+        var project = new Project(projectName, projectFilePath);
+        // TODO: Project files don't exist yet
+        //var directoryPath = Path.GetDirectoryName(projectFilePath)!;
+        var directoryPath = projectFilePath;
         var namespaceScope = BuildScope(projectName, directoryPath, null, project);
         project.Initialise(namespaceScope);
 

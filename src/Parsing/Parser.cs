@@ -274,6 +274,7 @@ public class Parser
 
         var symbol = new FieldSymbol(node);
         scope.AddSymbol(symbol);
+        node.Symbol = symbol;
 
         return node;
     }
@@ -421,6 +422,9 @@ public class Parser
         if (Match(TokenKind.New))
             return ParseNew();
 
+        if (Match(TokenKind.Return))
+            return ParseReturn();
+
         _diagnostics.ReportUnexpectedToken(_current!);
         throw Recover();
     }
@@ -492,6 +496,16 @@ public class Parser
         var arguments = ParseArguments();
 
         return new SyntaxNewNode(type, arguments, start.Combine(_previous!.Span));
+    }
+
+    private SyntaxReturnNode ParseReturn()
+    {
+        var start = EatExpected(TokenKind.Return).Span;
+        var value = AdvanceIf(TokenKind.Semicolon)
+            ? null
+            : ParseStatement();
+
+        return new SyntaxReturnNode(value, start.Combine(value?.Span ?? start));
     }
 
     private List<SyntaxNode> ParseArguments()

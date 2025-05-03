@@ -2,10 +2,9 @@
   "profiles": {
     "ConsoleApp": {
       "commandName": "Project",
-      "commandLineArgs": "../experiments",
+      "commandLineArgs": "build ../experiments/namespaces --dump-ir",
       "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development",
-        "AAA_TEST": "testing"
+        "DOTNET_ENVIRONMENT": "Development"
       }
     }
   }

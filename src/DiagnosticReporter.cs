@@ -98,6 +98,11 @@ public class DiagnosticReporter
         ReportError($"The constructor parameter was treated as a field reference, since it lacks a type, but a field with the name '{identifier.Value}' was not found.", identifier.Span);
     }
 
+    public void ReportReturnOutsideFunction(TextSpan span)
+    {
+        ReportError($"A return statement must be placed within a function.", span);
+    }
+
     private void ReportHint(string message, TextSpan span)
     {
         var diagnostic = new Diagnostic(DiagnosticSeverity.Hint, message, span);

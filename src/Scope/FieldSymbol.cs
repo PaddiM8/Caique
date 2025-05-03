@@ -6,7 +6,9 @@ namespace Caique.Scope;
 public class FieldSymbol(SyntaxFieldDeclarationNode declarationNode) : ISymbol
 {
     public string Name
-        => Declaration.Identifier.Value;
+        => SyntaxDeclaration.Identifier.Value;
 
-    public SyntaxFieldDeclarationNode Declaration { get; } = declarationNode;
+    public SyntaxFieldDeclarationNode SyntaxDeclaration { get; } = declarationNode;
+
+    public SemanticFieldDeclarationNode? SemanticDeclaration { get; set; }
 }

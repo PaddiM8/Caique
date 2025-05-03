@@ -31,13 +31,27 @@ public class SyntaxTree(string text, FileScope fileScope)
         return current as SyntaxBlockNode;
     }
 
-    public StructureScope? GetStructureScope(SyntaxNode node)
+    public SyntaxFunctionDeclarationNode? GetEnclosingFunction(SyntaxNode node)
     {
-        var current = node;
-        while (current is not (null or ISyntaxStructure))
+        var current = node.Parent;
+        while (current is not (null or SyntaxFunctionDeclarationNode))
             current = current.Parent;
 
-        return (current as ISyntaxStructure)?.Scope;
+        return current as SyntaxFunctionDeclarationNode;
+    }
+
+    public ISyntaxStructureDeclaration? GetEnclosingStructure(SyntaxNode node)
+    {
+        var current = node;
+        while (current is not (null or ISyntaxStructureDeclaration))
+            current = current.Parent;
+
+        return current as ISyntaxStructureDeclaration;
+    }
+
+    public StructureScope? GetStructureScope(SyntaxNode node)
+    {
+        return GetEnclosingStructure(node)?.Scope;
     }
 
     public LocalScope? GetLocalScope(SyntaxNode node)
@@ -124,6 +138,12 @@ public class SyntaxNewNode(SyntaxTypeNode identifier, List<SyntaxNode> arguments
     public List<SyntaxNode> Arguments { get; } = arguments;
 }
 
+public class SyntaxReturnNode(SyntaxNode? value, TextSpan span)
+    : SyntaxNode(span)
+{
+    public SyntaxNode? Value { get; } = value;
+}
+
 public class SyntaxBlockNode(List<SyntaxNode> expressions, TextSpan span)
     : SyntaxNode(span)
 {
@@ -181,11 +201,13 @@ public class SyntaxFunctionDeclarationNode(
     public FunctionSymbol? Symbol { get; set; }
 }
 
-public interface ISyntaxStructure
+public interface ISyntaxStructureDeclaration
 {
     Token Identifier { get; }
 
     StructureScope Scope { get; }
+
+    StructureSymbol? Symbol { get; }
 }
 
 public class SyntaxClassDeclarationNode(
@@ -195,11 +217,11 @@ public class SyntaxClassDeclarationNode(
     StructureScope scope,
     TextSpan span
 )
-    : SyntaxNode(span), ISyntaxStructure
+    : SyntaxNode(span), ISyntaxStructureDeclaration
 {
     public Token Identifier { get; } = identifier;
 
-    public SyntaxInitNode? Constructor { get; } = constructor;
+    public SyntaxInitNode? Init { get; } = constructor;
 
     public List<SyntaxNode> Declarations { get; } = declarations;
 
@@ -218,6 +240,8 @@ public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, S
     public SyntaxNode? Value { get; } = value;
 
     public bool IsStatic { get; } = isStatic;
+
+    public FieldSymbol? Symbol { get; set; }
 }
 
 public class SyntaxInitNode(List<SyntaxInitParameterNode> parameters, SyntaxBlockNode body, TextSpan span)

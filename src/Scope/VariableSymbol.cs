@@ -6,7 +6,7 @@ namespace Caique.Scope;
 public class VariableSymbol(ISemanticVariableDeclaration declarationNode) : ISymbol
 {
     public string Name
-        => Declaration.Identifier.Value;
+        => SemanticDeclaration.Identifier.Value;
 
-    public ISemanticVariableDeclaration Declaration { get; } = declarationNode;
+    public ISemanticVariableDeclaration SemanticDeclaration { get; } = declarationNode;
 }

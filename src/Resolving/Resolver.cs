@@ -53,6 +53,10 @@ public class Resolver
             case SyntaxNewNode newNode:
                 Visit(newNode);
                 break;
+            case SyntaxReturnNode returnNode:
+                if (returnNode.Value != null)
+                    Next(returnNode.Value, node);
+                break;
             case SyntaxBlockNode blockNode:
                 Visit(blockNode);
                 break;
@@ -73,7 +77,6 @@ public class Resolver
                 Visit(fieldDeclarationNode);
                 break;
             default:
-                Debug.Assert(false);
                 break;
         }
     }
@@ -141,8 +144,8 @@ public class Resolver
 
         // This needs to be done after the declarations since
         // init parameters may refer to fields
-        if (node.Constructor != null)
-            Next(node.Constructor, node);
+        if (node.Init != null)
+            Next(node.Init, node);
     }
 
     private void Visit(SyntaxFieldDeclarationNode node)
@@ -181,6 +184,6 @@ public class Resolver
             return;
         }
 
-        node.LinkedField = fieldSymbol.Declaration;
+        node.LinkedField = fieldSymbol.SyntaxDeclaration;
     }
 }

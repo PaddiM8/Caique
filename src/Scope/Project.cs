@@ -1,7 +1,11 @@
 namespace Caique.Scope;
 
-public class Project()
+public class Project(string name, string projectFilePath)
 {
+    public string Name { get; private set; } = name;
+
+    public string ProjectFilePath { get; private set; } = projectFilePath;
+
     public NamespaceScope? ProjectNamespace { get; private set; }
 
     public void Initialise(NamespaceScope namespaceScope)
