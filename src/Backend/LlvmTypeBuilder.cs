@@ -69,6 +69,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
             {
                 Primitive.Void => LLVM.VoidType(),
                 Primitive.Bool => LLVM.Int1Type(),
+                Primitive.String => LLVM.PointerType(LLVM.Int8Type(), 0),
                 Primitive.Int8 => LLVM.Int8Type(),
                 Primitive.Int16 => LLVM.Int16Type(),
                 Primitive.Int32 => LLVM.Int32Type(),

@@ -6,6 +6,7 @@ public enum Primitive
 {
     Void,
     Bool,
+    String,
     Int8,
     Int16,
     Int32,
@@ -46,6 +47,7 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         {
             Primitive.Void => "void",
             Primitive.Bool => "bool",
+            Primitive.String => "string",
             Primitive.Int8 => "i8",
             Primitive.Int16 => "i16",
             Primitive.Int32 => "i32",

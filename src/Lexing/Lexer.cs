@@ -152,6 +152,7 @@ public class Lexer
             "false" => TokenKind.False,
             "void" => TokenKind.Void,
             "bool" => TokenKind.Bool,
+            "string" => TokenKind.String,
             "i8" => TokenKind.I8,
             "i16" => TokenKind.I16,
             "i32" => TokenKind.I32,

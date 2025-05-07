@@ -118,6 +118,7 @@ public class LlvmContentEmitter
         {
             Primitive.Void => throw new InvalidOperationException(),
             Primitive.Bool => LlvmUtils.CreateConstBool(node.Value.Kind == TokenKind.True),
+            Primitive.String => _builder.BuildGlobalStringPtr(node.Value.Value),
             >= Primitive.Int8 and <= Primitive.Int128 => LLVMValueRef.CreateConstInt(
                 _typeBuilder.BuildType(node.DataType),
                 ulong.Parse(node.Value.Value),

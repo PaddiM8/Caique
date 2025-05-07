@@ -32,6 +32,6 @@ public enum TokenKind
     Exclamation, EqualsEquals, NotEquals, Greater, Less, GreaterEquals, LessEquals,
     NumberLiteral, StringLiteral, True, False,
     Comment,
-    Void, Bool, I8, I16, I32, I64, I128, F8, F16, F32, F64, F128,
+    Void, Bool, String, I8, I16, I32, I64, I128, F8, F16, F32, F64, F128,
     EndOfFile,
 }

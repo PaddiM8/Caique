@@ -87,6 +87,13 @@ public class Analyser
             return new SemanticLiteralNode(node.Value, dataType);
         }
 
+        if (node.Value.Kind == TokenKind.StringLiteral)
+        {
+            var dataType = new PrimitiveDataType(Primitive.String);
+
+            return new SemanticLiteralNode(node.Value, dataType);
+        }
+
         throw new NotImplementedException();
     }
 
@@ -368,6 +375,7 @@ public class Analyser
             {
                 TokenKind.Void => Primitive.Void,
                 TokenKind.Bool => Primitive.Bool,
+                TokenKind.String => Primitive.String,
                 TokenKind.I8 => Primitive.Int8,
                 TokenKind.I16 => Primitive.Int16,
                 TokenKind.I32 => Primitive.Int32,
