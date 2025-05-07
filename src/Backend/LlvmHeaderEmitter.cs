@@ -57,11 +57,23 @@ public class LlvmHeaderEmitter
     private void Visit(SemanticFunctionDeclarationNode node)
     {
         var functionType = _typeBuilder.BuildType(new FunctionDataType(node.Symbol));
-        var parentStructure = _tree.GetEnclosingStructure(node);
-        var name = $"{parentStructure!.Identifier.Value}::{node.Identifier.Value}";
+        var name = CreateFunctionName(node);
         var function = _module.AddFunction(name, functionType);
         _moduleCache.SetNodeLlvmValue(node, function);
         _contextCache.SetSymbolName(node, name);
+    }
+
+    private string CreateFunctionName(SemanticFunctionDeclarationNode node)
+    {
+        var ffiAttribute = node.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
+        if (ffiAttribute != null)
+        {
+            return node.Identifier.Value;
+        }
+
+        var parentStructure = _tree.GetEnclosingStructure(node);
+
+        return $"{parentStructure!.Identifier.Value}::{node.Identifier.Value}";
     }
 
     private void Visit(SemanticClassDeclarationNode node)

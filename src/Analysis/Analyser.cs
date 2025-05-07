@@ -46,7 +46,9 @@ public class Analyser
             SyntaxCallNode callNode => Visit(callNode),
             SyntaxNewNode newNode => Visit(newNode),
             SyntaxReturnNode returnNode => Visit(returnNode),
+            SyntaxKeywordValueNode keywordValueNode => Visit(keywordValueNode),
             SyntaxBlockNode blockNode => Visit(blockNode),
+            SyntaxAttributeNode attributeNode => Visit(attributeNode),
             SyntaxParameterNode parameterNode => Visit(parameterNode),
             SyntaxTypeNode typeNode => Visit(typeNode),
             SyntaxVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
@@ -66,6 +68,26 @@ public class Analyser
     private SemanticNode Visit(SyntaxStatementNode node)
     {
         return Next(node.Expression);
+    }
+
+    private SemanticNode Visit(SyntaxKeywordValueNode node)
+    {
+        var arguments = node
+            .Arguments
+            .Select(Next)
+            .ToList();
+
+        if (node.Keyword.Value == "size_of")
+        {
+            if (arguments.Count != 1)
+                _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+
+            var sliceType = new SliceDataType(arguments[0].DataType);
+
+            return new SemanticKeywordValueNode(node.Keyword, arguments, sliceType, node.Span);
+        }
+
+        throw new UnreachableException();
     }
 
     private SemanticNode Visit(SyntaxLiteralNode node)
@@ -357,6 +379,16 @@ public class Analyser
         return new SemanticBlockNode(expressions, dataType, node.Span);
     }
 
+    private SemanticNode Visit(SyntaxAttributeNode node)
+    {
+        var arguments = node
+            .Arguments
+            .Select(Next)
+            .ToList();
+
+        return new SemanticAttributeNode(node.Identifier, arguments, node.Span);
+    }
+
     private SemanticNode Visit(SyntaxParameterNode node)
     {
         var dataType = Next(node.Type).DataType;
@@ -365,6 +397,18 @@ public class Analyser
     }
 
     private SemanticNode Visit(SyntaxTypeNode node)
+    {
+        if (node.IsSlice)
+        {
+            var sliceType = new SliceDataType(NextSimpleType(node));
+
+            return new SemanticTypeNode(sliceType, node.Span);
+        }
+
+        return new SemanticTypeNode(NextSimpleType(node), node.Span);
+    }
+
+    private IDataType NextSimpleType(SyntaxTypeNode node)
     {
         // Primitive
         Debug.Assert(node.TypeNames.Count > 0);
@@ -386,9 +430,8 @@ public class Analyser
                 TokenKind.F64 => Primitive.Float64,
                 _ => throw new NotImplementedException(),
             };
-            var primitiveDataType = new PrimitiveDataType(primitiveKind);
 
-            return new SemanticTypeNode(primitiveDataType, node.Span);
+            return new PrimitiveDataType(primitiveKind);
         }
 
         // Symbol
@@ -405,9 +448,7 @@ public class Analyser
             throw Recover();
         }
 
-        var dataType = new StructureDataType(symbol);
-
-        return new SemanticTypeNode(dataType, node.Span);
+        return new StructureDataType(symbol);
     }
 
     private SemanticNode Visit(SyntaxVariableDeclarationNode node)
@@ -426,6 +467,12 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxFunctionDeclarationNode node)
     {
+        var attributes = node
+            .Attributes
+            .Select(Next)
+            .Cast<SemanticAttributeNode>()
+            .ToList();
+
         var parameters = new List<SemanticParameterNode>();
         foreach (var parameter in node.Parameters)
         {
@@ -457,7 +504,11 @@ public class Analyser
             node.IsStatic,
             node.Symbol!,
             node.Span
-        );
+        )
+        {
+            Attributes = attributes,
+        };
+
         node.Symbol!.SemanticDeclaration = semanticNode;
 
         return semanticNode;

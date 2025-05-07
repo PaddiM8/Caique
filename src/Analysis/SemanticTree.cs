@@ -197,6 +197,23 @@ public class SemanticReturnNode(SemanticNode? value, TextSpan span)
     }
 }
 
+public class SemanticKeywordValueNode(Token keyword, List<SemanticNode> arguments, IDataType dataType, TextSpan span)
+    : SemanticNode(dataType, span)
+{
+    public Token Keyword { get; } = keyword;
+
+    public List<SemanticNode> Arguments { get; } = arguments;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        foreach (var argument in Arguments)
+        {
+            argument.Traverse(callback);
+            callback(argument, this);
+        }
+    }
+}
+
 public class SemanticBlockNode(List<SemanticNode> expressions, IDataType dataType, TextSpan span)
     : SemanticNode(dataType, span)
 {
@@ -208,6 +225,23 @@ public class SemanticBlockNode(List<SemanticNode> expressions, IDataType dataTyp
         {
             expression.Traverse(callback);
             callback(expression, this);
+        }
+    }
+}
+
+public class SemanticAttributeNode(Token identifier, List<SemanticNode> arguments, TextSpan span)
+    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SemanticNode> Arguments { get; } = arguments;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        foreach (var argument in Arguments)
+        {
+            argument.Traverse(callback);
+            callback(argument, this);
         }
     }
 }
@@ -263,6 +297,8 @@ public class SemanticFunctionDeclarationNode(
     public bool IsStatic { get; } = isStatic;
 
     public FunctionSymbol Symbol { get; } = symbol;
+
+    public List<SemanticAttributeNode> Attributes { get; init; } = [];
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {

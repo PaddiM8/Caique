@@ -82,13 +82,17 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
     public LLVMValueRef BuildMalloc(LLVMTypeRef type)
     {
         var sizeType = _typeBuilder.BuildType(new PrimitiveDataType(Primitive.Int64));
-        LLVMTypeRef mallocType;
-        mallocType = LLVMTypeRef.CreateFunction(
+        LLVMTypeRef mallocType = LLVMTypeRef.CreateFunction(
             LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0),
             [sizeType]
         );
 
-        var mallocValue = _module.AddFunction("malloc", mallocType);
+        LLVMValueRef mallocValue = _module.GetNamedFunction("malloc");
+        if (mallocValue.Handle == IntPtr.Zero)
+        {
+            mallocValue = _module.AddFunction("malloc", mallocType);
+        }
+
         var call = _builder.BuildCall2(
             mallocType,
             mallocValue,

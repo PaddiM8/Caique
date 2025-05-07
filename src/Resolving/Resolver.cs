@@ -57,8 +57,14 @@ public class Resolver
                 if (returnNode.Value != null)
                     Next(returnNode.Value, node);
                 break;
+            case SyntaxKeywordValueNode keywordNode:
+                Visit(keywordNode);
+                break;
             case SyntaxBlockNode blockNode:
                 Visit(blockNode);
+                break;
+            case SyntaxAttributeNode attributeNode:
+                Visit(attributeNode);
                 break;
             case SyntaxVariableDeclarationNode variableDeclarationNode:
                 Next(variableDeclarationNode.Value, node);
@@ -106,6 +112,12 @@ public class Resolver
             Next(argument, node);
     }
 
+    private void Visit(SyntaxKeywordValueNode node)
+    {
+        foreach (var argument in node.Arguments)
+            Next(argument, node);
+    }
+
     private void Visit(SyntaxBlockNode node)
     {
         var parentScope = _syntaxTree.GetEnclosingBlock(node)?.Scope;
@@ -123,8 +135,17 @@ public class Resolver
             Next(child, node);
     }
 
+    private void Visit(SyntaxAttributeNode node)
+    {
+        foreach (var argument in node.Arguments)
+            Next(argument, node);
+    }
+
     private void Visit(SyntaxFunctionDeclarationNode node)
     {
+        foreach (var attribute in node.Attributes)
+            Next(attribute, node);
+
         foreach (var parameter in node.Parameters)
             Next(parameter, node);
 

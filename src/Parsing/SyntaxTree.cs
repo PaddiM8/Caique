@@ -144,6 +144,14 @@ public class SyntaxReturnNode(SyntaxNode? value, TextSpan span)
     public SyntaxNode? Value { get; } = value;
 }
 
+public class SyntaxKeywordValueNode(Token keyword, List<SyntaxNode> arguments, TextSpan span)
+    : SyntaxNode(span)
+{
+    public Token Keyword { get; } = keyword;
+
+    public List<SyntaxNode> Arguments { get; } = arguments;
+}
+
 public class SyntaxBlockNode(List<SyntaxNode> expressions, TextSpan span)
     : SyntaxNode(span)
 {
@@ -160,12 +168,22 @@ public class SyntaxParameterNode(Token identifier, SyntaxTypeNode type, TextSpan
     public SyntaxTypeNode Type { get; } = type;
 }
 
-public class SyntaxTypeNode(List<Token> typeNames)
+public class SyntaxTypeNode(List<Token> typeNames, bool isSlice)
     : SyntaxNode(typeNames.First().Span.Combine(typeNames.Last().Span))
 {
     public List<Token> TypeNames { get; } = typeNames;
 
+    public bool IsSlice { get; } = isSlice;
+
     public StructureSymbol? ResolvedSymbol { get; set; }
+}
+
+public class SyntaxAttributeNode(Token identifier, List<SyntaxNode> arguments, TextSpan span)
+    : SyntaxNode(span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SyntaxNode> Arguments { get; } = arguments;
 }
 
 public class SyntaxVariableDeclarationNode(Token identifier, SyntaxTypeNode? type, SyntaxNode value, TextSpan span)
@@ -199,6 +217,8 @@ public class SyntaxFunctionDeclarationNode(
     public bool IsStatic { get; } = isStatic;
 
     public FunctionSymbol? Symbol { get; set; }
+
+    public List<SyntaxAttributeNode> Attributes { get; init; } = [];
 }
 
 public interface ISyntaxStructureDeclaration

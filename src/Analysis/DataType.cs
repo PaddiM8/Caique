@@ -78,6 +78,21 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         => Kind.GetHashCode();
 }
 
+public class SliceDataType(IDataType subType) : IDataType
+{
+    public IDataType SubType { get; } = subType;
+
+    public bool IsEquivalent(IDataType other)
+        => other is SliceDataType otherSlice &&
+            SubType.IsEquivalent(otherSlice.SubType);
+
+    public override string ToString()
+        => $"[{SubType}]";
+
+    public override int GetHashCode()
+        => HashCode.Combine(typeof(SliceDataType), SubType);
+}
+
 public class StructureDataType(StructureSymbol symbol) : IDataType
 {
     public StructureSymbol Symbol { get; } = symbol;

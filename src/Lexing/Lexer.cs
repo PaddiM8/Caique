@@ -94,6 +94,7 @@ public class Lexer
                 : (TokenKind.Colon, Eat()),
             ';' => (TokenKind.Semicolon, Eat()),
             ',' => (TokenKind.Comma, Eat()),
+            '#' => (TokenKind.Hash, Eat()),
             _ => (TokenKind.Unknown, ""),
         };
 

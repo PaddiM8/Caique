@@ -20,6 +20,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         var built = dataType switch
         {
             PrimitiveDataType primitive => Build(primitive),
+            SliceDataType slice => Build(slice),
             FunctionDataType function => Build(function),
             StructureDataType structure => Build(structure),
             _ => throw new NotImplementedException(),
@@ -79,6 +80,14 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
                 Primitive.Float32 => LLVM.FloatType(),
                 Primitive.Float64 => LLVM.DoubleType(),
             };
+        }
+    }
+
+    private LLVMTypeRef Build(SliceDataType dataType)
+    {
+        unsafe
+        {
+            return LLVM.PointerType(BuildType(dataType.SubType), 0);
         }
     }
 

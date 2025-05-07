@@ -96,6 +96,7 @@ public class LlvmContentEmitter
             SemanticCallNode callNode => Visit(callNode),
             SemanticNewNode newNode => Visit(newNode),
             SemanticReturnNode returnNode => Visit(returnNode),
+            SemanticKeywordValueNode keywordValueNode => Visit(keywordValueNode),
             SemanticBlockNode blockNode => Visit(blockNode),
             SemanticVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
             SemanticFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
@@ -341,6 +342,14 @@ public class LlvmContentEmitter
         _builder.BuildRet(value!.Value);
 
         return value.Value;
+    }
+
+    private LLVMValueRef Visit(SemanticKeywordValueNode node)
+    {
+        if (node.Keyword.Value == "size_of")
+            return _typeBuilder.BuildType(node.Arguments[0].DataType).SizeOf;
+
+        throw new UnreachableException();
     }
 
     private LLVMValueRef? Visit(SemanticBlockNode node)

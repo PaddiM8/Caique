@@ -23,7 +23,7 @@ public enum TokenKind
     Static,
     New,
     Return,
-    Equals, Colon, ColonColon, Semicolon, Comma,
+    Equals, Colon, ColonColon, Semicolon, Comma, Hash,
     Identifier,
     OpenParenthesis, ClosedParenthesis, OpenBracket, ClosedBracket, OpenBrace, ClosedBrace,
     Plus, Minus, Star, Slash,
