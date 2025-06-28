@@ -232,6 +232,7 @@ public interface ISyntaxStructureDeclaration
 
 public class SyntaxClassDeclarationNode(
     Token identifier,
+    List<SyntaxTypeNode> subTypes,
     SyntaxInitNode? constructor,
     List<SyntaxNode> declarations,
     StructureScope scope,
@@ -240,6 +241,8 @@ public class SyntaxClassDeclarationNode(
     : SyntaxNode(span), ISyntaxStructureDeclaration
 {
     public Token Identifier { get; } = identifier;
+
+    public List<SyntaxTypeNode> SubTypes { get; } = subTypes;
 
     public SyntaxInitNode? Init { get; } = constructor;
 

@@ -1,3 +1,4 @@
+using Caique.Parsing;
 using Caique.Scope;
 
 namespace Caique.Analysis;
@@ -100,11 +101,14 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
     public override string ToString()
         => $"{Symbol.Namespace}::{Symbol.Name}";
 
-    public bool IsEquivalent(IDataType other)
-        => other is StructureDataType otherStructure && otherStructure.Symbol == Symbol;
-
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();
+
+    public bool IsClass()
+        => Symbol is StructureSymbol { SyntaxDeclaration: SyntaxClassDeclarationNode };
+
+    public bool IsEquivalent(IDataType other)
+        => other is StructureDataType otherStructure && otherStructure.Symbol == Symbol;
 }
 
 public class FunctionDataType(FunctionSymbol symbol) : IDataType

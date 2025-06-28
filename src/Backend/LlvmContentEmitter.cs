@@ -493,16 +493,30 @@ public class LlvmContentEmitter
         _builder.PositionAtEnd(value);
 
         var type = _typeBuilder.BuildNamedStructType(new StructureDataType(parentStructure.Symbol));
-        var instance = _specialValueBuilder.BuildMalloc(type);
+        var instance = _specialValueBuilder.BuildMalloc(type, "self");
+
+        if (parentStructure.InheritedClass != null)
+        {
+            var baseCallArguments = new List<LLVMValueRef>();
+            if (node.BaseCall != null)
+            {
+                baseCallArguments = node
+                    .BaseCall
+                    .Arguments
+                    .Select(Next)
+                    .Select(x => x!.Value)
+                    .ToList();
+            }
+
+            BuildBaseCall(parentStructure.InheritedClass, baseCallArguments);
+        }
 
         foreach (var expression in node.Body.Expressions)
             Next(expression);
 
-        foreach (var (i, field) in parentStructure.Fields.Index())
+        foreach (var (i, field) in parentStructure.GetAllFields().Index())
         {
-            var index = (uint)parentStructure.FieldStartIndex + (uint)i;
-            var fieldType = _typeBuilder.BuildType(field.DataType);
-            var fieldPointer = _builder.BuildStructGEP2(fieldType, instance, index, field.Identifier.Value);
+            var fieldPointer = _builder.BuildStructGEP2(type, instance, (uint)i, field.Identifier.Value);
             var fieldValue = field.Value == null
                 ? _specialValueBuilder.BuildDefaultValueForType(field.DataType)
                 : Next(field.Value);
@@ -512,5 +526,11 @@ public class LlvmContentEmitter
         _builder.BuildRet(instance);
 
         return function;
+    }
+
+    private LLVMValueRef BuildBaseCall(SemanticClassDeclarationNode baseStructure, List<LLVMValueRef> arguments)
+    {
+        // TODO: Constructors should not include the malloc because we need to be able to call the constructor of
+        // the base class without instantiating it
     }
 }

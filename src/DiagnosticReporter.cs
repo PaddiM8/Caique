@@ -80,12 +80,12 @@ public class DiagnosticReporter
 
     public void ReportNonStaticSymbolReferencedAsStatic(Token identifier)
     {
-        ReportError($"Non-static symbol was referenced as if it was static.", identifier.Span);
+        ReportError("Non-static symbol was referenced as if it was static.", identifier.Span);
     }
 
     public void ReportStaticSymbolReferencedAsNonStatic(Token identifier)
     {
-        ReportError($"Static symbol was referenced as if it was non-static.", identifier.Span);
+        ReportError("Static symbol was referenced as if it was non-static.", identifier.Span);
     }
 
     public void ReportConstructorAlreadyExists(Token structureIdentifier, TextSpan span)
@@ -100,7 +100,17 @@ public class DiagnosticReporter
 
     public void ReportReturnOutsideFunction(TextSpan span)
     {
-        ReportError($"A return statement must be placed within a function.", span);
+        ReportError("A return statement must be placed within a function.", span);
+    }
+
+    public void ReportMultipleInheritance(TextSpan span)
+    {
+        ReportError("Inheriting from multiple classes is not allowed.", span);
+    }
+
+    public void ReportMisplacedBaseCall(TextSpan span)
+    {
+        ReportError("A base call must be at the top of a constructor of a class that inherits from another class.", span);
     }
 
     private void ReportHint(string message, TextSpan span)

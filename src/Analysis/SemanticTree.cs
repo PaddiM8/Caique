@@ -197,8 +197,8 @@ public class SemanticReturnNode(SemanticNode? value, TextSpan span)
     }
 }
 
-public class SemanticKeywordValueNode(Token keyword, List<SemanticNode> arguments, IDataType dataType, TextSpan span)
-    : SemanticNode(dataType, span)
+public class SemanticKeywordValueNode(Token keyword, List<SemanticNode> arguments, TextSpan span)
+    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
 {
     public Token Keyword { get; } = keyword;
 
@@ -348,6 +348,7 @@ public interface ISemanticInstantiableStructureDeclaration : ISemanticStructureD
 
 public class SemanticClassDeclarationNode(
     Token identifier,
+    StructureSymbol? inheritedClass,
     SemanticInitNode init,
     List<SemanticFunctionDeclarationNode> functions,
     List<SemanticFieldDeclarationNode> fields,
@@ -358,6 +359,8 @@ public class SemanticClassDeclarationNode(
 {
     public Token Identifier { get; } = identifier;
 
+    public StructureSymbol? InheritedClass { get; } = inheritedClass;
+
     public SemanticInitNode Init { get; } = init;
 
     public List<SemanticFunctionDeclarationNode> Functions { get; } = functions;
@@ -366,7 +369,7 @@ public class SemanticClassDeclarationNode(
 
     public StructureSymbol Symbol { get; } = symbol;
 
-    public int FieldStartIndex { get; } = 0;
+    public int FieldStartIndex { get; init; }
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {
@@ -381,6 +384,15 @@ public class SemanticClassDeclarationNode(
             function.Traverse(callback);
             callback(function, this);
         }
+    }
+
+    public IEnumerable<SemanticFieldDeclarationNode> GetAllFields()
+    {
+        var inheritedFields = InheritedClass == null
+            ? []
+            : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllFields();
+
+        return inheritedFields.Concat(Fields);
     }
 }
 
@@ -412,10 +424,17 @@ public class SemanticFieldDeclarationNode(
     }
 }
 
-public class SemanticInitNode(List<SemanticParameterNode> parameters, SemanticBlockNode body, TextSpan span)
+public class SemanticInitNode(
+    List<SemanticParameterNode> parameters,
+    SemanticKeywordValueNode? baseCall,
+    SemanticBlockNode body,
+    TextSpan span
+)
     : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
 {
     public List<SemanticParameterNode> Parameters { get; } = parameters;
+
+    public SemanticKeywordValueNode? BaseCall { get; } = baseCall;
 
     public SemanticBlockNode Body { get; } = body;
 

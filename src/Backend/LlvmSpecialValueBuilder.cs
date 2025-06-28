@@ -79,7 +79,7 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
         };
     }
 
-    public LLVMValueRef BuildMalloc(LLVMTypeRef type)
+    public LLVMValueRef BuildMalloc(LLVMTypeRef type, string label = "malloc")
     {
         var sizeType = _typeBuilder.BuildType(new PrimitiveDataType(Primitive.Int64));
         LLVMTypeRef mallocType = LLVMTypeRef.CreateFunction(
@@ -97,7 +97,7 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
             mallocType,
             mallocValue,
             new LLVMValueRef[] { type.SizeOf },
-            "malloc"
+            label
         );
 
         return _builder.BuildBitCast(call, LLVMTypeRef.CreatePointer(mallocType, 0), "cast");

@@ -161,6 +161,12 @@ public class Resolver
 
     private void Visit(SyntaxClassDeclarationNode node)
     {
+        foreach (var subType in node.SubTypes)
+        {
+            Next(subType, node);
+            ResolveNode(subType);
+        }
+
         foreach (var declaration in node.Declarations)
             Next(declaration, node);
 
@@ -172,6 +178,7 @@ public class Resolver
 
     private void Visit(SyntaxFieldDeclarationNode node)
     {
+        Next(node.Type, node);
         ResolveNode(node.Type);
         if (node.Value != null)
             Next(node.Value, node);

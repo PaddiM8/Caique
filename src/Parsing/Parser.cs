@@ -127,6 +127,17 @@ public class Parser
     {
         var start = EatExpected(TokenKind.Class).Span;
         var identifier = EatExpected(TokenKind.Identifier);
+
+        var subTypes = new List<SyntaxTypeNode>();
+        if (AdvanceIf(TokenKind.Colon))
+        {
+            do
+            {
+                subTypes.Add(ParseType());
+            }
+            while (AdvanceIf(TokenKind.Comma));
+        }
+
         EatExpected(TokenKind.OpenBrace);
 
         var declarations = new List<SyntaxNode>();
@@ -159,6 +170,7 @@ public class Parser
 
         var node = new SyntaxClassDeclarationNode(
             identifier,
+            subTypes,
             constructor,
             declarations,
             scope,
@@ -451,7 +463,7 @@ public class Parser
         if (Match(TokenKind.Return))
             return ParseReturn();
 
-        if (Match(TokenKind.Identifier) && _current?.Value == "size_of")
+        if (Match(TokenKind.Identifier) && _current?.Value is "size_of" or "base")
             return ParseKeywordValue();
 
         _diagnostics.ReportUnexpectedToken(_current!);

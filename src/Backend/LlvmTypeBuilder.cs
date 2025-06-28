@@ -47,10 +47,10 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         if (_namedStructCache.TryGetValue(dataType, out var llvmType))
             return llvmType;
 
-        var fieldTypes = dataType
-            .Symbol
-            .SemanticDeclaration!
-            .Fields
+        var fields = dataType.IsClass()
+            ? ((SemanticClassDeclarationNode)dataType.Symbol.SemanticDeclaration!).GetAllFields()
+            : dataType.Symbol.SemanticDeclaration!.Fields;
+        var fieldTypes = fields
             .Select(x => BuildType(x.DataType))
             .ToArray();
 
@@ -64,23 +64,20 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
 
     private LLVMTypeRef Build(PrimitiveDataType dataType)
     {
-        unsafe
+        return dataType.Kind switch
         {
-            return dataType.Kind switch
-            {
-                Primitive.Void => LLVM.VoidType(),
-                Primitive.Bool => LLVM.Int1Type(),
-                Primitive.String => LLVM.PointerType(LLVM.Int8Type(), 0),
-                Primitive.Int8 => LLVM.Int8Type(),
-                Primitive.Int16 => LLVM.Int16Type(),
-                Primitive.Int32 => LLVM.Int32Type(),
-                Primitive.Int64 => LLVM.Int64Type(),
-                Primitive.Int128 => LLVM.Int128Type(),
-                Primitive.Float16 => LLVM.HalfType(),
-                Primitive.Float32 => LLVM.FloatType(),
-                Primitive.Float64 => LLVM.DoubleType(),
-            };
-        }
+            Primitive.Void => LLVMTypeRef.Void,
+            Primitive.Bool => LLVMTypeRef.Int1,
+            Primitive.String => LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0),
+            Primitive.Int8 => LLVMTypeRef.Int8,
+            Primitive.Int16 => LLVMTypeRef.Int16,
+            Primitive.Int32 => LLVMTypeRef.Int32,
+            Primitive.Int64 => LLVMTypeRef.Int64,
+            Primitive.Int128 => LlvmUtils.Int128,
+            Primitive.Float16 => LLVMTypeRef.Half,
+            Primitive.Float32 => LLVMTypeRef.Float,
+            Primitive.Float64 => LLVMTypeRef.Double,
+        };
     }
 
     private LLVMTypeRef Build(SliceDataType dataType)

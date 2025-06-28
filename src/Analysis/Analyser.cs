@@ -78,16 +78,49 @@ public class Analyser
             .ToList();
 
         if (node.Keyword.Value == "size_of")
-        {
-            if (arguments.Count != 1)
-                _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+            return NextSizeOfKeyword(node, arguments);
 
-            var sliceType = new SliceDataType(arguments[0].DataType);
-
-            return new SemanticKeywordValueNode(node.Keyword, arguments, sliceType, node.Span);
-        }
+        if (node.Keyword.Kind == TokenKind.Base)
+            return NextBaseKeyword(node, arguments);
 
         throw new UnreachableException();
+    }
+
+    private SemanticKeywordValueNode NextSizeOfKeyword(SyntaxKeywordValueNode node, List<SemanticNode> arguments)
+    {
+        if (arguments.Count != 1)
+            _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+
+        var sliceType = new SliceDataType(arguments[0].DataType);
+
+        return new SemanticKeywordValueNode(node.Keyword, arguments, sliceType, node.Span);
+    }
+
+    private SemanticKeywordValueNode NextBaseKeyword(SyntaxKeywordValueNode node, List<SemanticNode> arguments)
+    {
+        if (node.Parent?.Parent is not SyntaxInitNode)
+            _diagnostics.ReportMisplacedBaseCall(node.Span);
+
+        var structureNode = _syntaxTree.GetEnclosingStructure(node);
+        var baseClassNode = ((structureNode as SemanticClassDeclarationNode)?
+            .InheritedClass?
+            .SyntaxDeclaration as SyntaxClassDeclarationNode);
+
+        if (baseClassNode == null)
+        {
+            _diagnostics.ReportMisplacedBaseCall(node.Span);
+            throw Recover();
+        }
+
+        var parameterTypes = baseClassNode
+            .Init?
+            .Parameters
+            .Select(Next)
+            .Select(x => x.DataType)
+            .ToList();
+        ValidateArguments(parameterTypes ?? [], arguments, node.Span);
+
+        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span);
     }
 
     private SemanticNode Visit(SyntaxLiteralNode node)
@@ -297,14 +330,7 @@ public class Analyser
             .Parameters
             .Select(x => Next(x.Type).DataType)
             .ToList();
-        if (parameterTypes.Count != arguments.Count)
-            _diagnostics.ReportWrongNumberOfArguments(parameterTypes.Count, arguments.Count, node.Span);
-
-        foreach (var (parameterType, argument) in parameterTypes.Zip(arguments))
-        {
-            if (!argument.DataType.IsEquivalent(parameterType))
-                _diagnostics.ReportIncompatibleType(parameterType, argument.DataType, argument.Span);
-        }
+        ValidateArguments(parameterTypes, arguments, node.Span);
 
         var declarationReturnType = functionDataType.Symbol.SyntaxDeclaration.ReturnType;
         var dataType = declarationReturnType == null
@@ -317,9 +343,45 @@ public class Analyser
     private SemanticNewNode Visit(SyntaxNewNode node)
     {
         var dataType = Next(node.Type).DataType;
+        if (dataType is not StructureDataType structureDataType)
+        {
+            _diagnostics.ReportIncompatibleType("name of structure", dataType, node.Span);
+            throw Recover();
+        }
+
+        var initNode = structureDataType.Symbol.SyntaxDeclaration switch
+        {
+            SyntaxClassDeclarationNode classNode => classNode.Init,
+            _ => null,
+        };
+
+        if (initNode == null)
+        {
+            _diagnostics.ReportIncompatibleType("name of instantiable structure", dataType, node.Span);
+            throw Recover();
+        }
+
         var arguments = node.Arguments.Select(Next).ToList();
+        var parameterTypes = initNode
+            .Parameters
+            .Select(Next)
+            .Select(x => x.DataType)
+            .ToList();
+        ValidateArguments(parameterTypes, arguments, node.Span);
 
         return new SemanticNewNode(arguments, dataType, node.Span);
+    }
+
+    private void ValidateArguments(List<IDataType> parameterTypes, List<SemanticNode> arguments, TextSpan span)
+    {
+        if (parameterTypes.Count != arguments.Count)
+            _diagnostics.ReportWrongNumberOfArguments(parameterTypes.Count, arguments.Count, span);
+
+        foreach (var (parameterType, argument) in parameterTypes.Zip(arguments))
+        {
+            if (!argument.DataType.IsEquivalent(parameterType))
+                _diagnostics.ReportIncompatibleType(parameterType, argument.DataType, argument.Span);
+        }
     }
 
     private SemanticReturnNode Visit(SyntaxReturnNode node)
@@ -516,6 +578,23 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxClassDeclarationNode node)
     {
+        if (node.SubTypes.Count > 1)
+            _diagnostics.ReportMultipleInheritance(node.Span);
+
+        StructureSymbol? inheritedClass = null;
+        foreach (var subTypeNode in node.SubTypes)
+        {
+            var subTypeDataType = Next(subTypeNode).DataType;
+            if (subTypeDataType is StructureDataType structureDataType && structureDataType.IsClass())
+            {
+                inheritedClass = structureDataType.Symbol;
+            }
+            else
+            {
+                _diagnostics.ReportIncompatibleType("class", subTypeDataType, subTypeNode.Span);
+            }
+        }
+
         var functions = new List<SemanticFunctionDeclarationNode>();
         var fields = new List<SemanticFieldDeclarationNode>();
         foreach (var declaration in node.Declarations)
@@ -526,7 +605,7 @@ public class Analyser
                 {
                     functions.Add((SemanticFunctionDeclarationNode)Next(function));
                 }
-                else if (declaration is SyntaxFunctionDeclarationNode field)
+                else if (declaration is SyntaxFieldDeclarationNode field)
                 {
                     fields.Add((SemanticFieldDeclarationNode)Next(field));
                 }
@@ -541,7 +620,7 @@ public class Analyser
         if (node.Init == null)
         {
             var emptyBlock = new SemanticBlockNode([], new PrimitiveDataType(Primitive.Void), _blankSpan);
-            init = new SemanticInitNode([], emptyBlock, _blankSpan);
+            init = new SemanticInitNode([], null, emptyBlock, _blankSpan);
         }
         else
         {
@@ -550,23 +629,42 @@ public class Analyser
 
         var semanticNode = new SemanticClassDeclarationNode(
             node.Identifier,
+            inheritedClass,
             init,
             functions,
             fields,
             node.Symbol!,
             node.Span
-        );
+        )
+        {
+            FieldStartIndex = CalculateFieldStartIndex(node),
+        };
+
         node.Symbol!.SemanticDeclaration = semanticNode;
 
         return semanticNode;
     }
 
+    private static int CalculateFieldStartIndex(SyntaxClassDeclarationNode classDeclarationNode)
+    {
+        var inheritedClassSyntax = classDeclarationNode.SubTypes
+            .Select(x => x.ResolvedSymbol?.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .FirstOrDefault();
+
+        if (inheritedClassSyntax == null)
+            return 0;
+
+        var fieldCount = inheritedClassSyntax.Declarations.Count(x => x is SyntaxFieldDeclarationNode);
+
+        return CalculateFieldStartIndex(inheritedClassSyntax) + fieldCount;
+    }
+
     private SemanticFieldDeclarationNode Visit(SyntaxFieldDeclarationNode node)
     {
-        var dataType = Next(node).DataType;
+        var dataType = Next(node.Type).DataType;
         var value = node.Value == null
             ? null
-            : Next(node);
+            : Next(node.Value);
 
         var semanticNode = new SemanticFieldDeclarationNode(
             node.Identifier,
@@ -610,7 +708,19 @@ public class Analyser
         var body = (SemanticBlockNode)Next(node.Body);
         body.Expressions.InsertRange(0, assignmentNodes);
 
-        return new SemanticInitNode(analysedParameters, body, node.Span);
+        var baseCall = body.Expressions.FirstOrDefault() is SemanticKeywordValueNode { Keyword: { Kind: TokenKind.Base } } baseCallNode
+            ? baseCallNode
+            : null;
+        if (baseCall != null)
+            body.Expressions.RemoveAt(0);
+
+        foreach (var expression in body.Expressions.Skip(1))
+        {
+            if (expression is SemanticKeywordValueNode { Keyword: { Kind: TokenKind.Base } } baseNode)
+                _diagnostics.ReportMisplacedBaseCall(baseNode.Span);
+        }
+
+        return new SemanticInitNode(analysedParameters, baseCall, body, node.Span);
     }
 
     private (SemanticParameterNode node, bool hasType) NextInitParameter(SyntaxInitParameterNode node)

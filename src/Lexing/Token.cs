@@ -22,7 +22,7 @@ public enum TokenKind
     Let, Fn, Class,
     Static,
     New,
-    Return,
+    Return, Base,
     Equals, Colon, ColonColon, Semicolon, Comma, Hash,
     Identifier,
     OpenParenthesis, ClosedParenthesis, OpenBracket, ClosedBracket, OpenBrace, ClosedBrace,
