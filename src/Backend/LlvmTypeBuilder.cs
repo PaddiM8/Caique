@@ -36,10 +36,10 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         var parameterTypes = node.Parameters
             .Select(x => x.DataType)
             .Select(BuildType)
-            .ToList();
-        var returnType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Void, 0);
+            .Prepend(LLVMTypeRef.CreatePointer(LLVMTypeRef.Void, 0))
+            .ToArray();
 
-        return LLVMTypeRef.CreateFunction(returnType, parameterTypes.ToArray());
+        return LLVMTypeRef.CreateFunction(LLVMTypeRef.Void, parameterTypes);
     }
 
     public LLVMTypeRef BuildNamedStructType(StructureDataType dataType)

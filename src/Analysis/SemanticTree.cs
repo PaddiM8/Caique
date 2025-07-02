@@ -68,23 +68,34 @@ public class SemanticVariableReferenceNode(Token identifier, VariableSymbol symb
     }
 }
 
-public class SemanticFunctionReferenceNode(Token identifier, FunctionSymbol symbol, IDataType dataType)
+public class SemanticFunctionReferenceNode(
+    Token identifier,
+    FunctionSymbol symbol,
+    SemanticNode? objectInstance,
+    IDataType dataType
+)
     : SemanticNode(dataType, identifier.Span)
 {
     public Token Identifier { get; } = identifier;
 
     public FunctionSymbol Symbol { get; } = symbol;
 
+    public SemanticNode? ObjectInstance { get; } = objectInstance;
+
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {
+        if (ObjectInstance != null)
+        {
+            ObjectInstance.Traverse(callback);
+            callback(ObjectInstance, this);
+        }
     }
 }
 
 public class SemanticFieldReferenceNode(
     Token identifier,
     FieldSymbol symbol,
-    SemanticNode? explicitObjectInstance,
-    bool isStatic,
+    SemanticNode? objectInstance,
     IDataType dataType
 )
     : SemanticNode(dataType, identifier.Span)
@@ -93,12 +104,15 @@ public class SemanticFieldReferenceNode(
 
     public FieldSymbol Symbol { get; } = symbol;
 
-    public SemanticNode? ExplicitObjectInstance { get; } = explicitObjectInstance;
-
-    public bool IsStatic { get; } = isStatic;
+    public SemanticNode? ObjectInstance { get; } = objectInstance;
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {
+        if (ObjectInstance != null)
+        {
+            ObjectInstance.Traverse(callback);
+            callback(ObjectInstance, this);
+        }
     }
 }
 
@@ -134,15 +148,18 @@ public class SemanticBinaryNode(SemanticNode left, TokenKind op, SemanticNode ri
     }
 }
 
-public class SemanticAssignmentNode(ISymbol leftSymbol, SemanticNode right, TextSpan span)
+public class SemanticAssignmentNode(SemanticNode left, SemanticNode right, TextSpan span)
     : SemanticNode(right.DataType, span)
 {
-    public ISymbol Left { get; } = leftSymbol;
+    public SemanticNode Left { get; } = left;
 
     public SemanticNode Right { get; } = right;
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {
+        Left.Traverse(callback);
+        callback(Left, this);
+
         Right.Traverse(callback);
         callback(Right, this);
     }
@@ -197,15 +214,18 @@ public class SemanticReturnNode(SemanticNode? value, TextSpan span)
     }
 }
 
-public class SemanticKeywordValueNode(Token keyword, List<SemanticNode> arguments, TextSpan span)
-    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
+public class SemanticKeywordValueNode(Token keyword, List<SemanticNode>? arguments, TextSpan span, IDataType dataType)
+    : SemanticNode(dataType, span)
 {
     public Token Keyword { get; } = keyword;
 
-    public List<SemanticNode> Arguments { get; } = arguments;
+    public List<SemanticNode>? Arguments { get; } = arguments;
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {
+        if (Arguments == null)
+            return;
+
         foreach (var argument in Arguments)
         {
             argument.Traverse(callback);
@@ -379,6 +399,9 @@ public class SemanticClassDeclarationNode(
             callback(field, this);
         }
 
+        Init.Traverse(callback);
+        callback(Init, this);
+
         foreach (var function in Functions)
         {
             function.Traverse(callback);
@@ -444,6 +467,12 @@ public class SemanticInitNode(
         {
             parameter.Traverse(callback);
             callback(parameter, this);
+        }
+
+        if (BaseCall != null)
+        {
+            BaseCall.Traverse(callback);
+            callback(BaseCall, this);
         }
 
         Body.Traverse(callback);

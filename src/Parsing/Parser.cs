@@ -34,7 +34,9 @@ public class Parser
         var nodes = new List<SyntaxNode>();
         while (!parser._reachedEnd)
         {
-            nodes.Add(parser.ParseTopLevelStatement());
+            var node = parser.ParseTopLevelStatement();
+            if (node != null)
+                nodes.Add(node);
         }
 
         var start = nodes.FirstOrDefault()?.Span.Start ?? TextPosition.Default(syntaxTree);
@@ -45,13 +47,20 @@ public class Parser
         return syntaxTree;
     }
 
-    private SyntaxNode ParseTopLevelStatement()
+    private SyntaxNode? ParseTopLevelStatement()
     {
-        return _current?.Kind switch
+        try
         {
-            TokenKind.Class => ParseClass(),
-            _ => ParseStatement(),
-        };
+            return _current?.Kind switch
+            {
+                TokenKind.Class => ParseClass(),
+                _ => ParseStatement(),
+            };
+        }
+        catch (ParserRecoveryException)
+        {
+            return null;
+        }
     }
 
     private SyntaxStatementNode ParseStatement()
@@ -77,7 +86,6 @@ public class Parser
 
     private SyntaxTypeNode ParseType()
     {
-        var start = _current?.Span;
         var isSlice = AdvanceIf(TokenKind.OpenBracket);
 
         var typeNames = new List<Token>();
@@ -206,16 +214,10 @@ public class Parser
 
         bool isStatic = AdvanceIf(TokenKind.Static);
         if (Match(TokenKind.Fn))
-        {
-            if (_peek is { Kind: TokenKind.Identifier, Value: "init" })
-            {
-                return ParseInit();
-            }
-            else
-            {
-                return ParseFunction(isStatic, attributes, scope);
-            }
-        }
+            return ParseFunction(isStatic, attributes, scope);
+
+        if (_current is { Kind: TokenKind.Identifier, Value: "init" })
+            return ParseInit();
 
         if (Match(TokenKind.Identifier))
             return ParseField(isStatic, scope);
@@ -259,7 +261,7 @@ public class Parser
 
     private SyntaxInitNode ParseInit()
     {
-        var start = EatExpected(TokenKind.Fn).Span;
+        var start = EatExpected(TokenKind.Identifier).Span;
         var parameters = ParseInitParameters();
         var body = ParseBlock();
 
@@ -290,7 +292,7 @@ public class Parser
 
             parameters.Add(new SyntaxInitParameterNode(identifier, type));
         }
-        while (!_reachedEnd && Match(TokenKind.Comma));
+        while (!_reachedEnd && AdvanceIf(TokenKind.Comma));
 
         EatExpected(TokenKind.ClosedParenthesis);
 
@@ -435,12 +437,24 @@ public class Parser
 
     private SyntaxNode ParseCall()
     {
-        var left = ParsePrimary();
+        var left = ParseMemberAccess();
         if (Match(TokenKind.OpenParenthesis))
         {
             var arguments = ParseArguments();
 
             return new SyntaxCallNode(left, arguments, left.Span.Combine(_previous!.Span));
+        }
+
+        return left;
+    }
+
+    private SyntaxNode ParseMemberAccess()
+    {
+        var left = ParsePrimary();
+        while (AdvanceIf(TokenKind.Dot))
+        {
+            var identifier = EatExpected(TokenKind.Identifier);
+            left = new SyntaxMemberAccessNode(left, identifier);
         }
 
         return left;
@@ -454,6 +468,12 @@ public class Parser
         if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral))
             return ParseLiteral();
 
+        if (Match(TokenKind.Identifier) && _current?.Value == "size_of")
+            return ParseKeywordValue();
+
+        if (Match(TokenKind.Base))
+            return ParseKeywordValue();
+
         if (Match(TokenKind.Identifier))
             return ParseIdentifier();
 
@@ -462,9 +482,6 @@ public class Parser
 
         if (Match(TokenKind.Return))
             return ParseReturn();
-
-        if (Match(TokenKind.Identifier) && _current?.Value is "size_of" or "base")
-            return ParseKeywordValue();
 
         _diagnostics.ReportUnexpectedToken(_current!);
         throw Recover();
@@ -552,7 +569,9 @@ public class Parser
     private SyntaxKeywordValueNode ParseKeywordValue()
     {
         var keyword = Eat();
-        var arguments = ParseArguments();
+        List<SyntaxNode>? arguments = null;
+        if (Match(TokenKind.OpenParenthesis))
+            arguments = ParseArguments();
 
         return new SyntaxKeywordValueNode(keyword, arguments, keyword.Span.Combine(_previous!.Span));
     }

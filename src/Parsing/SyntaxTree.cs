@@ -122,6 +122,14 @@ public class SyntaxAssignmentNode(SyntaxNode left, SyntaxNode right)
     public SyntaxNode Right { get; } = right;
 }
 
+public class SyntaxMemberAccessNode(SyntaxNode left, Token identifier)
+    : SyntaxNode(left.Span.Combine(identifier.Span))
+{
+    public SyntaxNode Left { get; } = left;
+
+    public Token Identifier { get; } = identifier;
+}
+
 public class SyntaxCallNode(SyntaxNode left, List<SyntaxNode> arguments, TextSpan span)
     : SyntaxNode(span)
 {
@@ -144,12 +152,12 @@ public class SyntaxReturnNode(SyntaxNode? value, TextSpan span)
     public SyntaxNode? Value { get; } = value;
 }
 
-public class SyntaxKeywordValueNode(Token keyword, List<SyntaxNode> arguments, TextSpan span)
+public class SyntaxKeywordValueNode(Token keyword, List<SyntaxNode>? arguments, TextSpan span)
     : SyntaxNode(span)
 {
     public Token Keyword { get; } = keyword;
 
-    public List<SyntaxNode> Arguments { get; } = arguments;
+    public List<SyntaxNode>? Arguments { get; } = arguments;
 }
 
 public class SyntaxBlockNode(List<SyntaxNode> expressions, TextSpan span)
@@ -228,6 +236,8 @@ public interface ISyntaxStructureDeclaration
     StructureScope Scope { get; }
 
     StructureSymbol? Symbol { get; }
+
+    ISymbol? ResolveSymbol(string name);
 }
 
 public class SyntaxClassDeclarationNode(
@@ -251,6 +261,20 @@ public class SyntaxClassDeclarationNode(
     public StructureScope Scope { get; } = scope;
 
     public StructureSymbol? Symbol { get; set; }
+
+    public ISymbol? ResolveSymbol(string name)
+    {
+        var localSymbol = Scope.FindSymbol(name);
+        if (localSymbol != null)
+            return localSymbol;
+
+        var inherited = SubTypes
+            .FirstOrDefault(x => x.ResolvedSymbol?.SyntaxDeclaration is SyntaxClassDeclarationNode)?
+            .ResolvedSymbol?
+            .SyntaxDeclaration as SyntaxClassDeclarationNode;
+
+        return inherited?.ResolveSymbol(name);
+    }
 }
 
 public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)

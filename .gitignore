@@ -1,3 +1,5 @@
 experiments/
 bin/
 obj/
+
+vgcore.*

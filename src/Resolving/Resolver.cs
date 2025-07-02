@@ -47,6 +47,9 @@ public class Resolver
                 Next(assignmentNode.Left, node);
                 Next(assignmentNode.Right, node);
                 break;
+            case SyntaxMemberAccessNode memberAccessNode:
+                Next(memberAccessNode.Left, node);
+                break;
             case SyntaxCallNode callNode:
                 Visit(callNode);
                 break;
@@ -114,8 +117,11 @@ public class Resolver
 
     private void Visit(SyntaxKeywordValueNode node)
     {
-        foreach (var argument in node.Arguments)
-            Next(argument, node);
+        if (node.Arguments != null)
+        {
+            foreach (var argument in node.Arguments)
+                Next(argument, node);
+        }
     }
 
     private void Visit(SyntaxBlockNode node)
@@ -173,7 +179,10 @@ public class Resolver
         // This needs to be done after the declarations since
         // init parameters may refer to fields
         if (node.Init != null)
-            Next(node.Init, node);
+        {
+            node.Init.Parent = node;
+            Visit(node.Init, node.Scope);
+        }
     }
 
     private void Visit(SyntaxFieldDeclarationNode node)

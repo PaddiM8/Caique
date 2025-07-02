@@ -3,6 +3,7 @@ using Caique.Backend;
 using Caique.Lexing;
 using Caique.Parsing;
 using Caique.Scope;
+using LLVMSharp;
 
 namespace Caique.Analysis;
 
@@ -43,6 +44,8 @@ public class Analyser
             SyntaxIdentifierNode identifierNode => Visit(identifierNode),
             SyntaxUnaryNode unaryNode => Visit(unaryNode),
             SyntaxBinaryNode binaryNode => Visit(binaryNode),
+            SyntaxAssignmentNode assignmentNode => Visit(assignmentNode),
+            SyntaxMemberAccessNode memberAccessNode => Visit(memberAccessNode),
             SyntaxCallNode callNode => Visit(callNode),
             SyntaxNewNode newNode => Visit(newNode),
             SyntaxReturnNode returnNode => Visit(returnNode),
@@ -56,6 +59,7 @@ public class Analyser
             SyntaxClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
             SyntaxFieldDeclarationNode fieldDeclarationNode => Visit(fieldDeclarationNode),
             SyntaxInitNode initNode => Visit(initNode),
+            SyntaxInitParameterNode initParameterNode => Visit(initParameterNode),
             _ => throw new NotImplementedException(),
         };
     }
@@ -63,6 +67,13 @@ public class Analyser
     private AnalyserRecoveryException Recover()
     {
         return new AnalyserRecoveryException();
+    }
+
+    private SemanticKeywordValueNode BuildSelfNode(StructureSymbol structureSymbol)
+    {
+        var token = new Token(TokenKind.Self, string.Empty, _blankSpan);
+
+        return new SemanticKeywordValueNode(token, [], _blankSpan, new StructureDataType(structureSymbol));
     }
 
     private SemanticNode Visit(SyntaxStatementNode node)
@@ -73,7 +84,7 @@ public class Analyser
     private SemanticNode Visit(SyntaxKeywordValueNode node)
     {
         var arguments = node
-            .Arguments
+            .Arguments?
             .Select(Next)
             .ToList();
 
@@ -86,31 +97,43 @@ public class Analyser
         throw new UnreachableException();
     }
 
-    private SemanticKeywordValueNode NextSizeOfKeyword(SyntaxKeywordValueNode node, List<SemanticNode> arguments)
+    private SemanticKeywordValueNode NextSizeOfKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
     {
-        if (arguments.Count != 1)
+        if (arguments?.Count != 1)
+        {
+            arguments = [];
             _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+        }
 
-        var sliceType = new SliceDataType(arguments[0].DataType);
-
-        return new SemanticKeywordValueNode(node.Keyword, arguments, sliceType, node.Span);
+        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span, new PrimitiveDataType(Primitive.Int64));
     }
 
-    private SemanticKeywordValueNode NextBaseKeyword(SyntaxKeywordValueNode node, List<SemanticNode> arguments)
+    private SemanticKeywordValueNode NextBaseKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
     {
-        if (node.Parent?.Parent is not SyntaxInitNode)
+        var structure = _syntaxTree.GetEnclosingStructure(node);
+        if (arguments == null)
+        {
+            Debug.Assert(structure?.Symbol != null);
+
+            return new SemanticKeywordValueNode(node.Keyword, null, node.Span, new StructureDataType(structure.Symbol));
+        }
+
+        if (node.Parent?.Parent?.Parent is not SyntaxInitNode)
             _diagnostics.ReportMisplacedBaseCall(node.Span);
 
-        var structureNode = _syntaxTree.GetEnclosingStructure(node);
-        var baseClassNode = ((structureNode as SemanticClassDeclarationNode)?
-            .InheritedClass?
-            .SyntaxDeclaration as SyntaxClassDeclarationNode);
+        var baseClassNode = (structure as SyntaxClassDeclarationNode)?
+            .SubTypes
+            .FirstOrDefault(x => x.ResolvedSymbol?.SyntaxDeclaration is SyntaxClassDeclarationNode)?
+            .ResolvedSymbol?
+            .SyntaxDeclaration as SyntaxClassDeclarationNode;
 
         if (baseClassNode == null)
         {
             _diagnostics.ReportMisplacedBaseCall(node.Span);
             throw Recover();
         }
+
+        Debug.Assert(structure?.Symbol != null);
 
         var parameterTypes = baseClassNode
             .Init?
@@ -120,7 +143,12 @@ public class Analyser
             .ToList();
         ValidateArguments(parameterTypes ?? [], arguments, node.Span);
 
-        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span);
+        return new SemanticKeywordValueNode(
+            node.Keyword,
+            arguments,
+            node.Span,
+            new StructureDataType(structure.Symbol)
+        );
     }
 
     private SemanticNode Visit(SyntaxLiteralNode node)
@@ -183,7 +211,12 @@ public class Analyser
 
                 var dataType = new FunctionDataType(functionSymbol);
 
-                return new SemanticFunctionReferenceNode(node.IdentifierList.Last(), functionSymbol, dataType);
+                return new SemanticFunctionReferenceNode(
+                    node.IdentifierList.Last(),
+                    functionSymbol,
+                    objectInstance: BuildSelfNode(structureSymbol),
+                    dataType
+                );
             }
 
             if (identifierSymbol is FieldSymbol fieldSymbol)
@@ -198,8 +231,7 @@ public class Analyser
                 return new SemanticFieldReferenceNode(
                     node.IdentifierList.Last(),
                     fieldSymbol,
-                    explicitObjectInstance: null,
-                    isStatic: true,
+                    objectInstance: BuildSelfNode(structureSymbol),
                     dataType
                 );
             }
@@ -213,6 +245,8 @@ public class Analyser
             return new SemanticVariableReferenceNode(identifier, variableSymbol);
 
         var structure = _syntaxTree.GetEnclosingStructure(node);
+        Debug.Assert(structure?.Symbol != null);
+
         var symbolFromStructure = structure?.Scope.FindSymbol(identifier.Value);
         if (symbolFromStructure is FunctionSymbol functionSymbol2)
         {
@@ -222,7 +256,12 @@ public class Analyser
                 _diagnostics.ReportStaticSymbolReferencedAsNonStatic(identifier);
             }
 
-            return new SemanticFunctionReferenceNode(identifier, functionSymbol2, dataType);
+            return new SemanticFunctionReferenceNode(
+                identifier,
+                functionSymbol2,
+                objectInstance: BuildSelfNode(structure!.Symbol),
+                dataType
+            );
         }
 
         if (symbolFromStructure is FieldSymbol fieldSymbol2)
@@ -240,8 +279,7 @@ public class Analyser
             return new SemanticFieldReferenceNode(
                 identifier,
                 fieldSymbol2,
-                explicitObjectInstance: null,
-                isStatic: false,
+                objectInstance: BuildSelfNode(structure.Symbol),
                 dataType
             );
         }
@@ -311,6 +349,72 @@ public class Analyser
         }
 
         return new SemanticBinaryNode(left, node.Operator, right, left.DataType);
+    }
+
+    private SemanticAssignmentNode Visit(SyntaxAssignmentNode node)
+    {
+        var left = Next(node.Left);
+        var right = Next(node.Right);
+
+        if (left is not (SemanticVariableReferenceNode or SemanticFieldReferenceNode))
+        {
+            _diagnostics.ReportExpectedVariableReferenceInAssignment(node.Span);
+        }
+
+        if (!left.DataType.IsEquivalent(right.DataType))
+        {
+            _diagnostics.ReportIncompatibleType(left.DataType, right.DataType, node.Span);
+        }
+
+        return new SemanticAssignmentNode(left, right, node.Span);
+    }
+
+    private SemanticNode Visit(SyntaxMemberAccessNode node)
+    {
+        var left = Next(node.Left);
+        if (left.DataType is StructureDataType structureDataType)
+        {
+            var symbol = structureDataType.Symbol.SyntaxDeclaration.ResolveSymbol(node.Identifier.Value);
+            if (symbol == null)
+            {
+                _diagnostics.ReportMemberNotFound(node.Identifier, left.DataType);
+                throw Recover();
+            }
+
+            if (symbol is FunctionSymbol functionSymbol)
+            {
+                var dataType = new FunctionDataType(functionSymbol);
+                if (node.Parent is not SyntaxCallNode)
+                {
+                    _diagnostics.ReportNonStaticFunctionReferenceMustBeCalled(node.Identifier);
+                }
+
+                return new SemanticFunctionReferenceNode(
+                    functionSymbol.SyntaxDeclaration.Identifier,
+                    functionSymbol,
+                    objectInstance: left,
+                    dataType
+                );
+            }
+            else if (symbol is FieldSymbol fieldSymbol)
+            {
+                var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
+
+                return new SemanticFieldReferenceNode(
+                    fieldSymbol.SyntaxDeclaration.Identifier,
+                    fieldSymbol,
+                    objectInstance: left,
+                    dataType
+                );
+            }
+            else
+            {
+                throw new UnreachableException();
+            }
+        }
+
+        _diagnostics.ReportMemberNotFound(node.Identifier, left.DataType);
+        throw Recover();
     }
 
     private SemanticCallNode Visit(SyntaxCallNode node)
@@ -555,6 +659,10 @@ public class Analyser
             returnType = new PrimitiveDataType(Primitive.Void);
         }
 
+        var structure = _syntaxTree.GetEnclosingStructure(node);
+        if (node.Identifier.Value == structure?.Identifier.Value)
+            _diagnostics.ReportFunctionNameSameAsParentStructure(node.Identifier);
+
         var body = node.Body == null
             ? null
             : (SemanticBlockNode)Next(node.Body);
@@ -685,30 +793,36 @@ public class Analyser
         var assignmentNodes = new List<SemanticAssignmentNode>();
         foreach (var parameter in node.Parameters)
         {
-            var (analysedParameter, hasType) = NextInitParameter(parameter);
+            var analysedParameter = Visit(parameter);
             analysedParameters.Add(analysedParameter);
             var parameterSymbol = new VariableSymbol(analysedParameter);
 
             var scope = (LocalScope)node.Body.Scope!;
             scope.AddSymbol(parameterSymbol);
 
-            if (hasType)
+            if (parameter.Type != null)
                 continue;
 
             // References a field, so we need to insert assignment nodes
-            var linkedSymbol = _syntaxTree.GetStructureScope(node)!.FindSymbol(parameter.Identifier.Value)!;
-            var assignmentNode = new SemanticAssignmentNode(
+            var structure = _syntaxTree.GetEnclosingStructure(node);
+            Debug.Assert(structure?.Symbol != null);
+            var linkedSymbol = (FieldSymbol)structure.Scope.FindSymbol(parameter.Identifier.Value)!;
+            var left = new SemanticFieldReferenceNode(
+                parameter.Identifier,
                 linkedSymbol,
-                new SemanticVariableReferenceNode(parameter.Identifier, parameterSymbol),
-                _blankSpan
+                objectInstance: BuildSelfNode(structure.Symbol),
+                analysedParameter.DataType
             );
+
+            var right = new SemanticVariableReferenceNode(parameter.Identifier, parameterSymbol);
+            var assignmentNode = new SemanticAssignmentNode(left, right, _blankSpan);
             assignmentNodes.Add(assignmentNode);
         }
 
         var body = (SemanticBlockNode)Next(node.Body);
-        body.Expressions.InsertRange(0, assignmentNodes);
+        body.Expressions.AddRange(assignmentNodes);
 
-        var baseCall = body.Expressions.FirstOrDefault() is SemanticKeywordValueNode { Keyword: { Kind: TokenKind.Base } } baseCallNode
+        var baseCall = body.Expressions.FirstOrDefault() is SemanticKeywordValueNode { Keyword.Kind: TokenKind.Base } baseCallNode
             ? baseCallNode
             : null;
         if (baseCall != null)
@@ -716,25 +830,25 @@ public class Analyser
 
         foreach (var expression in body.Expressions.Skip(1))
         {
-            if (expression is SemanticKeywordValueNode { Keyword: { Kind: TokenKind.Base } } baseNode)
+            if (expression is SemanticKeywordValueNode { Keyword.Kind: TokenKind.Base } baseNode)
                 _diagnostics.ReportMisplacedBaseCall(baseNode.Span);
         }
 
         return new SemanticInitNode(analysedParameters, baseCall, body, node.Span);
     }
 
-    private (SemanticParameterNode node, bool hasType) NextInitParameter(SyntaxInitParameterNode node)
+    private SemanticParameterNode Visit(SyntaxInitParameterNode node)
     {
         if (node.Type != null)
         {
             var dataType = Next(node.Type).DataType;
 
-            return (new SemanticParameterNode(node.Identifier, dataType, node.Span), hasType: true);
+            return new SemanticParameterNode(node.Identifier, dataType, node.Span);
         }
 
         Debug.Assert(node.LinkedField != null);
         var linkedDataType = Next(node.LinkedField.Type).DataType;
 
-        return (new SemanticParameterNode(node.Identifier, linkedDataType, node.Span), hasType: false);
+        return new SemanticParameterNode(node.Identifier, linkedDataType, node.Span);
     }
 }

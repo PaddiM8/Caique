@@ -57,6 +57,11 @@ public class DiagnosticReporter
         ReportError($"Symbol not found: {fullName}.", span);
     }
 
+    public void ReportMemberNotFound(Token identifier, IDataType dataType)
+    {
+        ReportError($"Member '{identifier.Value}' not found in '{dataType}'.", identifier.Span);
+    }
+
     public void ReportSymbolAlreadyExists(Token token)
     {
         ReportError($"A symbol with the name '{token.Value}' already exists.", token.Span);
@@ -78,6 +83,11 @@ public class DiagnosticReporter
         ReportError($"Incompatible type. Expected {expected} but got {got}.", span);
     }
 
+    public void ReportExpectedVariableReferenceInAssignment(TextSpan span)
+    {
+        ReportError($"Expected variable reference in the left side of the assignment.", span);
+    }
+
     public void ReportNonStaticSymbolReferencedAsStatic(Token identifier)
     {
         ReportError("Non-static symbol was referenced as if it was static.", identifier.Span);
@@ -86,6 +96,11 @@ public class DiagnosticReporter
     public void ReportStaticSymbolReferencedAsNonStatic(Token identifier)
     {
         ReportError("Static symbol was referenced as if it was non-static.", identifier.Span);
+    }
+
+    public void ReportNonStaticFunctionReferenceMustBeCalled(Token identifier)
+    {
+        ReportError("Non-static function reference must be called.", identifier.Span);
     }
 
     public void ReportConstructorAlreadyExists(Token structureIdentifier, TextSpan span)
@@ -111,6 +126,11 @@ public class DiagnosticReporter
     public void ReportMisplacedBaseCall(TextSpan span)
     {
         ReportError("A base call must be at the top of a constructor of a class that inherits from another class.", span);
+    }
+
+    public void ReportFunctionNameSameAsParentStructure(Token identifier)
+    {
+        ReportError($"Function name cannot be the same as its parent structure ('{identifier.Value}').", identifier.Span);
     }
 
     private void ReportHint(string message, TextSpan span)
