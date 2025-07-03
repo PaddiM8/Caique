@@ -48,6 +48,14 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
         return (Parent as NamespaceScope)?.FindType(name);
     }
 
+    public NamespaceScope? ResolveNamespace(List<string> path)
+    {
+        if (_namespaceScopes.TryGetValue(path.First(), out var foundScope))
+            return foundScope.ResolveNamespace(path[1..]);
+
+        return Project.ResolveNamespace(path);
+    }
+
     public StructureSymbol? ResolveStructure(List<string> typeNames)
     {
         if (typeNames.Count == 0)

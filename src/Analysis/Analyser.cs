@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using Caique.Backend;
 using Caique.Lexing;
 using Caique.Parsing;
 using Caique.Scope;
-using LLVMSharp;
 
 namespace Caique.Analysis;
 
@@ -12,11 +10,13 @@ public class Analyser
     private readonly TextSpan _blankSpan;
     private readonly SyntaxTree _syntaxTree;
     private readonly DiagnosticReporter _diagnostics;
+    private readonly NamespaceScope _preludeScope;
 
     private Analyser(SyntaxTree syntaxTree, CompilationContext compilationContext)
     {
         _syntaxTree = syntaxTree;
         _diagnostics = compilationContext.DiagnosticReporter;
+        _preludeScope = compilationContext.PreludeScope;
         _blankSpan = new TextSpan(
             new TextPosition(-1, -1, -1, syntaxTree),
             new TextPosition(-1, -1, -1, syntaxTree)
@@ -172,7 +172,8 @@ public class Analyser
 
         if (node.Value.Kind == TokenKind.StringLiteral)
         {
-            var dataType = new PrimitiveDataType(Primitive.String);
+            var symbol = _preludeScope.ResolveStructure(["String"])!;
+            var dataType = new StructureDataType(symbol);
 
             return new SemanticLiteralNode(node.Value, dataType);
         }
@@ -188,7 +189,7 @@ public class Analyser
                 .Take(node.IdentifierList.Count - 1)
                 .Select(x => x.Value)
                 .ToList();
-            var structureSymbol = _syntaxTree.Namespace.ResolveStructure(namespaceNames);
+            var structureSymbol = _syntaxTree.File.ResolveStructure(namespaceNames);
             if (structureSymbol == null)
             {
                 _diagnostics.ReportNotFound(node.IdentifierList);
@@ -214,7 +215,7 @@ public class Analyser
                 return new SemanticFunctionReferenceNode(
                     node.IdentifierList.Last(),
                     functionSymbol,
-                    objectInstance: BuildSelfNode(structureSymbol),
+                    objectInstance: null,
                     dataType
                 );
             }
@@ -231,7 +232,7 @@ public class Analyser
                 return new SemanticFieldReferenceNode(
                     node.IdentifierList.Last(),
                     fieldSymbol,
-                    objectInstance: BuildSelfNode(structureSymbol),
+                    objectInstance: null,
                     dataType
                 );
             }
@@ -526,7 +527,7 @@ public class Analyser
         var expressions = new List<SemanticNode>();
         foreach (var child in node.Expressions)
         {
-            if (child is SyntaxErrorNode)
+            if (child is SyntaxErrorNode or SyntaxWithNode)
                 continue;
 
             try
@@ -585,12 +586,16 @@ public class Analyser
             {
                 TokenKind.Void => Primitive.Void,
                 TokenKind.Bool => Primitive.Bool,
-                TokenKind.String => Primitive.String,
                 TokenKind.I8 => Primitive.Int8,
                 TokenKind.I16 => Primitive.Int16,
                 TokenKind.I32 => Primitive.Int32,
                 TokenKind.I64 => Primitive.Int64,
                 TokenKind.I128 => Primitive.Int128,
+                TokenKind.U8 => Primitive.Uint8,
+                TokenKind.U16 => Primitive.Uint16,
+                TokenKind.U32 => Primitive.Uint32,
+                TokenKind.U64 => Primitive.Uint64,
+                TokenKind.U128 => Primitive.Uint128,
                 TokenKind.F16 => Primitive.Float16,
                 TokenKind.F32 => Primitive.Float32,
                 TokenKind.F64 => Primitive.Float64,
@@ -605,7 +610,7 @@ public class Analyser
         if (node.ResolvedSymbol == null)
         {
             var typeNames = node.TypeNames.Select(x => x.Value).ToList();
-            symbol = _syntaxTree.Namespace.ResolveStructure(typeNames);
+            symbol = _syntaxTree.File.ResolveStructure(typeNames);
         }
 
         if (symbol == null)

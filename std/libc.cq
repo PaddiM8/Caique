@@ -1,0 +1,7 @@
+class Libc
+{
+    static fn printf(pattern: String, arg: String)
+    {
+        LibcUnsafe::printf(pattern.ToCString(), arg.ToCString());
+    }
+}

@@ -53,6 +53,7 @@ public class Parser
         {
             return _current?.Kind switch
             {
+                TokenKind.With => ParseWith(),
                 TokenKind.Class => ParseClass(),
                 _ => ParseStatement(),
             };
@@ -129,6 +130,22 @@ public class Parser
         var type = ParseType();
 
         return new SyntaxParameterNode(identifier, type, identifier.Span.Combine(type.Span));
+    }
+
+    private SyntaxWithNode ParseWith()
+    {
+        var start = EatExpected(TokenKind.With).Span;
+        var identifiers = new List<Token>();
+        do
+        {
+            var identifier = EatExpected(TokenKind.Identifier);
+            identifiers.Add(identifier);
+        }
+        while (AdvanceIf(TokenKind.ColonColon));
+
+        EatExpected(TokenKind.Semicolon);
+
+        return new SyntaxWithNode(identifiers, start.Combine(identifiers.First().Span));
     }
 
     private SyntaxClassDeclarationNode ParseClass()

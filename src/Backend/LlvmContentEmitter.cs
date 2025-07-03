@@ -17,9 +17,10 @@ public class LlvmContentEmitter
     private readonly LlvmTypeBuilder _typeBuilder;
     private readonly LlvmContextCache _contextCache;
     private readonly LlvmModuleCache _moduleCache;
+    private readonly NamespaceScope _preludeScope;
     private readonly LlvmSpecialValueBuilder _specialValueBuilder;
 
-    private LlvmContentEmitter(SemanticTree semanticTree, LlvmEmitterContext emitterContext)
+    private LlvmContentEmitter(SemanticTree semanticTree, LlvmEmitterContext emitterContext, CompilationContext compilationContext)
     {
         _semanticTree = semanticTree;
         _context = emitterContext.LlvmContext;
@@ -28,6 +29,7 @@ public class LlvmContentEmitter
         _typeBuilder = emitterContext.LlvmTypeBuilder;
         _contextCache = emitterContext.ContextCache;
         _moduleCache = emitterContext.ModuleCache;
+        _preludeScope = compilationContext.PreludeScope;
         _specialValueBuilder = new LlvmSpecialValueBuilder(emitterContext, _typeBuilder);
     }
 
@@ -35,10 +37,11 @@ public class LlvmContentEmitter
         SemanticTree semanticTree,
         LlvmEmitterContext emitterContext,
         string targetDirectory,
+        CompilationContext compilationContext,
         CompilationOptions? compilationOptions = null
     )
     {
-        var emitter = new LlvmContentEmitter(semanticTree, emitterContext);
+        var emitter = new LlvmContentEmitter(semanticTree, emitterContext, compilationContext);
         emitter.Next(semanticTree.Root);
 
         if (compilationOptions?.DumpIr is true)
@@ -113,18 +116,37 @@ public class LlvmContentEmitter
         return _builder.InsertBlock.Parent.GetParam(0);
     }
 
+    private LLVMValueRef BuildString(string value)
+    {
+        var valuePointer = _builder.BuildGlobalStringPtr(value);
+        var symbol = _preludeScope.ResolveStructure(["String"])!;
+        var type = _typeBuilder.BuildNamedStructType(new StructureDataType(symbol.SemanticDeclaration!.Symbol));
+        var instance = _specialValueBuilder.BuildMalloc(type, "str");
+        var structure = (ISemanticInstantiableStructureDeclaration)symbol.SemanticDeclaration;
+        BuildConstructorCall(instance, structure, [valuePointer]);
+
+        return instance;
+    }
+
     private LLVMValueRef Visit(SemanticLiteralNode node)
     {
+        if (node.DataType is StructureDataType { Symbol.Name: "String" })
+            return BuildString(node.Value.Value);
+
         var primitive = (PrimitiveDataType)node.DataType;
         return primitive.Kind switch
         {
             Primitive.Void => throw new InvalidOperationException(),
             Primitive.Bool => LlvmUtils.CreateConstBool(node.Value.Kind == TokenKind.True),
-            Primitive.String => _builder.BuildGlobalStringPtr(node.Value.Value),
             >= Primitive.Int8 and <= Primitive.Int128 => LLVMValueRef.CreateConstInt(
                 _typeBuilder.BuildType(node.DataType),
                 ulong.Parse(node.Value.Value),
                 SignExtend: true
+            ),
+            >= Primitive.Uint8 and <= Primitive.Uint128 => LLVMValueRef.CreateConstInt(
+                _typeBuilder.BuildType(node.DataType),
+                ulong.Parse(node.Value.Value),
+                SignExtend: false
             ),
             >= Primitive.Float16 and <= Primitive.Float64 => LLVMValueRef.CreateConstReal(
                 _typeBuilder.BuildType(node.DataType),
@@ -348,7 +370,11 @@ public class LlvmContentEmitter
             arguments.Insert(0, instance!.Value);
         }
 
-        return _builder.BuildCall2(functionType, function, arguments.ToArray(), "call");
+        var name = node.DataType.IsVoid()
+            ? string.Empty
+            : "call";
+
+        return _builder.BuildCall2(functionType, function, arguments.ToArray(), name);
     }
 
     private LLVMValueRef Visit(SemanticNewNode node)
@@ -356,7 +382,11 @@ public class LlvmContentEmitter
         var type = _typeBuilder.BuildType(node.DataType);
         var structure = (ISemanticInstantiableStructureDeclaration)((StructureDataType)node.DataType).Symbol.SemanticDeclaration!;
         var instance = _specialValueBuilder.BuildMalloc(type, "self");
-        BuildConstructorCall(instance, structure, node.Arguments);
+        var arguments = node
+            .Arguments
+            .Select(Next)
+            .Select(x => x!.Value);
+        BuildConstructorCall(instance, structure, arguments);
 
         return instance;
     }
@@ -364,12 +394,10 @@ public class LlvmContentEmitter
     private void BuildConstructorCall(
         LLVMValueRef instance,
         ISemanticInstantiableStructureDeclaration structure,
-        List<SemanticNode> arguments
+        IEnumerable<LLVMValueRef> arguments
     )
     {
         var builtArguments = arguments
-            .Select(Next)
-            .Select(x => x!.Value)
             .Prepend(instance)
             .ToArray();
 
@@ -593,9 +621,15 @@ public class LlvmContentEmitter
         // Call base constructor (if any)
         if (parentStructure.InheritedClass != null)
         {
-            var baseCallArguments = node.BaseCall == null
-                ? []
-                : node.BaseCall.Arguments!;
+            IEnumerable<LLVMValueRef> baseCallArguments = [];
+            if (node.BaseCall != null)
+            {
+                baseCallArguments = node
+                    .BaseCall
+                    .Arguments!
+                    .Select(Next)
+                    .Select(x => x!.Value);
+            }
 
             BuildConstructorCall(
                 instance,

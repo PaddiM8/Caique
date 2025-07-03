@@ -74,7 +74,7 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
             PrimitiveDataType d when d.IsInteger() => LLVMValueRef.CreateConstInt(type, 0, true),
             PrimitiveDataType d when d.IsFloat() => LLVMValueRef.CreateConstReal(type, 0),
             PrimitiveDataType { Kind: Primitive.Bool } => LlvmUtils.CreateConstBool(false),
-            PrimitiveDataType or FunctionDataType or StructureDataType => LLVMValueRef.CreateConstNull(type),
+            PrimitiveDataType or SliceDataType or FunctionDataType or StructureDataType => LLVMValueRef.CreateConstNull(type),
             _ => throw new NotImplementedException(),
         };
     }

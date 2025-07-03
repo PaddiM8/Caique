@@ -1,3 +1,4 @@
+using System.Security.Principal;
 using Caique.Analysis;
 using Caique.Lexing;
 using Caique.Scope;
@@ -74,6 +75,12 @@ public abstract class SyntaxNode(TextSpan span)
 public class SyntaxErrorNode(TextSpan span)
     : SyntaxNode(span)
 {
+}
+
+public class SyntaxWithNode(List<Token> identifiers, TextSpan span)
+    : SyntaxNode(span)
+{
+    public List<Token> Identifiers { get; } = identifiers;
 }
 
 public class SyntaxStatementNode(SyntaxNode expression, bool isReturnValue)

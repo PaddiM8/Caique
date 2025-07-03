@@ -33,6 +33,9 @@ public class Resolver
 
         switch (node)
         {
+            case SyntaxWithNode withNode:
+                Visit(withNode);
+                break;
             case SyntaxStatementNode statementNode:
                 Next(statementNode.Expression, node);
                 break;
@@ -99,6 +102,15 @@ public class Resolver
         var typeNames = typeNode.TypeNames.Select(x => x.Value).ToList();
         var resolvedType = _syntaxTree.Namespace.ResolveStructure(typeNames);
         typeNode.ResolvedSymbol = resolvedType;
+    }
+
+    private void Visit(SyntaxWithNode node)
+    {
+        var path = node.Identifiers
+            .Select(x => x.Value)
+            .ToList();
+        if (!_syntaxTree.File.ImportNamespace(path))
+            _diagnostics.ReportInvalidNamespace(node.Identifiers);
     }
 
     private void Visit(SyntaxCallNode node)

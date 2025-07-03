@@ -144,6 +144,7 @@ public class Lexer
         var text = builder.ToString();
         var kind = text switch
         {
+            "with" => TokenKind.With,
             "let" => TokenKind.Let,
             "fn" => TokenKind.Fn,
             "class" => TokenKind.Class,
@@ -155,12 +156,16 @@ public class Lexer
             "false" => TokenKind.False,
             "void" => TokenKind.Void,
             "bool" => TokenKind.Bool,
-            "string" => TokenKind.String,
             "i8" => TokenKind.I8,
             "i16" => TokenKind.I16,
             "i32" => TokenKind.I32,
             "i64" => TokenKind.I64,
             "i128" => TokenKind.I128,
+            "u8" => TokenKind.U8,
+            "u16" => TokenKind.U16,
+            "u32" => TokenKind.U32,
+            "u64" => TokenKind.U64,
+            "u128" => TokenKind.U128,
             "f8" => TokenKind.F8,
             "f16" => TokenKind.F16,
             "f32" => TokenKind.F32,
@@ -184,17 +189,27 @@ public class Lexer
 
         while (!ReachedEnd && !Match('"'))
         {
-            if (Current == '\\')
+            if (Current != '\\')
             {
-                Eat();
-
-                if (!ReachedEnd)
-                    builder.Append(Eat());
+                builder.Append(Eat());
 
                 continue;
             }
 
-            builder.Append(Eat());
+            Eat();
+            if (ReachedEnd)
+                continue;
+
+            var next = Eat();
+            var nextToAppend = next switch
+            {
+                "n" => "\n",
+                "t" => "\t",
+                "0" => "\0",
+                _ => next,
+            };
+
+            builder.Append(nextToAppend);
         }
 
         AdvanceIf('"');

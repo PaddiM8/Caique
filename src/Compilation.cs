@@ -17,9 +17,14 @@ public class Compilation
     {
         options ??= new CompilationOptions();
 
+        var preludeProject = Preprocessor.Process("prelude", "/home/paddi/projects/caique/prelude", prelude: null);
+        var stdProject = Preprocessor.Process("std", "/home/paddi/projects/caique/std", preludeProject.ProjectNamespace);
+
         // TODO: The actual project name should be defined in the project file
-        var project = Preprocessor.Process("root", projectFilePath);
-        var context = new CompilationContext();
+        var project = Preprocessor.Process("root", projectFilePath, preludeProject.ProjectNamespace);
+        var context = new CompilationContext(preludeProject.ProjectNamespace!);
+        project.AddDependency(preludeProject);
+        project.AddDependency(stdProject);
 
         Parse(project, context);
 
@@ -36,7 +41,7 @@ public class Compilation
 
         if (!context.DiagnosticReporter.Errors.Any())
         {
-            var objectFilePaths = Emit(semanticTrees, projectFilePath, options);
+            var objectFilePaths = Emit(semanticTrees, projectFilePath, context, options);
             Link(objectFilePaths, project, GetTargetDirectory(projectFilePath));
         }
 
@@ -45,6 +50,15 @@ public class Compilation
 
     private static void Parse(Project project, CompilationContext context)
     {
+        foreach (var dependency in project.Dependencies.Values)
+        {
+            dependency.ProjectNamespace!.Traverse(scope =>
+            {
+                var content = File.ReadAllText(scope.FilePath);
+                scope.SyntaxTree = Parser.Parse(content, scope, context);
+            });
+        }
+
         project.ProjectNamespace!.Traverse(scope =>
         {
             var content = File.ReadAllText(scope.FilePath);
@@ -54,6 +68,15 @@ public class Compilation
 
     private static void Resolve(Project project, CompilationContext context)
     {
+        foreach (var dependency in project.Dependencies.Values)
+        {
+            dependency.ProjectNamespace!.Traverse(scope =>
+            {
+                Debug.Assert(scope.SyntaxTree != null);
+                Resolver.Resolve(scope.SyntaxTree, context);
+            });
+        }
+
         project.ProjectNamespace!.Traverse(scope =>
         {
             Debug.Assert(scope.SyntaxTree != null);
@@ -64,6 +87,16 @@ public class Compilation
     private static List<(SemanticTree, FileScope)> Analyse(Project project, CompilationContext context)
     {
         var semanticTrees = new List<(SemanticTree, FileScope)>();
+        foreach (var dependency in project.Dependencies.Values)
+        {
+            dependency.ProjectNamespace!.Traverse(scope =>
+            {
+                Debug.Assert(scope.SyntaxTree != null);
+                var semanticTree = Analyser.Analyse(scope.SyntaxTree, context);
+                semanticTrees.Add((semanticTree, scope));
+            });
+        }
+
         project.ProjectNamespace!.Traverse(scope =>
         {
             Debug.Assert(scope.SyntaxTree != null);
@@ -77,6 +110,7 @@ public class Compilation
     private static List<string> Emit(
         List<(SemanticTree, FileScope)> semanticTrees,
         string projectFilePath,
+        CompilationContext compilationContext,
         CompilationOptions options
     )
     {
@@ -97,7 +131,7 @@ public class Compilation
         {
             var emitterContext = emitterContextMap[semanticTree];
             var targetPath = GetTargetDirectory(projectFilePath);
-            string objectFilePath = LlvmContentEmitter.Emit(semanticTree, emitterContext, targetPath, options);
+            string objectFilePath = LlvmContentEmitter.Emit(semanticTree, emitterContext, targetPath, compilationContext, options);
             objectFilePaths.Add(objectFilePath);
             emitterContext.Dispose();
         }

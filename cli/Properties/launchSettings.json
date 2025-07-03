@@ -2,7 +2,7 @@
   "profiles": {
     "ConsoleApp": {
       "commandName": "Project",
-      "commandLineArgs": "build ../experiments/inheritance --dump-ir",
+      "commandLineArgs": "build ../experiments/simple --dump-ir",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }

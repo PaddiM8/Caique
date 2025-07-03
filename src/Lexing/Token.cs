@@ -19,6 +19,7 @@ public record TextPosition(int Index, int Line, int Column, SyntaxTree SyntaxTre
 public enum TokenKind
 {
     Unknown,
+    With,
     Let, Fn, Class,
     Static,
     New,
@@ -33,6 +34,6 @@ public enum TokenKind
     Exclamation, EqualsEquals, NotEquals, Greater, Less, GreaterEquals, LessEquals,
     NumberLiteral, StringLiteral, True, False,
     Comment,
-    Void, Bool, String, I8, I16, I32, I64, I128, F8, F16, F32, F64, F128,
+    Void, Bool, I8, I16, I32, I64, I128, U8, U16, U32, U64, U128, F8, F16, F32, F64, F128,
     EndOfFile,
 }

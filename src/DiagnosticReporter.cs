@@ -57,6 +57,17 @@ public class DiagnosticReporter
         ReportError($"Symbol not found: {fullName}.", span);
     }
 
+    public void ReportInvalidNamespace(List<Token> path)
+    {
+        var namespaceString = string.Join("::", path.Select(x => x.Value));
+        var span = path
+            .First()
+            .Span
+            .Combine(path.Last().Span);
+
+        ReportError($"Invalid namespace: {namespaceString}.", span);
+    }
+
     public void ReportMemberNotFound(Token identifier, IDataType dataType)
     {
         ReportError($"Member '{identifier.Value}' not found in '{dataType}'.", identifier.Span);

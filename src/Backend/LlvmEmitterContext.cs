@@ -3,7 +3,11 @@ using LLVMSharp.Interop;
 
 namespace Caique.Backend;
 
-public class LlvmEmitterContext(string moduleName, LLVMContextRef context, LlvmContextCache contextCache) : IDisposable
+public class LlvmEmitterContext(
+    string moduleName,
+    LLVMContextRef context,
+    LlvmContextCache contextCache
+) : IDisposable
 {
     public string ModuleName { get; } = moduleName;
 

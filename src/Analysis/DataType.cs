@@ -7,12 +7,16 @@ public enum Primitive
 {
     Void,
     Bool,
-    String,
     Int8,
     Int16,
     Int32,
     Int64,
     Int128,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+    Uint128,
     Float16,
     Float32,
     Float64,
@@ -21,6 +25,9 @@ public enum Primitive
 public interface IDataType
 {
     bool IsEquivalent(IDataType other);
+
+    bool IsVoid()
+        => false;
 
     bool IsNumber()
         => false;
@@ -48,17 +55,24 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         {
             Primitive.Void => "void",
             Primitive.Bool => "bool",
-            Primitive.String => "string",
             Primitive.Int8 => "i8",
             Primitive.Int16 => "i16",
             Primitive.Int32 => "i32",
             Primitive.Int64 => "i64",
             Primitive.Int128 => "i128",
+            Primitive.Uint8 => "u8",
+            Primitive.Uint16 => "u16",
+            Primitive.Uint32 => "u32",
+            Primitive.Uint64 => "u64",
+            Primitive.Uint128 => "u128",
             Primitive.Float16 => "f16",
             Primitive.Float32 => "f32",
             Primitive.Float64 => "f64",
         };
     }
+
+    public bool IsVoid()
+        => Kind == Primitive.Void;
 
     public bool IsEquivalent(IDataType other)
         => other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind;
@@ -71,6 +85,9 @@ public class PrimitiveDataType(Primitive kind) : IDataType
 
     public bool IsSignedInteger()
         => Kind >= Primitive.Int8 && Kind <= Primitive.Int128;
+
+    public bool IsUnsignedInteger()
+        => Kind >= Primitive.Uint8 && Kind <= Primitive.Uint128;
 
     public bool IsFloat()
         => Kind >= Primitive.Float16 && Kind <= Primitive.Float64;
