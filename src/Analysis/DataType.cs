@@ -136,8 +136,8 @@ public class FunctionDataType(FunctionSymbol symbol) : IDataType
     {
         var parameters = Symbol.SyntaxDeclaration.Parameters
             .Select(x => x.Type.TypeNames)
-            .Select(x => string.Join("::", x));
-        var returnType = string.Join("::", Symbol.SyntaxDeclaration.ReturnType?.TypeNames ?? []);
+            .Select(x => string.Join(":", x));
+        var returnType = string.Join(":", Symbol.SyntaxDeclaration.ReturnType?.TypeNames ?? []);
 
         return $"Fn({string.Join(", ", parameters)})({returnType})";
     }

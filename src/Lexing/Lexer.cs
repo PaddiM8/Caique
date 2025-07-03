@@ -150,6 +150,7 @@ public class Lexer
             "class" => TokenKind.Class,
             "static" => TokenKind.Static,
             "new" => TokenKind.New,
+            "as" => TokenKind.As,
             "return" => TokenKind.Return,
             "base" => TokenKind.Base,
             "true" => TokenKind.True,

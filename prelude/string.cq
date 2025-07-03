@@ -1,13 +1,13 @@
 class String
 {
-    chars: [u8];
+    chars [u8];
 
     init(chars)
     {
     }
 
-    fn ToCString(): [u8]
+    fn ToCString() [u8]
     {
-        return chars;
+        chars
     }
 }

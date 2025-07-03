@@ -23,6 +23,7 @@ public enum TokenKind
     Let, Fn, Class,
     Static,
     New,
+    As,
     Return, Self, Base,
     Equals, Colon, ColonColon, Semicolon, Comma, Hash,
     Identifier,

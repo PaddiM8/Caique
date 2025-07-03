@@ -52,14 +52,14 @@ public class DiagnosticReporter
 
     public void ReportNotFound(List<Token> typeNames)
     {
-        var fullName = string.Join("::", typeNames.Select(x => x.Value));
+        var fullName = string.Join(":", typeNames.Select(x => x.Value));
         var span = typeNames.First().Span.Combine(typeNames.Last().Span);
         ReportError($"Symbol not found: {fullName}.", span);
     }
 
     public void ReportInvalidNamespace(List<Token> path)
     {
-        var namespaceString = string.Join("::", path.Select(x => x.Value));
+        var namespaceString = string.Join(":", path.Select(x => x.Value));
         var span = path
             .First()
             .Span

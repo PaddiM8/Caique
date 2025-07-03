@@ -102,7 +102,7 @@ public class Parser
 
             typeNames.Add(Eat());
         }
-        while (AdvanceIf(TokenKind.ColonColon));
+        while (AdvanceIf(TokenKind.Colon));
 
         if (isSlice)
             EatExpected(TokenKind.ClosedBracket);
@@ -114,9 +114,9 @@ public class Parser
     {
         var start = EatExpected(TokenKind.Let).Span;
         var identifier = EatExpected(TokenKind.Identifier);
-        var type = AdvanceIf(TokenKind.Colon)
-            ? ParseType()
-            : null;
+        var type = Match(TokenKind.Equals)
+            ? null
+            : ParseType();
         EatExpected(TokenKind.Equals);
         var value = ParseExpression();
 
@@ -126,7 +126,6 @@ public class Parser
     private SyntaxParameterNode ParseParameter()
     {
         var identifier = EatExpected(TokenKind.Identifier);
-        EatExpected(TokenKind.Colon);
         var type = ParseType();
 
         return new SyntaxParameterNode(identifier, type, identifier.Span.Combine(type.Span));
@@ -141,7 +140,7 @@ public class Parser
             var identifier = EatExpected(TokenKind.Identifier);
             identifiers.Add(identifier);
         }
-        while (AdvanceIf(TokenKind.ColonColon));
+        while (AdvanceIf(TokenKind.Colon));
 
         EatExpected(TokenKind.Semicolon);
 
@@ -165,6 +164,29 @@ public class Parser
 
         EatExpected(TokenKind.OpenBrace);
 
+        var (declarations, constructor, scope) = ParseStructureBody(identifier);
+        var end = EatExpected(TokenKind.ClosedBrace).Span;
+
+        var node = new SyntaxClassDeclarationNode(
+            identifier,
+            subTypes,
+            constructor,
+            declarations,
+            scope,
+            start.Combine(end)
+        );
+        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
+            _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
+
+        var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
+        node.Symbol = symbol;
+        _fileScope.Namespace.AddSymbol(symbol);
+
+        return node;
+    }
+
+    private (List<SyntaxNode>, SyntaxInitNode? constructor, StructureScope scope) ParseStructureBody(Token identifier)
+    {
         var declarations = new List<SyntaxNode>();
         var scope = new StructureScope(_fileScope.Namespace);
         SyntaxInitNode? constructor = null;
@@ -191,24 +213,7 @@ public class Parser
             }
         }
 
-        var end = EatExpected(TokenKind.ClosedBrace).Span;
-
-        var node = new SyntaxClassDeclarationNode(
-            identifier,
-            subTypes,
-            constructor,
-            declarations,
-            scope,
-            start.Combine(end)
-        );
-        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
-            _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
-
-        var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
-        node.Symbol = symbol;
-        _fileScope.Namespace.AddSymbol(symbol);
-
-        return node;
+        return (declarations, constructor, scope);
     }
 
     private SyntaxAttributeNode ParseAttribute()
@@ -239,7 +244,7 @@ public class Parser
         if (Match(TokenKind.Identifier))
             return ParseField(isStatic, scope);
 
-        throw new NotImplementedException();
+        throw Recover();
     }
 
     private SyntaxFunctionDeclarationNode ParseFunction(bool isStatic, List<SyntaxAttributeNode> attributes, StructureScope? scope = null)
@@ -247,9 +252,9 @@ public class Parser
         var start = EatExpected(TokenKind.Fn).Span;
         var identifier = EatExpected(TokenKind.Identifier);
         var parameters = ParseParameters();
-        var returnType = AdvanceIf(TokenKind.Colon)
-            ? ParseType()
-            : null;
+        var returnType = Match(TokenKind.OpenBrace, TokenKind.Semicolon)
+            ? null
+            : ParseType();
         var body = AdvanceIf(TokenKind.Semicolon)
             ? null
             : ParseBlock();
@@ -319,7 +324,6 @@ public class Parser
     private SyntaxFieldDeclarationNode ParseField(bool isStatic, StructureScope scope)
     {
         var identifier = EatExpected(TokenKind.Identifier);
-        EatExpected(TokenKind.Colon);
         var type = ParseType();
 
         SyntaxNode? value = null;
@@ -558,7 +562,7 @@ public class Parser
             EatExpected(TokenKind.Identifier),
         };
 
-        while (AdvanceIf(TokenKind.ColonColon))
+        while (AdvanceIf(TokenKind.Colon))
             identifierList.Add(EatExpected(TokenKind.Identifier));
 
         return new SyntaxIdentifierNode(identifierList);

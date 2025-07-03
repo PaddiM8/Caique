@@ -1,5 +1,5 @@
 class LibcUnsafe
 {
     #ffi
-    static fn printf(pattern: [u8], arg: [u8]);
+    static fn printf(pattern [u8], arg [u8]);
 }
