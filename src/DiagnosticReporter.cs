@@ -94,6 +94,11 @@ public class DiagnosticReporter
         ReportError($"Incompatible type. Expected {expected} but got {got}.", span);
     }
 
+    public void ReportInvalidCast(IDataType fromType, IDataType toType, TextSpan span)
+    {
+        ReportError($"Invalid cast. Cannot cast from {fromType} to {toType}.", span);
+    }
+
     public void ReportExpectedVariableReferenceInAssignment(TextSpan span)
     {
         ReportError($"Expected variable reference in the left side of the assignment.", span);

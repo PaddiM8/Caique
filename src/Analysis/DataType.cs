@@ -29,6 +29,9 @@ public interface IDataType
     bool IsVoid()
         => false;
 
+    bool IsBoolean()
+        => false;
+
     bool IsNumber()
         => false;
 
@@ -48,6 +51,26 @@ public interface IDataType
 public class PrimitiveDataType(Primitive kind) : IDataType
 {
     public Primitive Kind { get; } = kind;
+
+    public int BitSize
+        => Kind switch
+        {
+            Primitive.Void => 0,
+            Primitive.Bool => 1,
+            Primitive.Int8 => 8,
+            Primitive.Int16 => 16,
+            Primitive.Int32 => 32,
+            Primitive.Int64 => 64,
+            Primitive.Int128 => 128,
+            Primitive.Uint8 => 8,
+            Primitive.Uint16 => 16,
+            Primitive.Uint32 => 32,
+            Primitive.Uint64 => 64,
+            Primitive.Uint128 => 128,
+            Primitive.Float16 => 16,
+            Primitive.Float32 => 32,
+            Primitive.Float64 => 64,
+        };
 
     public override string ToString()
     {
@@ -73,6 +96,9 @@ public class PrimitiveDataType(Primitive kind) : IDataType
 
     public bool IsVoid()
         => Kind == Primitive.Void;
+
+    public bool IsBoolean()
+        => Kind == Primitive.Bool;
 
     public bool IsEquivalent(IDataType other)
         => other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind;

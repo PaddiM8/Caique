@@ -234,6 +234,22 @@ public class SemanticKeywordValueNode(Token keyword, List<SemanticNode>? argumen
     }
 }
 
+public class SemanticCastNode(
+    SemanticNode value,
+    TextSpan span,
+    IDataType dataType
+)
+    : SemanticNode(dataType, span)
+{
+    public SemanticNode Value { get; } = value;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        Value.Traverse(callback);
+        callback(Value, this);
+    }
+}
+
 public class SemanticBlockNode(List<SemanticNode> expressions, IDataType dataType, TextSpan span)
     : SemanticNode(dataType, span)
 {

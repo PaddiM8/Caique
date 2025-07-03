@@ -39,6 +39,9 @@ public class Resolver
             case SyntaxStatementNode statementNode:
                 Next(statementNode.Expression, node);
                 break;
+            case SyntaxGroupNode groupNode:
+                Next(groupNode.Value, node);
+                break;
             case SyntaxUnaryNode unaryNode:
                 Next(unaryNode.Value, node);
                 break;
@@ -65,6 +68,9 @@ public class Resolver
                 break;
             case SyntaxKeywordValueNode keywordNode:
                 Visit(keywordNode);
+                break;
+            case SyntaxDotKeywordNode dotKeywordNode:
+                Visit(dotKeywordNode);
                 break;
             case SyntaxBlockNode blockNode:
                 Visit(blockNode);
@@ -129,6 +135,17 @@ public class Resolver
 
     private void Visit(SyntaxKeywordValueNode node)
     {
+        if (node.Arguments != null)
+        {
+            foreach (var argument in node.Arguments)
+                Next(argument, node);
+        }
+    }
+
+    private void Visit(SyntaxDotKeywordNode node)
+    {
+        Next(node.Left, node);
+
         if (node.Arguments != null)
         {
             foreach (var argument in node.Arguments)

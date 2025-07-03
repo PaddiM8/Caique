@@ -91,6 +91,12 @@ public class SyntaxStatementNode(SyntaxNode expression, bool isReturnValue)
     public bool IsReturnValue { get; } = isReturnValue;
 }
 
+public class SyntaxGroupNode(SyntaxNode value, TextSpan span)
+    : SyntaxNode(span)
+{
+    public SyntaxNode Value { get; } = value;
+}
+
 public class SyntaxLiteralNode(Token value)
     : SyntaxNode(value.Span)
 {
@@ -162,6 +168,16 @@ public class SyntaxReturnNode(SyntaxNode? value, TextSpan span)
 public class SyntaxKeywordValueNode(Token keyword, List<SyntaxNode>? arguments, TextSpan span)
     : SyntaxNode(span)
 {
+    public Token Keyword { get; } = keyword;
+
+    public List<SyntaxNode>? Arguments { get; } = arguments;
+}
+
+public class SyntaxDotKeywordNode(SyntaxNode left, Token keyword, List<SyntaxNode>? arguments, TextSpan span)
+    : SyntaxNode(span)
+{
+    public SyntaxNode Left { get; } = left;
+
     public Token Keyword { get; } = keyword;
 
     public List<SyntaxNode>? Arguments { get; } = arguments;

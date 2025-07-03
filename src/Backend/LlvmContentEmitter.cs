@@ -103,6 +103,7 @@ public class LlvmContentEmitter
             SemanticNewNode newNode => Visit(newNode),
             SemanticReturnNode returnNode => Visit(returnNode),
             SemanticKeywordValueNode keywordValueNode => Visit(keywordValueNode),
+            SemanticCastNode castNode => Visit(castNode),
             SemanticBlockNode blockNode => Visit(blockNode),
             SemanticVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
             SemanticFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
@@ -437,6 +438,70 @@ public class LlvmContentEmitter
             return GetSelf();
 
         throw new UnreachableException();
+    }
+
+    private LLVMValueRef Visit(SemanticCastNode node)
+    {
+        var value = Next(node.Value)!.Value;
+        if (node.DataType is PrimitiveDataType primitiveDataType)
+            return BuildPrimitiveCast(value, node.Value.DataType, primitiveDataType);
+
+        if (node.DataType is StructureDataType structureDataType)
+        {
+            var toLlvmType = _typeBuilder.BuildNamedStructType(structureDataType);
+
+            return _builder.BuildBitCast(value, toLlvmType, "bitcast");
+        }
+
+        throw new NotImplementedException();
+    }
+
+    private LLVMValueRef BuildPrimitiveCast(
+        LLVMValueRef value,
+        IDataType fromDataType,
+        PrimitiveDataType toPrimitive
+    )
+    {
+        if (fromDataType is not PrimitiveDataType fromPrimitive)
+            throw new NotImplementedException();
+
+        bool isUpcast = toPrimitive.BitSize > fromPrimitive.BitSize;
+        bool isDowncast = toPrimitive.BitSize < fromPrimitive.BitSize;
+        var toLlvmType = _typeBuilder.BuildType(toPrimitive);
+
+        LLVMOpcode? opCode;
+        if (toPrimitive.IsInteger())
+        {
+            opCode = fromPrimitive switch
+            {
+                var from when from.IsSignedInteger() && isUpcast => LLVMOpcode.LLVMZExt,
+                var from when from.IsUnsignedInteger() && isUpcast => LLVMOpcode.LLVMSExt,
+                var from when from.IsInteger() && isDowncast => LLVMOpcode.LLVMTrunc,
+                var from when from.IsFloat() && toPrimitive.IsSignedInteger() => LLVMOpcode.LLVMFPToSI,
+                var from when from.IsFloat() && toPrimitive.IsUnsignedInteger() => LLVMOpcode.LLVMFPToUI,
+                _ => null,
+            };
+        }
+        else if (toPrimitive.IsFloat())
+        {
+            opCode = fromPrimitive switch
+            {
+                var from when from.IsSignedInteger() => LLVMOpcode.LLVMSIToFP,
+                var from when from.IsUnsignedInteger() => LLVMOpcode.LLVMUIToFP,
+                var from when from.IsFloat() && isUpcast => LLVMOpcode.LLVMFPExt,
+                var from when from.IsFloat() && isDowncast => LLVMOpcode.LLVMFPTrunc,
+                _ => null,
+            };
+        }
+        else
+        {
+            throw new NotImplementedException();
+        }
+
+        if (!opCode.HasValue)
+            return value;
+
+        return _builder.BuildCast(opCode.Value, value, toLlvmType, "cast");
     }
 
     private LLVMValueRef? Visit(SemanticBlockNode node)

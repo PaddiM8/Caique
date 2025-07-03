@@ -40,6 +40,7 @@ public class Analyser
         return node switch
         {
             SyntaxStatementNode statementNode => Visit(statementNode),
+            SyntaxGroupNode groupNode => Visit(groupNode),
             SyntaxLiteralNode literalNode => Visit(literalNode),
             SyntaxIdentifierNode identifierNode => Visit(identifierNode),
             SyntaxUnaryNode unaryNode => Visit(unaryNode),
@@ -50,6 +51,7 @@ public class Analyser
             SyntaxNewNode newNode => Visit(newNode),
             SyntaxReturnNode returnNode => Visit(returnNode),
             SyntaxKeywordValueNode keywordValueNode => Visit(keywordValueNode),
+            SyntaxDotKeywordNode dotKeywordNode => Visit(dotKeywordNode),
             SyntaxBlockNode blockNode => Visit(blockNode),
             SyntaxAttributeNode attributeNode => Visit(attributeNode),
             SyntaxParameterNode parameterNode => Visit(parameterNode),
@@ -81,7 +83,12 @@ public class Analyser
         return Next(node.Expression);
     }
 
-    private SemanticNode Visit(SyntaxKeywordValueNode node)
+    private SemanticNode Visit(SyntaxGroupNode node)
+    {
+        return Next(node.Value);
+    }
+
+    private SemanticKeywordValueNode Visit(SyntaxKeywordValueNode node)
     {
         var arguments = node
             .Arguments?
@@ -151,7 +158,43 @@ public class Analyser
         );
     }
 
-    private SemanticNode Visit(SyntaxLiteralNode node)
+    private SemanticNode Visit(SyntaxDotKeywordNode node)
+    {
+        var arguments = node
+            .Arguments?
+            .Select(Next)
+            .ToList();
+
+        if (node.Keyword.Kind == TokenKind.As)
+            return NextAsKeyword(node, arguments);
+
+        throw new UnreachableException();
+    }
+
+    private SemanticCastNode NextAsKeyword(SyntaxDotKeywordNode node, List<SemanticNode>? arguments)
+    {
+        if (arguments?.Count != 1)
+        {
+            _diagnostics.ReportWrongNumberOfArguments(1, arguments?.Count ?? 0, node.Span);
+            throw Recover();
+        }
+
+        var value = Next(node.Left);
+        var targetDataType = arguments.Single().DataType;
+
+        if (value.DataType.GetType() != targetDataType.GetType())
+            _diagnostics.ReportInvalidCast(value.DataType, targetDataType, value.Span);
+
+        if (value.DataType.IsVoid() || targetDataType.IsVoid())
+            _diagnostics.ReportInvalidCast(value.DataType, targetDataType, value.Span);
+
+        if ((value.DataType.IsBoolean() != targetDataType.IsBoolean()))
+            _diagnostics.ReportInvalidCast(value.DataType, targetDataType, value.Span);
+
+        return new SemanticCastNode(value, node.Span, targetDataType);
+    }
+
+    private SemanticLiteralNode Visit(SyntaxLiteralNode node)
     {
         if (node.Value.Kind == TokenKind.NumberLiteral)
         {

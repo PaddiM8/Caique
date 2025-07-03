@@ -474,6 +474,13 @@ public class Parser
         var left = ParsePrimary();
         while (AdvanceIf(TokenKind.Dot))
         {
+            if (Match(TokenKind.As))
+            {
+                left = ParseDotKeyword(left, areTypeArguments: true);
+
+                continue;
+            }
+
             var identifier = EatExpected(TokenKind.Identifier);
             left = new SyntaxMemberAccessNode(left, identifier);
         }
@@ -481,19 +488,36 @@ public class Parser
         return left;
     }
 
+    private SyntaxDotKeywordNode ParseDotKeyword(SyntaxNode left, bool areTypeArguments)
+    {
+        var keyword = Eat();
+        List<SyntaxNode>? arguments = null;
+        if (Match(TokenKind.OpenParenthesis))
+        {
+            arguments = areTypeArguments
+                ? ParseArgumentsAsTypes()
+                : ParseArguments();
+        }
+
+        return new SyntaxDotKeywordNode(left, keyword, arguments, left.Span.Combine(_previous!.Span));
+    }
+
     private SyntaxNode ParsePrimary()
     {
         if (Match(TokenKind.OpenBrace))
             return ParseBlock();
 
+        if (Match(TokenKind.OpenParenthesis))
+            return ParseParenthesis();
+
         if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral))
             return ParseLiteral();
 
         if (Match(TokenKind.Identifier) && _current?.Value == "size_of")
-            return ParseKeywordValue();
+            return ParseKeywordValue(areTypeArguments: true);
 
         if (Match(TokenKind.Base))
-            return ParseKeywordValue();
+            return ParseKeywordValue(areTypeArguments: false);
 
         if (Match(TokenKind.Identifier))
             return ParseIdentifier();
@@ -548,6 +572,15 @@ public class Parser
         return new SyntaxBlockNode(expressions, start.Combine(end));
     }
 
+    private SyntaxGroupNode ParseParenthesis()
+    {
+        var start = EatExpected(TokenKind.OpenParenthesis).Span;
+        var value = ParseExpression();
+        var end = EatExpected(TokenKind.ClosedParenthesis).Span;
+
+        return new SyntaxGroupNode(value, start.Combine(end));
+    }
+
     private SyntaxLiteralNode ParseLiteral()
     {
         var token = EatExpected(TokenKind.NumberLiteral, TokenKind.StringLiteral);
@@ -587,12 +620,16 @@ public class Parser
         return new SyntaxReturnNode(value, start.Combine(value?.Span ?? start));
     }
 
-    private SyntaxKeywordValueNode ParseKeywordValue()
+    private SyntaxKeywordValueNode ParseKeywordValue(bool areTypeArguments)
     {
         var keyword = Eat();
         List<SyntaxNode>? arguments = null;
         if (Match(TokenKind.OpenParenthesis))
-            arguments = ParseArguments();
+        {
+            arguments = areTypeArguments
+                ? ParseArgumentsAsTypes()
+                : ParseArguments();
+        }
 
         return new SyntaxKeywordValueNode(keyword, arguments, keyword.Span.Combine(_previous!.Span));
     }
@@ -605,6 +642,23 @@ public class Parser
         while (!_reachedEnd && !Match(TokenKind.ClosedParenthesis))
         {
             arguments.Add(ParseExpression());
+            if (!AdvanceIf(TokenKind.Comma))
+                break;
+        }
+
+        EatExpected(TokenKind.ClosedParenthesis);
+
+        return arguments;
+    }
+
+    private List<SyntaxNode> ParseArgumentsAsTypes()
+    {
+        EatExpected(TokenKind.OpenParenthesis);
+
+        var arguments = new List<SyntaxNode>();
+        while (!_reachedEnd && !Match(TokenKind.ClosedParenthesis))
+        {
+            arguments.Add(ParseType());
             if (!AdvanceIf(TokenKind.Comma))
                 break;
         }
