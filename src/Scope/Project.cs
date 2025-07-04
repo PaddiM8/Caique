@@ -24,10 +24,16 @@ public class Project(string name, string projectFilePath)
             return null;
 
         if (ProjectNamespace?.Name == path.First())
-            return ProjectNamespace;
+        {
+            return path.Count == 1
+                ? ProjectNamespace
+                : ProjectNamespace.ResolveNamespace(path[1..]);
+        }
 
         if (Dependencies.TryGetValue(path.First(), out var dependency))
+        {
             return dependency.ResolveNamespace(path);
+        }
 
         return null;
     }

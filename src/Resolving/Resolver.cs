@@ -24,6 +24,8 @@ public class Resolver
     {
         var resolver = new Resolver(syntaxTree, compilationContext);
         Debug.Assert(syntaxTree.Root != null);
+
+        syntaxTree.File.ImportNamespace(compilationContext.PreludeScope);
         resolver.Next(syntaxTree.Root, null);
     }
 

@@ -17,13 +17,14 @@ public class Compilation
     {
         options ??= new CompilationOptions();
 
-        var preludeProject = Preprocessor.Process("prelude", "/home/paddi/projects/caique/prelude", prelude: null);
-        var stdProject = Preprocessor.Process("std", "/home/paddi/projects/caique/std", preludeProject.ProjectNamespace);
+        // var preludeProject = Preprocessor.Process("prelude", "/home/paddi/projects/caique/prelude", prelude: null);
+        var stdProject = Preprocessor.Process("std", "/home/paddi/projects/caique/std", prelude: null);
+        var preludeScope = stdProject.ResolveNamespace(["std", "prelude"])!;
 
         // TODO: The actual project name should be defined in the project file
-        var project = Preprocessor.Process("root", projectFilePath, preludeProject.ProjectNamespace);
-        var context = new CompilationContext(preludeProject.ProjectNamespace!);
-        project.AddDependency(preludeProject);
+        var project = Preprocessor.Process("root", projectFilePath, preludeScope);
+        var context = new CompilationContext(preludeScope);
+        // project.AddDependency(preludeProject);
         project.AddDependency(stdProject);
 
         Parse(project, context);

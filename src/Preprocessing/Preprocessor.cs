@@ -30,9 +30,6 @@ public class Preprocessor
             string fileScopeName = Path.GetFileNameWithoutExtension(filePath);
             var fileScope = new FileScope(fileScopeName, filePath, scope);
             scope.AddScope(fileScope);
-
-            if (prelude != null)
-                fileScope.ImportNamespace(prelude);
         }
 
         foreach (var childDirectoryPath in Directory.GetDirectories(directoryPath))

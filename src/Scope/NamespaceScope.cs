@@ -22,7 +22,7 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
         if (Parent == null)
             return Name;
 
-        return $"{Parent}::{Name}";
+        return $"{Parent}:{Name}";
     }
 
     public void AddScope(NamespaceScope scope)
@@ -51,7 +51,11 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
     public NamespaceScope? ResolveNamespace(List<string> path)
     {
         if (_namespaceScopes.TryGetValue(path.First(), out var foundScope))
-            return foundScope.ResolveNamespace(path[1..]);
+        {
+            return path.Count == 1
+                ? foundScope
+                : foundScope.ResolveNamespace(path[1..]);
+        }
 
         return Project.ResolveNamespace(path);
     }
