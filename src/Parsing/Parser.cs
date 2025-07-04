@@ -242,12 +242,16 @@ public class Parser
             return ParseInit();
 
         if (Match(TokenKind.Identifier))
-            return ParseField(isStatic, scope);
+            return ParseField(isStatic, attributes, scope);
 
         throw Recover();
     }
 
-    private SyntaxFunctionDeclarationNode ParseFunction(bool isStatic, List<SyntaxAttributeNode> attributes, StructureScope? scope = null)
+    private SyntaxFunctionDeclarationNode ParseFunction(
+        bool isStatic,
+        List<SyntaxAttributeNode> attributes,
+        StructureScope? scope = null
+    )
     {
         var start = EatExpected(TokenKind.Fn).Span;
         var identifier = EatExpected(TokenKind.Identifier);
@@ -321,7 +325,11 @@ public class Parser
         return parameters;
     }
 
-    private SyntaxFieldDeclarationNode ParseField(bool isStatic, StructureScope scope)
+    private SyntaxFieldDeclarationNode ParseField(
+        bool isStatic,
+        List<SyntaxAttributeNode> attributes,
+        StructureScope scope
+    )
     {
         var identifier = EatExpected(TokenKind.Identifier);
         var type = ParseType();
@@ -331,7 +339,16 @@ public class Parser
             value = ParseExpression();
 
         var end = EatExpected(TokenKind.Semicolon).Span;
-        var node = new SyntaxFieldDeclarationNode(identifier, type, value, isStatic, identifier.Span.Combine(end));
+        var node = new SyntaxFieldDeclarationNode(
+            identifier,
+            type,
+            value,
+            isStatic,
+            identifier.Span.Combine(end)
+        )
+        {
+            Attributes = attributes,
+        };
 
         var symbol = new FieldSymbol(node);
         scope.AddSymbol(symbol);
@@ -448,30 +465,17 @@ public class Parser
         if (Match(TokenKind.Minus, TokenKind.Exclamation))
         {
             var op = Eat();
-            var value = ParseCall();
+            var value = ParseMemberAccess();
 
             return new SyntaxUnaryNode(op.Kind, value, op.Span.Combine(value.Span));
         }
 
-        return ParseCall();
-    }
-
-    private SyntaxNode ParseCall()
-    {
-        var left = ParseMemberAccess();
-        if (Match(TokenKind.OpenParenthesis))
-        {
-            var arguments = ParseArguments();
-
-            return new SyntaxCallNode(left, arguments, left.Span.Combine(_previous!.Span));
-        }
-
-        return left;
+        return ParseMemberAccess();
     }
 
     private SyntaxNode ParseMemberAccess()
     {
-        var left = ParsePrimary();
+        var left = ParseCall();
         while (AdvanceIf(TokenKind.Dot))
         {
             if (Match(TokenKind.As))
@@ -483,6 +487,13 @@ public class Parser
 
             var identifier = EatExpected(TokenKind.Identifier);
             left = new SyntaxMemberAccessNode(left, identifier);
+
+            if (Match(TokenKind.OpenParenthesis))
+            {
+                var arguments = ParseArguments();
+
+                return new SyntaxCallNode(left, arguments, left.Span.Combine(_previous!.Span));
+            }
         }
 
         return left;
@@ -500,6 +511,19 @@ public class Parser
         }
 
         return new SyntaxDotKeywordNode(left, keyword, arguments, left.Span.Combine(_previous!.Span));
+    }
+
+    private SyntaxNode ParseCall()
+    {
+        var left = ParsePrimary();
+        if (Match(TokenKind.OpenParenthesis))
+        {
+            var arguments = ParseArguments();
+
+            return new SyntaxCallNode(left, arguments, left.Span.Combine(_previous!.Span));
+        }
+
+        return left;
     }
 
     private SyntaxNode ParsePrimary()

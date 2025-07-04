@@ -216,6 +216,9 @@ public class Resolver
 
     private void Visit(SyntaxFieldDeclarationNode node)
     {
+        foreach (var attribute in node.Attributes)
+            Next(attribute, node);
+
         Next(node.Type, node);
         ResolveNode(node.Type);
         if (node.Value != null)

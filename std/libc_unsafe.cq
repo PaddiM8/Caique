@@ -1,5 +1,15 @@
 class LibcUnsafe
 {
     #ffi
+    static stdout usize;
+
+    #ffi
     static fn printf(pattern [u8], arg [u8]);
+
+    #ffi
+    static fn fputs(str [u8], stream usize);
+
+    static fn GetStdout() usize {
+        LibcUnsafe:stdout
+    }
 }

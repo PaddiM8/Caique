@@ -20,6 +20,8 @@ public enum Primitive
     Float16,
     Float32,
     Float64,
+    ISize,
+    USize,
 }
 
 public interface IDataType
@@ -70,6 +72,8 @@ public class PrimitiveDataType(Primitive kind) : IDataType
             Primitive.Float16 => 16,
             Primitive.Float32 => 32,
             Primitive.Float64 => 64,
+            Primitive.ISize => 64,
+            Primitive.USize => 64,
         };
 
     public override string ToString()
@@ -91,6 +95,8 @@ public class PrimitiveDataType(Primitive kind) : IDataType
             Primitive.Float16 => "f16",
             Primitive.Float32 => "f32",
             Primitive.Float64 => "f64",
+            Primitive.ISize => "isize",
+            Primitive.USize => "usize",
         };
     }
 
@@ -107,13 +113,13 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         => Kind >= Primitive.Int8 && Kind <= Primitive.Float64;
 
     public bool IsInteger()
-        => Kind >= Primitive.Int8 && Kind <= Primitive.Int128;
+        => Kind >= Primitive.Int8 && Kind <= Primitive.USize;
 
     public bool IsSignedInteger()
-        => Kind >= Primitive.Int8 && Kind <= Primitive.Int128;
+        => Kind >= Primitive.Int8 && Kind <= Primitive.ISize;
 
     public bool IsUnsignedInteger()
-        => Kind >= Primitive.Uint8 && Kind <= Primitive.Uint128;
+        => Kind >= Primitive.Uint8 && Kind <= Primitive.USize;
 
     public bool IsFloat()
         => Kind >= Primitive.Float16 && Kind <= Primitive.Float64;
@@ -142,7 +148,7 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
     public StructureSymbol Symbol { get; } = symbol;
 
     public override string ToString()
-        => $"{Symbol.Namespace}::{Symbol.Name}";
+        => $"{Symbol.Namespace}:{Symbol.Name}";
 
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();

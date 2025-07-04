@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using Caique.Analysis;
 using Caique.Lexing;
 using Caique.Parsing;
 using Caique.Scope;
+using LLVMSharp;
 using LLVMSharp.Interop;
 
 namespace Caique.Backend;
@@ -53,7 +55,23 @@ public class LlvmContentEmitter
 
         Directory.CreateDirectory(Path.Combine(targetDirectory, "objects"));
         var objectPath = Path.Combine(targetDirectory, "objects", $"{emitterContext.ModuleName}.o");
-        emitter.CreateObjectFile(objectPath);
+
+        var isValid = emitter._module.TryVerify(LLVMVerifierFailureAction.LLVMReturnStatusAction, out var errorMessage);
+        if (isValid)
+        {
+            emitter.CreateObjectFile(objectPath);
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Compilation error in module {emitterContext.ModuleName}:");
+            Console.ResetColor();
+            Console.Write("  ");
+            Console.Error.WriteLine(errorMessage);
+
+            // TODO: Remove this when the strange errors are fixed?
+            emitter.CreateObjectFile(objectPath);
+        }
 
         return objectPath;
     }
@@ -119,11 +137,22 @@ public class LlvmContentEmitter
 
     private LLVMValueRef BuildString(string value)
     {
-        var valuePointer = _builder.BuildGlobalStringPtr(value);
+        // var stringType = LLVMTypeRef.CreateArray(LLVMTypeRef.Int8, (uint)Encoding.Default.GetByteCount(value));
+        /*var indices = new LLVMValueRef[]*/
+        /*{*/
+        /*    LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, 0, false),*/
+        /*    LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, 0, false),*/
+        /*};*/
+        /**/
+        /*var valuePointer = _builder.BuildGEP2(stringType, globalString, indices);*/
+
         var symbol = _preludeScope.ResolveStructure(["String"])!;
         var type = _typeBuilder.BuildNamedStructType(new StructureDataType(symbol.SemanticDeclaration!.Symbol));
         var instance = _specialValueBuilder.BuildMalloc(type, "str");
         var structure = (ISemanticInstantiableStructureDeclaration)symbol.SemanticDeclaration;
+
+        var global = _builder.BuildGlobalString(value);
+        var valuePointer = _builder.BuildBitCast(global, LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0));
         BuildConstructorCall(instance, structure, [valuePointer]);
 
         return instance;
@@ -196,11 +225,14 @@ public class LlvmContentEmitter
 
     private (LLVMTypeRef type, LLVMValueRef pointer) ResolveFieldReference(SemanticFieldReferenceNode node)
     {
+        Debug.Assert(node.Symbol.SemanticDeclaration != null);
+
         var type = _typeBuilder.BuildType(node.DataType);
+        var declaration = node.Symbol.SemanticDeclaration;
+
+        // Static fields are generated as globals
         if (node.ObjectInstance == null)
-        {
-            throw new NotImplementedException("Static fields have not been implemented yet.");
-        }
+            return (type, _moduleCache.GetNodeLlvmValue(declaration));
 
         var structure = _semanticTree.GetEnclosingStructure(node)!;
         var instanceDataType = (StructureDataType)node.ObjectInstance.DataType;
@@ -209,8 +241,7 @@ public class LlvmContentEmitter
             ? GetSelf()
             : Next(node.ObjectInstance);
 
-        Debug.Assert(node.Symbol.SemanticDeclaration != null);
-        var index = (uint)structure.FieldStartIndex + (uint)structure.Fields.IndexOf(node.Symbol.SemanticDeclaration);
+        var index = (uint)structure.FieldStartIndex + (uint)structure.Fields.IndexOf(declaration);
         var pointer = _builder.BuildStructGEP2(instanceLlvmType, instance!.Value, index, $"{node.Identifier.Value}_pointer");
 
         return (type, pointer);
@@ -432,7 +463,11 @@ public class LlvmContentEmitter
     private LLVMValueRef Visit(SemanticKeywordValueNode node)
     {
         if (node.Keyword.Value == "size_of")
-            return _typeBuilder.BuildType(node.Arguments![0].DataType).SizeOf;
+        {
+            var type =_typeBuilder.BuildType(node.Arguments![0].DataType);
+
+            return LlvmUtils.BuildSizeOf(_module, type);
+        }
 
         if (node.Keyword.Kind is TokenKind.Self or TokenKind.Base)
             return GetSelf();
@@ -607,6 +642,17 @@ public class LlvmContentEmitter
     {
         Visit(node.Init, node);
 
+        foreach (var staticField in node.Fields.Where(x => x.IsStatic))
+        {
+            if (staticField.Attributes.Any(x => x.Identifier.Value == "ffi"))
+                continue;
+
+            var global = _moduleCache.GetNodeLlvmValue(staticField);
+            global.Initializer = staticField.Value == null
+                ? _specialValueBuilder.BuildDefaultValueForType(staticField.DataType)
+                : Next(staticField.Value)!.Value;
+        }
+
         foreach (var function in node.Functions)
             Next(function);
 
@@ -674,7 +720,7 @@ public class LlvmContentEmitter
         // Insert default values
         var instance = GetSelf();
         var type = _typeBuilder.BuildNamedStructType(new StructureDataType(parentStructure.Symbol));
-        foreach (var (i, field) in parentStructure.GetAllFields().Index())
+        foreach (var (i, field) in parentStructure.GetAllMemberFields().Index())
         {
             var fieldPointer = _builder.BuildStructGEP2(type, instance, (uint)i, field.Identifier.Value);
             var fieldValue = field.Value == null

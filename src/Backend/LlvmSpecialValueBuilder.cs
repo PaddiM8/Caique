@@ -89,14 +89,12 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
 
         LLVMValueRef mallocValue = _module.GetNamedFunction("malloc");
         if (mallocValue.Handle == IntPtr.Zero)
-        {
             mallocValue = _module.AddFunction("malloc", mallocType);
-        }
 
         var call = _builder.BuildCall2(
             mallocType,
             mallocValue,
-            new LLVMValueRef[] { type.SizeOf },
+            new LLVMValueRef[] { LlvmUtils.BuildSizeOf(_module, type) },
             label
         );
 

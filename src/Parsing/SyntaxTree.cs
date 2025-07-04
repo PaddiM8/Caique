@@ -227,6 +227,17 @@ public class SyntaxVariableDeclarationNode(Token identifier, SyntaxTypeNode? typ
     public SyntaxNode Value { get; } = value;
 }
 
+public interface ISyntaxFunctionDeclaration
+{
+    Token Identifier { get; }
+
+    List<SyntaxParameterNode> Parameters { get; }
+
+    SyntaxTypeNode? ReturnType { get; }
+
+    FunctionSymbol? Symbol { get; }
+}
+
 public class SyntaxFunctionDeclarationNode(
     Token identifier,
     List<SyntaxParameterNode> parameters,
@@ -235,7 +246,7 @@ public class SyntaxFunctionDeclarationNode(
     bool isStatic,
     TextSpan span
 )
-    : SyntaxNode(span)
+    : SyntaxNode(span), ISyntaxFunctionDeclaration
 {
     public Token Identifier { get; } = identifier;
 
@@ -312,6 +323,8 @@ public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, S
     public bool IsStatic { get; } = isStatic;
 
     public FieldSymbol? Symbol { get; set; }
+
+    public List<SyntaxAttributeNode> Attributes { get; set; } = [];
 }
 
 public class SyntaxInitNode(List<SyntaxInitParameterNode> parameters, SyntaxBlockNode body, TextSpan span)

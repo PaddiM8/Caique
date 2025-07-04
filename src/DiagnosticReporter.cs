@@ -119,6 +119,16 @@ public class DiagnosticReporter
         ReportError("Non-static function reference must be called.", identifier.Span);
     }
 
+    public void ReportNonStaticMainFunction(TextSpan span)
+    {
+        ReportError("Main function must be static.", span);
+    }
+
+    public void ReportNonConstantValueInStaticField(TextSpan span)
+    {
+        ReportError($"Static fields can only be initialised with constant values.", span);
+    }
+
     public void ReportConstructorAlreadyExists(Token structureIdentifier, TextSpan span)
     {
         ReportError($"A constructor is already present in '{structureIdentifier.Value}'.", span);

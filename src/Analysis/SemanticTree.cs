@@ -311,6 +311,17 @@ public class SemanticVariableDeclarationNode(Token identifier, SemanticNode valu
     }
 }
 
+public interface ISemanticFunctionDeclaration
+{
+    Token Identifier { get; }
+
+    List<SemanticParameterNode> Parameters { get; }
+
+    IDataType ReturnType { get; }
+
+    FunctionSymbol Symbol { get; }
+}
+
 public class SemanticFunctionDeclarationNode(
     Token identifier,
     List<SemanticParameterNode> parameters,
@@ -320,7 +331,7 @@ public class SemanticFunctionDeclarationNode(
     FunctionSymbol symbol,
     TextSpan span
 )
-    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
+    : SemanticNode(new PrimitiveDataType(Primitive.Void), span), ISemanticFunctionDeclaration
 {
     public Token Identifier { get; } = identifier;
 
@@ -348,6 +359,12 @@ public class SemanticFunctionDeclarationNode(
         {
             Body.Traverse(callback);
             callback(Body, this);
+        }
+
+        foreach (var attribute in Attributes)
+        {
+            attribute.Traverse(callback);
+            callback(attribute, this);
         }
     }
 }
@@ -425,13 +442,14 @@ public class SemanticClassDeclarationNode(
         }
     }
 
-    public IEnumerable<SemanticFieldDeclarationNode> GetAllFields()
+    public IEnumerable<SemanticFieldDeclarationNode> GetAllMemberFields()
     {
         var inheritedFields = InheritedClass == null
             ? []
-            : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllFields();
+            : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllMemberFields();
+        var memberFields = Fields.Where(x => !x.IsStatic);
 
-        return inheritedFields.Concat(Fields);
+        return inheritedFields.Concat(memberFields);
     }
 }
 
@@ -453,12 +471,20 @@ public class SemanticFieldDeclarationNode(
 
     public FieldSymbol Symbol { get; } = symbol;
 
+    public List<SemanticAttributeNode> Attributes { get; init; } = [];
+
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
     {
         if (Value != null)
         {
             Value.Traverse(callback);
             callback(Value, this);
+        }
+
+        foreach (var attribute in Attributes)
+        {
+            attribute.Traverse(callback);
+            callback(attribute, this);
         }
     }
 }

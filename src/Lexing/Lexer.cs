@@ -172,6 +172,8 @@ public class Lexer
             "f32" => TokenKind.F32,
             "f64" => TokenKind.F64,
             "f128" => TokenKind.F128,
+            "isize" => TokenKind.ISize,
+            "usize" => TokenKind.USize,
             _ => TokenKind.Identifier,
         };
 

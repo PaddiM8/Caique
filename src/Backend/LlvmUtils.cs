@@ -21,4 +21,16 @@ public static class LlvmUtils
 
         return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, numericalValue, SignExtend: false);
     }
+
+
+    public static LLVMValueRef BuildSizeOf(LLVMModuleRef module, LLVMTypeRef type)
+    {
+        ulong size;
+        unsafe
+        {
+            size = LLVMTargetDataRef.FromStringRepresentation(module.DataLayout).StoreSizeOfType(type);
+        }
+
+        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, size);
+    }
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Caique.Analysis;
 using Caique.Parsing;
+using Caique.Scope;
 using LLVMSharp;
 using LLVMSharp.Interop;
 
@@ -10,7 +11,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
 {
     private readonly LLVMContextRef _context = llvmContext;
     private readonly Dictionary<IDataType, LLVMTypeRef> _cache = [];
-    private readonly Dictionary<StructureDataType, LLVMTypeRef> _namedStructCache = [];
+    private readonly Dictionary<StructureSymbol, LLVMTypeRef> _namedStructCache = [];
 
     public LLVMTypeRef BuildType(IDataType dataType)
     {
@@ -44,20 +45,21 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
 
     public LLVMTypeRef BuildNamedStructType(StructureDataType dataType)
     {
-        if (_namedStructCache.TryGetValue(dataType, out var llvmType))
+        if (_namedStructCache.TryGetValue(dataType.Symbol, out var llvmType))
             return llvmType;
 
         var fields = dataType.IsClass()
-            ? ((SemanticClassDeclarationNode)dataType.Symbol.SemanticDeclaration!).GetAllFields()
+            ? ((SemanticClassDeclarationNode)dataType.Symbol.SemanticDeclaration!).GetAllMemberFields()
             : dataType.Symbol.SemanticDeclaration!.Fields;
         var fieldTypes = fields
+            .Where(x => !x.IsStatic)
             .Select(x => BuildType(x.DataType))
             .ToArray();
 
-        var structValue = _context.CreateNamedStruct($"class.{dataType.Symbol.SyntaxDeclaration.Identifier.Value}");
+        var structValue = _context.CreateNamedStruct($"class.{dataType}");
         structValue.StructSetBody(fieldTypes, Packed: false);
 
-        _namedStructCache[dataType] = structValue;
+        _namedStructCache[dataType.Symbol] = structValue;
 
         return structValue;
     }
@@ -81,15 +83,14 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
             Primitive.Float16 => LLVMTypeRef.Half,
             Primitive.Float32 => LLVMTypeRef.Float,
             Primitive.Float64 => LLVMTypeRef.Double,
+            Primitive.ISize => LLVMTypeRef.Int64,
+            Primitive.USize => LLVMTypeRef.Int64,
         };
     }
 
     private LLVMTypeRef Build(SliceDataType dataType)
     {
-        unsafe
-        {
-            return LLVM.PointerType(BuildType(dataType.SubType), 0);
-        }
+        return LLVMTypeRef.CreatePointer(BuildType(dataType.SubType), 0);
     }
 
     private LLVMTypeRef Build(FunctionDataType dataType)

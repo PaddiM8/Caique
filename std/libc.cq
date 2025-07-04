@@ -1,7 +1,17 @@
 class Libc
 {
-    static fn printf(pattern String, arg String)
+    static fn Printf(pattern String, arg String)
     {
         LibcUnsafe:printf(pattern.ToCString(), arg.ToCString());
+    }
+
+    static fn Fputs(str String, stream usize)
+    {
+        LibcUnsafe:fputs(str.ToCString(), stream);
+    }
+
+    static fn GetStdout() usize
+    {
+        LibcUnsafe:GetStdout()
     }
 }

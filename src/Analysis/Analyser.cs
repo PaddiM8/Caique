@@ -270,6 +270,7 @@ public class Analyser
                     _diagnostics.ReportNonStaticSymbolReferencedAsStatic(node.IdentifierList.Last());
                 }
 
+                // TODO: All fields should be private, so this isn't allowed
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
 
                 return new SemanticFieldReferenceNode(
@@ -295,10 +296,6 @@ public class Analyser
         if (symbolFromStructure is FunctionSymbol functionSymbol2)
         {
             var dataType = new FunctionDataType(functionSymbol2);
-            if (functionSymbol2.SyntaxDeclaration.IsStatic)
-            {
-                _diagnostics.ReportStaticSymbolReferencedAsNonStatic(identifier);
-            }
 
             return new SemanticFunctionReferenceNode(
                 identifier,
@@ -311,10 +308,6 @@ public class Analyser
         if (symbolFromStructure is FieldSymbol fieldSymbol2)
         {
             var dataType = Next(fieldSymbol2.SyntaxDeclaration.Type).DataType;
-            if (fieldSymbol2.SyntaxDeclaration.IsStatic)
-            {
-                _diagnostics.ReportStaticSymbolReferencedAsNonStatic(identifier);
-            }
 
             Debug.Assert(structure?.Symbol != null);
 
@@ -433,6 +426,11 @@ public class Analyser
                     _diagnostics.ReportNonStaticFunctionReferenceMustBeCalled(node.Identifier);
                 }
 
+                if (functionSymbol.SyntaxDeclaration.IsStatic)
+                {
+                    _diagnostics.ReportStaticSymbolReferencedAsNonStatic(functionSymbol.SyntaxDeclaration.Identifier);
+                }
+
                 return new SemanticFunctionReferenceNode(
                     functionSymbol.SyntaxDeclaration.Identifier,
                     functionSymbol,
@@ -443,6 +441,11 @@ public class Analyser
             else if (symbol is FieldSymbol fieldSymbol)
             {
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
+
+                if (fieldSymbol.SyntaxDeclaration.IsStatic)
+                {
+                    _diagnostics.ReportStaticSymbolReferencedAsNonStatic(fieldSymbol.SyntaxDeclaration.Identifier);
+                }
 
                 return new SemanticFieldReferenceNode(
                     fieldSymbol.SyntaxDeclaration.Identifier,
@@ -545,32 +548,37 @@ public class Analyser
             throw Recover();
         }
 
+        ValidateReturnType(enclosingFunction, value?.DataType, node.Span);
+
+        return new SemanticReturnNode(value, node.Span);
+    }
+
+    private void ValidateReturnType(ISyntaxFunctionDeclaration enclosingFunction, IDataType? valueType, TextSpan span)
+    {
         var functionReturnType = enclosingFunction.ReturnType == null
             ? null
             : Next(enclosingFunction.ReturnType).DataType;
-        if (functionReturnType == null && value != null)
-        {
-            _diagnostics.ReportIncompatibleType(Primitive.Void, value.DataType, node.Span);
-        }
-        else if (functionReturnType != null && value == null)
-        {
-            _diagnostics.ReportIncompatibleType(Primitive.Void, functionReturnType, node.Span);
-        }
-        else if (functionReturnType != null && value != null && !functionReturnType.IsEquivalent(value.DataType))
-        {
-            _diagnostics.ReportIncompatibleType(functionReturnType, value.DataType, node.Span);
-        }
 
-
-        return new SemanticReturnNode(value, node.Span);
+        if (functionReturnType == null && valueType != null)
+        {
+            _diagnostics.ReportIncompatibleType(Primitive.Void, valueType, span);
+        }
+        else if (functionReturnType != null && valueType == null)
+        {
+            _diagnostics.ReportIncompatibleType(Primitive.Void, functionReturnType, span);
+        }
+        else if (functionReturnType != null && valueType != null && !functionReturnType.IsEquivalent(valueType))
+        {
+            _diagnostics.ReportIncompatibleType(functionReturnType, valueType, span);
+        }
     }
 
     private SemanticNode Visit(SyntaxBlockNode node)
     {
         var expressions = new List<SemanticNode>();
-        foreach (var child in node.Expressions)
+        foreach (var child in node.Expressions.SkipLast(1))
         {
-            if (child is SyntaxErrorNode or SyntaxWithNode)
+            if (ShouldSkipBlockChild(child))
                 continue;
 
             try
@@ -583,10 +591,38 @@ public class Analyser
             }
         }
 
-        var dataType = expressions.LastOrDefault()?.DataType
-            ?? new PrimitiveDataType(Primitive.Void);
+        IDataType dataType = new PrimitiveDataType(Primitive.Void);
+        var last = node.Expressions.LastOrDefault();
+        if (last == null || ShouldSkipBlockChild(last))
+            return new SemanticBlockNode(expressions, dataType, node.Span);
+
+        SemanticNode? analysedLast;
+        try
+        {
+            analysedLast = Next(last);
+        }
+        catch (AnalyserRecoveryException)
+        {
+            return new SemanticBlockNode(expressions, dataType, node.Span);
+        }
+
+        if (last is SyntaxStatementNode { IsReturnValue: true })
+        {
+            if (node.Parent is ISyntaxFunctionDeclaration enclosingFunction)
+            {
+                analysedLast = new SemanticReturnNode(analysedLast, node.Span);
+                ValidateReturnType(enclosingFunction, analysedLast.DataType, node.Span);
+            }
+        }
+
+        expressions.Add(analysedLast);
 
         return new SemanticBlockNode(expressions, dataType, node.Span);
+    }
+
+    private bool ShouldSkipBlockChild(SyntaxNode child)
+    {
+        return child is SyntaxErrorNode or SyntaxWithNode;
     }
 
     private SemanticNode Visit(SyntaxAttributeNode node)
@@ -634,11 +670,13 @@ public class Analyser
                 TokenKind.I32 => Primitive.Int32,
                 TokenKind.I64 => Primitive.Int64,
                 TokenKind.I128 => Primitive.Int128,
+                TokenKind.ISize => Primitive.ISize,
                 TokenKind.U8 => Primitive.Uint8,
                 TokenKind.U16 => Primitive.Uint16,
                 TokenKind.U32 => Primitive.Uint32,
                 TokenKind.U64 => Primitive.Uint64,
                 TokenKind.U128 => Primitive.Uint128,
+                TokenKind.USize => Primitive.USize,
                 TokenKind.F16 => Primitive.Float16,
                 TokenKind.F32 => Primitive.Float32,
                 TokenKind.F64 => Primitive.Float64,
@@ -681,6 +719,11 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxFunctionDeclarationNode node)
     {
+        var isMain = node.Identifier.Value == "Main" &&
+            _syntaxTree.GetEnclosingStructure(node)?.Identifier.Value == "Program";
+        if (isMain && !node.IsStatic)
+            _diagnostics.ReportNonStaticMainFunction(node.Span);
+
         var attributes = node
             .Attributes
             .Select(Next)
@@ -817,10 +860,19 @@ public class Analyser
 
     private SemanticFieldDeclarationNode Visit(SyntaxFieldDeclarationNode node)
     {
+        var attributes = node
+            .Attributes
+            .Select(Next)
+            .Cast<SemanticAttributeNode>()
+            .ToList();
+
         var dataType = Next(node.Type).DataType;
         var value = node.Value == null
             ? null
             : Next(node.Value);
+
+        if (node.IsStatic && value is not (SemanticLiteralNode or null))
+            _diagnostics.ReportNonConstantValueInStaticField(value.Span);
 
         var semanticNode = new SemanticFieldDeclarationNode(
             node.Identifier,
@@ -829,7 +881,11 @@ public class Analyser
             dataType,
             node.Symbol!,
             node.Span
-        );
+        )
+        {
+            Attributes = attributes,
+        };
+
         node.Symbol!.SemanticDeclaration = semanticNode;
 
         return semanticNode;
