@@ -15,6 +15,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
     private readonly Dictionary<StructureSymbol, LLVMTypeRef> _namedStructCache = [];
     private readonly Dictionary<StructureSymbol, LLVMTypeRef> _unnamedStructCache = [];
     private readonly Dictionary<StructureSymbol, LLVMTypeRef> _vtableCache = [];
+    private readonly Dictionary<StructureSymbol, LLVMTypeRef> _typeTableCache = [];
 
     public LLVMTypeRef BuildType(IDataType dataType)
     {
@@ -81,6 +82,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         var fieldTypes = fields
             .Where(x => !x.IsStatic)
             .Select(x => BuildType(x.DataType))
+            .Prepend(BuildTypeTableType(dataType.Symbol))
             .ToArray();
 
         var value = _context.GetStructType(fieldTypes, Packed: false);
@@ -100,6 +102,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         var fieldTypes = fields
             .Where(x => !x.IsStatic)
             .Select(x => BuildType(x.DataType))
+            .Prepend(BuildTypeTableType(dataType.Symbol))
             .ToArray();
 
         var value = _context.CreateNamedStruct($"class.{dataType}");
@@ -121,13 +124,32 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
             .Select(x => BuildType(new FunctionDataType(x.Symbol)))
             .ToArray();
 
-        var implementedDataType = new StructureDataType(symbol.SemanticDeclaration.Symbol);
-        var vtableType = _context.CreateNamedStruct($"vtable.{implementedDataType}");
+        var dataType = new StructureDataType(symbol);
+        var vtableType = _context.CreateNamedStruct($"vtable.{dataType}");
         vtableType.StructSetBody(functionTypes, Packed: false);
 
         _vtableCache[symbol] = vtableType;
 
         return vtableType;
+    }
+
+    public LLVMTypeRef BuildTypeTableType(StructureSymbol symbol)
+    {
+        if (_typeTableCache.TryGetValue(symbol, out var existingType))
+            return existingType;
+
+        var types = new LLVMTypeRef[]
+        {
+            BuildVtableType(symbol),
+        };
+
+        var dataType = new StructureDataType(symbol);
+        var typeTableType = _context.CreateNamedStruct($"typeTable.{dataType}");
+        typeTableType.StructSetBody(types, Packed: false);
+
+        _typeTableCache[symbol] = typeTableType;
+
+        return typeTableType;
     }
 
     private LLVMTypeRef Build(PrimitiveDataType dataType)

@@ -769,6 +769,35 @@ public class Analyser
         if (node.Identifier.Value == structure?.Identifier.Value)
             _diagnostics.ReportFunctionNameSameAsParentStructure(node.Identifier);
 
+        if (structure is SyntaxProtocolDeclarationNode)
+            node.Symbol!.IsVirtual = true;
+
+        var parentClass = structure?
+            .SubTypes
+            .Select(x => x.ResolvedSymbol?.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .Where(x => x != null)
+            .FirstOrDefault();
+        if (parentClass != null && node.IsOverride)
+        {
+            if (!parentClass.IsInheritable)
+                _diagnostics.ReportBaseClassIsNotInheritable(node.Span, parentClass.Span);
+
+            // TODO: If it does not exist in the parent, throw an error.
+            // If it does exist, mark the base function as virtual
+            var baseFunction = parentClass
+                .Declarations
+                .FirstOrDefault(x => (x as SyntaxFunctionDeclarationNode)?.Identifier.Value == node.Identifier.Value)
+                    as SyntaxFunctionDeclarationNode;
+            if (baseFunction == null)
+            {
+                _diagnostics.ReportBaseFunctionNotFound(node.Identifier);
+            }
+            else if (baseFunction.Symbol != null)
+            {
+                baseFunction.Symbol.IsVirtual = true;
+            }
+        }
+
         var body = node.Body == null
             ? null
             : (SemanticBlockNode)Next(node.Body);
@@ -778,6 +807,7 @@ public class Analyser
             returnType,
             body,
             node.IsStatic,
+            node.IsOverride,
             node.Symbol!,
             node.Span
         )
@@ -860,6 +890,7 @@ public class Analyser
             init,
             functions,
             fields,
+            node.IsInheritable,
             node.Symbol!,
             node.Span
         )

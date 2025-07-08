@@ -244,6 +244,7 @@ public class SyntaxFunctionDeclarationNode(
     SyntaxTypeNode? returnType,
     SyntaxBlockNode? body,
     bool isStatic,
+    bool isOverride,
     TextSpan span
 )
     : SyntaxNode(span), ISyntaxFunctionDeclaration
@@ -257,6 +258,8 @@ public class SyntaxFunctionDeclarationNode(
     public SyntaxBlockNode? Body { get; } = body;
 
     public bool IsStatic { get; } = isStatic;
+
+    public bool IsOverride { get; } = isOverride;
 
     public FunctionSymbol? Symbol { get; set; }
 
@@ -300,6 +303,7 @@ public class SyntaxClassDeclarationNode(
     List<SyntaxTypeNode> subTypes,
     SyntaxInitNode? constructor,
     List<SyntaxNode> declarations,
+    bool isInheritable,
     StructureScope scope,
     TextSpan span
 )
@@ -312,6 +316,8 @@ public class SyntaxClassDeclarationNode(
     public SyntaxInitNode? Init { get; } = constructor;
 
     public List<SyntaxNode> Declarations { get; } = declarations;
+
+    public bool IsInheritable { get; } = isInheritable;
 
     public StructureScope Scope { get; } = scope;
 

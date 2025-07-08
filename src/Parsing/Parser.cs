@@ -49,12 +49,14 @@ public class Parser
 
     private SyntaxNode? ParseTopLevelStatement()
     {
+        bool isInheritable = AdvanceIf(TokenKind.Inheritable);
+
         try
         {
             return _current?.Kind switch
             {
                 TokenKind.With => ParseWith(),
-                TokenKind.Class => ParseClass(),
+                TokenKind.Class => ParseClass(isInheritable),
                 TokenKind.Protocol => ParseProtocol(),
                 _ => ParseStatement(),
             };
@@ -148,7 +150,7 @@ public class Parser
         return new SyntaxWithNode(identifiers, start.Combine(identifiers.First().Span));
     }
 
-    private SyntaxClassDeclarationNode ParseClass()
+    private SyntaxClassDeclarationNode ParseClass(bool isInheritable)
     {
         var start = EatExpected(TokenKind.Class).Span;
         var identifier = EatExpected(TokenKind.Identifier);
@@ -173,6 +175,7 @@ public class Parser
             subTypes,
             constructor,
             declarations,
+            isInheritable,
             scope,
             start.Combine(end)
         );
@@ -224,8 +227,9 @@ public class Parser
             attributes.Add(ParseAttribute());
 
         bool isStatic = AdvanceIf(TokenKind.Static);
+        bool isOverride = AdvanceIf(TokenKind.Override);
         if (Match(TokenKind.Fn))
-            return ParseFunction(isStatic, attributes, scope);
+            return ParseFunction(isStatic, isOverride, attributes, scope);
 
         if (_current is { Kind: TokenKind.Identifier, Value: "init" })
             return ParseInit();
@@ -301,7 +305,7 @@ public class Parser
 
         if (Match(TokenKind.Fn))
         {
-            var function = ParseFunction(isStatic: false, attributes, scope);
+            var function = ParseFunction(isStatic: false, isOverride: false, attributes, scope);
             if (function.Body != null)
                 _diagnostics.ReportBodyInProtocol(function.Span);
 
@@ -324,6 +328,7 @@ public class Parser
 
     private SyntaxFunctionDeclarationNode ParseFunction(
         bool isStatic,
+        bool isOverride,
         List<SyntaxAttributeNode> attributes,
         StructureScope? scope = null
     )
@@ -344,6 +349,7 @@ public class Parser
             returnType,
             body,
             isStatic,
+            isOverride,
             start.Combine(_previous!.Span)
         )
         {

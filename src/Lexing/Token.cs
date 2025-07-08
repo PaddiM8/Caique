@@ -21,7 +21,7 @@ public enum TokenKind
     Unknown,
     With,
     Let, Fn, Class, Protocol,
-    Static,
+    Inheritable, Static, Override,
     New,
     As,
     Return, Self, Base,

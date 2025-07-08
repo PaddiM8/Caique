@@ -164,6 +164,17 @@ public class DiagnosticReporter
         ReportError($"Function name cannot be the same as its parent structure ('{identifier.Value}').", identifier.Span);
     }
 
+    public void ReportBaseFunctionNotFound(Token identifier)
+    {
+        ReportError($"Unable to override: a function with the name {identifier.Value} found in the base class.", identifier.Span);
+    }
+
+    public void ReportBaseClassIsNotInheritable(TextSpan functionSpan, TextSpan baseClassSpan)
+    {
+        ReportError($"Unable to override: Base class is not inheritable.", functionSpan);
+        ReportHint("Use the 'inheritable' keyword to enable overriding.", baseClassSpan);
+    }
+
     private void ReportHint(string message, TextSpan span)
     {
         var diagnostic = new Diagnostic(DiagnosticSeverity.Hint, message, span);

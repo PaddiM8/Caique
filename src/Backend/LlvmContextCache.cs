@@ -6,6 +6,7 @@ public class LlvmContextCache
 {
     private readonly Dictionary<SemanticNode, string> _symbolNameCache = [];
     private readonly Dictionary<(ISemanticStructureDeclaration, ISemanticStructureDeclaration), string> _vtableNameCache = [];
+    private readonly Dictionary<SemanticClassDeclarationNode, string> _typeTableNameCache = [];
 
     public void SetSymbolName(SemanticNode node, string name)
     {
@@ -29,5 +30,15 @@ public class LlvmContextCache
     public string GetVtableName(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
     {
         return _vtableNameCache[(implementor, implemented)];
+    }
+
+    public string SetTypeTableName(SemanticClassDeclarationNode classNode, string name)
+    {
+        return _typeTableNameCache[classNode] = name;
+    }
+
+    public string GetTypeTableName(SemanticClassDeclarationNode classNode)
+    {
+        return _typeTableNameCache[classNode];
     }
 }

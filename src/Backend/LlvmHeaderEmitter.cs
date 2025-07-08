@@ -92,6 +92,8 @@ public class LlvmHeaderEmitter
         foreach (var function in node.Functions)
             Next(function);
 
+        CreateTypeTable(node);
+
         foreach (var subType in node.ImplementedProtocols)
             CreateVtable(node, subType.SemanticDeclaration!);
     }
@@ -107,12 +109,36 @@ public class LlvmHeaderEmitter
         var structValue = LLVMValueRef.CreateConstNamedStruct(vtableType, functionPointers);
         var implementorType = new StructureDataType(implementor.Symbol);
         var implementedType = new StructureDataType(implemented.Symbol);
-        var name =$"{implementorType}.vtable.{implementedType}";
+        var name = $"{implementorType}.vtable.{implementedType}";
         var global = _module.AddGlobal(vtableType, name);
         global.Initializer = structValue;
         global.IsGlobalConstant = true;
 
         _contextCache.SetVtableName(implementor, implemented, name);
+    }
+
+    private void CreateTypeTable(SemanticClassDeclarationNode classNode)
+    {
+        // Prepare the vtable
+        CreateVtable(classNode, classNode);
+        var vtableName = _contextCache.GetVtableName(classNode, classNode);
+        var vtablePointer = _module.GetNamedGlobal(vtableName);
+
+        // Build the type table
+        var typeTableType = _typeBuilder.BuildTypeTableType(classNode.Symbol);
+        var fields = new LLVMValueRef[]
+        {
+            vtablePointer,
+        };
+
+        var structValue = LLVMValueRef.CreateConstNamedStruct(typeTableType, fields);
+        var dataType = new StructureDataType(classNode.Symbol);
+        var name = $"typeTable.{dataType}";
+        var global = _module.AddGlobal(typeTableType, name);
+        global.Initializer = structValue;
+        global.IsGlobalConstant = true;
+
+        _contextCache.SetTypeTableName(classNode, name);
     }
 
     private void BuildStaticField(SemanticFieldDeclarationNode field, ISemanticStructureDeclaration parentStructure)

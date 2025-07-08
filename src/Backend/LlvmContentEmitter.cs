@@ -322,8 +322,16 @@ public class LlvmContentEmitter
             ? GetSelf()
             : Next(node.ObjectInstance);
 
+        // The first field is the type table
+        uint fieldOffset = 1;
+
         var index = (uint)structure.FieldStartIndex + (uint)structure.Fields.IndexOf(declaration);
-        var pointer = _builder.BuildStructGEP2(instanceLlvmType, instance!.Value, index, $"{node.Identifier.Value}_pointer");
+        var pointer = _builder.BuildStructGEP2(
+            instanceLlvmType,
+            instance!.Value,
+            index + fieldOffset,
+            $"{node.Identifier.Value}_pointer"
+        );
 
         return (type, pointer);
     }
@@ -478,7 +486,7 @@ public class LlvmContentEmitter
         if (node.Left is SemanticFunctionReferenceNode { ObjectInstance: not null } functionReference)
         {
             var objectInstance = Next(functionReference.ObjectInstance)!.Value;
-            if (functionReference.ObjectInstance.DataType.IsProtocol() is true)
+            if (functionReference.Symbol.IsVirtual)
                 return BuildVirtualCall(node, objectInstance, functionReference, arguments);
 
             arguments.Insert(0, objectInstance);
@@ -502,31 +510,82 @@ public class LlvmContentEmitter
     )
     {
         var instanceDataType = (StructureDataType)functionReference.ObjectInstance!.DataType;
-        var fatPointerType = _typeBuilder.BuildType(instanceDataType);
-        var instancePointer = _builder.BuildAlloca(fatPointerType, "instancePointer");
-        _builder.BuildStore(objectInstance, instancePointer);
-
-        // Extract the concrete instance from the fat pointer
-        var concreteInstance = _builder.BuildStructGEP2(fatPointerType, instancePointer, 0, "lean");
-        arguments.Insert(0, concreteInstance);
-
-        // Get the vtable
         var vtableType =_typeBuilder.BuildVtableType(instanceDataType.Symbol);
         var vtablePointerType = LLVMTypeRef.CreatePointer(vtableType, 0);
-        var vtablePointerPointer = _builder.BuildStructGEP2(fatPointerType, instancePointer, 1, "vtablePointerPointer");
-        var vtablePointer = _builder.BuildLoad2(vtablePointerType, vtablePointerPointer, "vtable");
+
+        int functionIndex;
+        LLVMValueRef vtablePointer;
+        if (instanceDataType.Symbol.SemanticDeclaration is SemanticClassDeclarationNode classNode)
+        {
+            arguments.Insert(0, objectInstance);
+
+            // Get the type table
+            var instanceType = _typeBuilder.BuildStructType(instanceDataType);
+            var typeTableType = _typeBuilder.BuildTypeTableType(instanceDataType.Symbol);
+            var typeTablePointerType = LLVMTypeRef.CreatePointer(typeTableType, 0);
+            var typeTablePointerPointer = _builder.BuildStructGEP2(
+                instanceType,
+                objectInstance,
+                0,
+                "typeTablePointerPointer"
+            );
+            var typeTablePointer = _builder.BuildLoad2(typeTablePointerType, typeTablePointerPointer, "typeTablePointer");
+
+            // Get the vtable
+            var vtablePointerPointer = _builder.BuildStructGEP2(
+                typeTableType,
+                typeTablePointer,
+                (uint)TypeTableField.Vtable,
+                "vtablePointerPointer"
+            );
+            vtablePointer = _builder.BuildLoad2(vtablePointerType, vtablePointerPointer, "vtable");
+
+            functionIndex = classNode
+                .GetAllMethods()
+                .Index()
+                .First(x => x.Item.Symbol == functionReference.Symbol)
+                .Index;
+        }
+        else
+        {
+            // Protocol
+            var fatPointerType = _typeBuilder.BuildType(instanceDataType);
+            var instancePointer = _builder.BuildAlloca(fatPointerType, "instancePointer");
+            _builder.BuildStore(objectInstance, instancePointer);
+
+            // Extract the concrete instance from the fat pointer
+            var concreteInstance = _builder.BuildStructGEP2(
+                fatPointerType,
+                instancePointer,
+                (uint)FatPointerField.Instance,
+                "lean"
+            );
+            arguments.Insert(0, concreteInstance);
+
+            // Get the vtable
+            var vtablePointerPointer = _builder.BuildStructGEP2(
+                fatPointerType,
+                instancePointer,
+                (uint)FatPointerField.Vtable,
+                "vtablePointerPointer"
+            );
+            vtablePointer = _builder.BuildLoad2(vtablePointerType, vtablePointerPointer, "vtable");
+
+            functionIndex = instanceDataType
+                .Symbol
+                .SemanticDeclaration!
+                .Functions
+                .IndexOf(functionReference.Symbol.SemanticDeclaration!);
+        }
+
 
         // Get the function from the vtable
-        var functionIndex = instanceDataType
-            .Symbol
-            .SemanticDeclaration!
-            .Functions
-            .IndexOf(functionReference.Symbol.SemanticDeclaration!);
         var functionDeclaration = _typeBuilder.BuildFunctionType(((FunctionDataType)callNode.Left.DataType).Symbol);
         var functionPointerPointer = _builder.BuildStructGEP2(vtableType, vtablePointer, (uint)functionIndex, "functionPointerPointer");
         var functionPointer = _builder.BuildLoad2(
             LLVMTypeRef.CreatePointer(functionDeclaration, 0),
-            functionPointerPointer
+            functionPointerPointer,
+            "functionPointer"
         );
 
         var name = callNode.DataType.IsVoid()
@@ -616,7 +675,12 @@ public class LlvmContentEmitter
             // Extract the instance pointer from the fat pointer
             var fatPointerType = _typeBuilder.BuildType((StructureDataType)fromType);
 
-            return _builder.BuildStructGEP2(fatPointerType, value, 0, "lean");
+            return _builder.BuildStructGEP2(
+                fatPointerType,
+                value,
+                (uint)FatPointerField.Instance,
+                "lean"
+            );
         }
 
         if (toType.IsProtocol() && fromType.IsClass())
@@ -631,7 +695,12 @@ public class LlvmContentEmitter
 
             // Extract the instance pointer from the existing fat pointer
             var fatPointerType = _typeBuilder.BuildType((StructureDataType)fromType);
-            var fromTypeInstance = _builder.BuildStructGEP2(fatPointerType, value, 0, "lean");
+            var fromTypeInstance = _builder.BuildStructGEP2(
+                fatPointerType,
+                value,
+                (uint)FatPointerField.Instance,
+                "lean"
+            );
 
             return BuildFatPointer(fromTypeInstance, (StructureDataType)fromType, (StructureDataType)toType);
         }
@@ -652,9 +721,19 @@ public class LlvmContentEmitter
 
         var fatPointerType = _typeBuilder.BuildType(implementedDataType);
         var alloca = _builder.BuildAlloca(fatPointerType);
-        var instancePointer = _builder.BuildStructGEP2(fatPointerType, alloca, 0, "instance");
-        var vtablePointer = _builder.BuildStructGEP2(fatPointerType, alloca, 1, "vtable");
-        var vtableValue = GetVtable(implementor, implemented);
+        var instancePointer = _builder.BuildStructGEP2(
+            fatPointerType,
+            alloca,
+            (uint)FatPointerField.Instance,
+            "instance"
+        );
+        var vtablePointer = _builder.BuildStructGEP2(
+            fatPointerType,
+            alloca,
+            (uint)FatPointerField.Vtable,
+            "vtable"
+        );
+        var vtableValue = BuildVtable(implementor, implemented);
 
         _builder.BuildStore(instance, instancePointer);
         _builder.BuildStore(vtableValue, vtablePointer);
@@ -662,7 +741,7 @@ public class LlvmContentEmitter
         return _builder.BuildLoad2(fatPointerType, alloca, "fatPointer");
     }
 
-    private LLVMValueRef GetVtable(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
+    private LLVMValueRef BuildVtable(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
     {
         var vtableName = _contextCache.GetVtableName(implementor, implemented);
 
@@ -948,9 +1027,14 @@ public class LlvmContentEmitter
         // Insert default values
         var instance = GetSelf();
         var type = _typeBuilder.BuildNamedStructType(new StructureDataType(parentStructure.Symbol));
+
+
+        uint fieldOffset = parentStructure is SemanticClassDeclarationNode
+            ? (uint)1
+            : (uint)0;
         foreach (var (i, field) in parentStructure.GetAllMemberFields().Index())
         {
-            var fieldPointer = _builder.BuildStructGEP2(type, instance, (uint)i, field.Identifier.Value);
+            var fieldPointer = _builder.BuildStructGEP2(type, instance, (uint)i + fieldOffset, field.Identifier.Value);
             var fieldValue = field.Value == null
                 ? _specialValueBuilder.BuildDefaultValueForType(field.DataType)
                 : Next(field.Value);
@@ -977,11 +1061,30 @@ public class LlvmContentEmitter
             );
         }
 
+        if (parentStructure is SemanticClassDeclarationNode parentClass)
+        {
+            // Insert type table
+            var typeTable = BuildTypeTable(parentClass);
+            var typeTableType = _typeBuilder.BuildTypeTableType(parentStructure.Symbol);
+            var typeTablePointer = _builder.BuildStructGEP2(type, instance, 0, "typeTable");
+            _builder.BuildStore(typeTable, typeTablePointer);
+
+            // The first field is the type table
+            fieldOffset = 1;
+        }
+
         foreach (var expression in node.Body.Expressions)
             Next(expression);
 
         _builder.BuildRetVoid();
 
         return function;
+    }
+
+    private LLVMValueRef BuildTypeTable(SemanticClassDeclarationNode classNode)
+    {
+        var typeTableName = _contextCache.GetTypeTableName(classNode);
+
+        return _module.GetNamedGlobal(typeTableName);
     }
 }

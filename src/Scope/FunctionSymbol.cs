@@ -11,4 +11,6 @@ public class FunctionSymbol(SyntaxFunctionDeclarationNode declarationNode) : ISy
     public SyntaxFunctionDeclarationNode SyntaxDeclaration { get; } = declarationNode;
 
     public SemanticFunctionDeclarationNode? SemanticDeclaration { get; set; }
+
+    public bool IsVirtual { get; set; }
 }

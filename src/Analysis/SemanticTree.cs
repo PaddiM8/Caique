@@ -342,6 +342,7 @@ public class SemanticFunctionDeclarationNode(
     IDataType returnType,
     SemanticBlockNode? body,
     bool isStatic,
+    bool isOverride,
     FunctionSymbol symbol,
     TextSpan span
 )
@@ -356,6 +357,8 @@ public class SemanticFunctionDeclarationNode(
     public SemanticBlockNode? Body { get; } = body;
 
     public bool IsStatic { get; } = isStatic;
+
+    public bool IsOverride { get; } = isOverride;
 
     public FunctionSymbol Symbol { get; } = symbol;
 
@@ -420,6 +423,7 @@ public class SemanticClassDeclarationNode(
     SemanticInitNode init,
     List<SemanticFunctionDeclarationNode> functions,
     List<SemanticFieldDeclarationNode> fields,
+    bool isInheritable,
     StructureSymbol symbol,
     TextSpan span
 )
@@ -436,6 +440,8 @@ public class SemanticClassDeclarationNode(
     public List<SemanticFunctionDeclarationNode> Functions { get; } = functions;
 
     public List<SemanticFieldDeclarationNode> Fields { get; } = fields;
+
+    public bool IsInheritable { get; } = isInheritable;
 
     public StructureSymbol Symbol { get; } = symbol;
 
@@ -467,6 +473,16 @@ public class SemanticClassDeclarationNode(
         var memberFields = Fields.Where(x => !x.IsStatic);
 
         return inheritedFields.Concat(memberFields);
+    }
+
+    public IEnumerable<SemanticFunctionDeclarationNode> GetAllMethods()
+    {
+        var inheritedFunctions = InheritedClass == null
+            ? []
+            : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllMethods();
+        var memberFunctions = Functions.Where(x => !x.IsStatic);
+
+        return inheritedFunctions.Concat(memberFunctions);
     }
 }
 
