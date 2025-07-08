@@ -6,7 +6,7 @@ class String
     {
     }
 
-    fn ToCString() [u8]
+    func ToByteArray() [u8]
     {
         chars
     }

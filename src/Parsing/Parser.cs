@@ -228,7 +228,10 @@ public class Parser
 
         bool isStatic = AdvanceIf(TokenKind.Static);
         bool isOverride = AdvanceIf(TokenKind.Override);
-        if (Match(TokenKind.Fn))
+        if (Match(TokenKind.Func))
+            return ParseFunction(isStatic, isOverride, attributes, scope);
+
+        if (Match(TokenKind.With))
             return ParseFunction(isStatic, isOverride, attributes, scope);
 
         if (_current is { Kind: TokenKind.Identifier, Value: "init" })
@@ -303,7 +306,7 @@ public class Parser
         while (Match(TokenKind.Hash))
             attributes.Add(ParseAttribute());
 
-        if (Match(TokenKind.Fn))
+        if (Match(TokenKind.Func))
         {
             var function = ParseFunction(isStatic: false, isOverride: false, attributes, scope);
             if (function.Body != null)
@@ -333,7 +336,7 @@ public class Parser
         StructureScope? scope = null
     )
     {
-        var start = EatExpected(TokenKind.Fn).Span;
+        var start = EatExpected(TokenKind.Func).Span;
         var identifier = EatExpected(TokenKind.Identifier);
         var parameters = ParseParameters();
         var returnType = Match(TokenKind.OpenBrace, TokenKind.Semicolon)

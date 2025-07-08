@@ -1,16 +1,16 @@
 class Libc
 {
-    static fn Printf(pattern String, arg String)
+    static func Printf(pattern String, arg String)
     {
-        LibcUnsafe:printf(pattern.ToCString(), arg.ToCString());
+        LibcUnsafe:printf(pattern.ToByteArray(), arg.ToByteArray());
     }
 
-    static fn Fputs(str String, stream usize)
+    static func Fputs(str String, stream usize)
     {
-        LibcUnsafe:fputs(str.ToCString(), stream);
+        LibcUnsafe:fputs(str.ToByteArray(), stream);
     }
 
-    static fn GetStdout() usize
+    static func GetStdout() usize
     {
         LibcUnsafe:GetStdout()
     }

@@ -146,7 +146,7 @@ public class Lexer
         {
             "with" => TokenKind.With,
             "let" => TokenKind.Let,
-            "fn" => TokenKind.Fn,
+            "func" => TokenKind.Func,
             "class" => TokenKind.Class,
             "protocol" => TokenKind.Protocol,
             "inheritable" => TokenKind.Inheritable,
