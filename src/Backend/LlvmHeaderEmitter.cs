@@ -47,6 +47,9 @@ public class LlvmHeaderEmitter
             case SemanticClassDeclarationNode classNode:
                 Visit(classNode);
                 return;
+            case SemanticProtocolDeclarationNode protocolNode:
+                Visit(protocolNode);
+                return;
         }
     }
 
@@ -58,7 +61,7 @@ public class LlvmHeaderEmitter
 
     private void Visit(SemanticFunctionDeclarationNode node)
     {
-        var functionType = _typeBuilder.BuildType(new FunctionDataType(node.Symbol));
+        var functionType = _typeBuilder.BuildFunctionType(node.Symbol);
         var name = CreateFunctionName(node);
         var function = _module.AddFunction(name, functionType);
         _moduleCache.SetNodeLlvmValue(node, function);
@@ -88,6 +91,28 @@ public class LlvmHeaderEmitter
 
         foreach (var function in node.Functions)
             Next(function);
+
+        foreach (var subType in node.ImplementedProtocols)
+            CreateVtable(node, subType.SemanticDeclaration!);
+    }
+
+    private void CreateVtable(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
+    {
+        var vtableType = _typeBuilder.BuildVtableType(implemented.Symbol);
+        var functionPointers = implementor
+            .Functions
+            .Select(x => _moduleCache.GetNodeLlvmValue(x))
+            .ToArray();
+
+        var structValue = LLVMValueRef.CreateConstNamedStruct(vtableType, functionPointers);
+        var implementorType = new StructureDataType(implementor.Symbol);
+        var implementedType = new StructureDataType(implemented.Symbol);
+        var name =$"{implementorType}.vtable.{implementedType}";
+        var global = _module.AddGlobal(vtableType, name);
+        global.Initializer = structValue;
+        global.IsGlobalConstant = true;
+
+        _contextCache.SetVtableName(implementor, implemented, name);
     }
 
     private void BuildStaticField(SemanticFieldDeclarationNode field, ISemanticStructureDeclaration parentStructure)
@@ -125,5 +150,9 @@ public class LlvmHeaderEmitter
         var function = _module.AddFunction(identifier, functionType);
         _moduleCache.SetNodeLlvmValue(node, function);
         _contextCache.SetSymbolName(node, identifier);
+    }
+
+    private void Visit(SemanticProtocolDeclarationNode node)
+    {
     }
 }

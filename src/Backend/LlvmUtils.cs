@@ -4,26 +4,23 @@ namespace Caique.Backend;
 
 public static class LlvmUtils
 {
-    public static LLVMTypeRef Int128
+    public static LLVMTypeRef Int128Type(LLVMContextRef context)
     {
-        get
+        unsafe
         {
-            unsafe
-            {
-                return LLVM.Int128Type();
-            }
+            return LLVM.Int128TypeInContext(context);
         }
     }
 
-    public static LLVMValueRef CreateConstBool(bool value)
+    public static LLVMValueRef CreateConstBool(LLVMContextRef context, bool value)
     {
         ulong numericalValue = value ? (uint)1 : 0;
 
-        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, numericalValue, SignExtend: false);
+        return LLVMValueRef.CreateConstInt(context.Int1Type, numericalValue, SignExtend: false);
     }
 
 
-    public static LLVMValueRef BuildSizeOf(LLVMModuleRef module, LLVMTypeRef type)
+    public static LLVMValueRef BuildSizeOf(LLVMContextRef context, LLVMModuleRef module, LLVMTypeRef type)
     {
         ulong size;
         unsafe
@@ -31,6 +28,6 @@ public static class LlvmUtils
             size = LLVMTargetDataRef.FromStringRepresentation(module.DataLayout).StoreSizeOfType(type);
         }
 
-        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, size);
+        return LLVMValueRef.CreateConstInt(context.Int64Type, size);
     }
 }

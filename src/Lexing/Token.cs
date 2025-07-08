@@ -20,7 +20,7 @@ public enum TokenKind
 {
     Unknown,
     With,
-    Let, Fn, Class,
+    Let, Fn, Class, Protocol,
     Static,
     New,
     As,

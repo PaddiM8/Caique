@@ -271,7 +271,28 @@ public interface ISyntaxStructureDeclaration
 
     StructureSymbol? Symbol { get; }
 
-    ISymbol? ResolveSymbol(string name);
+    List<SyntaxTypeNode> SubTypes { get; }
+
+    ISymbol? ResolveSymbol(string name)
+    {
+        var localSymbol = Scope.FindSymbol(name);
+        if (localSymbol != null)
+            return localSymbol;
+
+        foreach (var subType in SubTypes)
+        {
+            var resolved = subType.ResolvedSymbol?.SyntaxDeclaration.ResolveSymbol(name);
+            if (resolved != null)
+                return resolved;
+        }
+
+        return null;
+    }
+}
+
+public interface ISyntaxInstantiableStructureDeclaration : ISyntaxStructureDeclaration
+{
+    SyntaxInitNode? Init { get; }
 }
 
 public class SyntaxClassDeclarationNode(
@@ -282,7 +303,7 @@ public class SyntaxClassDeclarationNode(
     StructureScope scope,
     TextSpan span
 )
-    : SyntaxNode(span), ISyntaxStructureDeclaration
+    : SyntaxNode(span), ISyntaxStructureDeclaration, ISyntaxInstantiableStructureDeclaration
 {
     public Token Identifier { get; } = identifier;
 
@@ -295,20 +316,26 @@ public class SyntaxClassDeclarationNode(
     public StructureScope Scope { get; } = scope;
 
     public StructureSymbol? Symbol { get; set; }
+}
 
-    public ISymbol? ResolveSymbol(string name)
-    {
-        var localSymbol = Scope.FindSymbol(name);
-        if (localSymbol != null)
-            return localSymbol;
+public class SyntaxProtocolDeclarationNode(
+    Token identifier,
+    List<SyntaxTypeNode> subTypes,
+    List<SyntaxNode> declarations,
+    StructureScope scope,
+    TextSpan span
+)
+    : SyntaxNode(span), ISyntaxStructureDeclaration
+{
+    public Token Identifier { get; } = identifier;
 
-        var inherited = SubTypes
-            .FirstOrDefault(x => x.ResolvedSymbol?.SyntaxDeclaration is SyntaxClassDeclarationNode)?
-            .ResolvedSymbol?
-            .SyntaxDeclaration as SyntaxClassDeclarationNode;
+    public List<SyntaxTypeNode> SubTypes { get; } = subTypes;
 
-        return inherited?.ResolveSymbol(name);
-    }
+    public List<SyntaxNode> Declarations { get; } = declarations;
+
+    public StructureScope Scope { get; } = scope;
+
+    public StructureSymbol? Symbol { get; set; }
 }
 
 public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)

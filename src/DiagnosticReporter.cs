@@ -57,6 +57,11 @@ public class DiagnosticReporter
         ReportError($"Symbol not found: {fullName}.", span);
     }
 
+    public void ReportBodyInProtocol(TextSpan span)
+    {
+        ReportError($"Bodies in function declarations are not allowed in protocols.", span);
+    }
+
     public void ReportInvalidNamespace(List<Token> path)
     {
         var namespaceString = string.Join(":", path.Select(x => x.Value));

@@ -46,6 +46,18 @@ public abstract class SemanticNode(IDataType dataType, TextSpan span)
     public abstract void Traverse(Action<SemanticNode, SemanticNode> callback);
 }
 
+public class SemanticStatementNode(SemanticNode value)
+    : SemanticNode(value.DataType, value.Span)
+{
+    public SemanticNode Value { get; } = value;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        Value.Traverse(callback);
+        callback(Value, this);
+    }
+}
+
 public class SemanticLiteralNode(Token value, IDataType dataType)
     : SemanticNode(dataType, value.Span)
 {
@@ -200,7 +212,7 @@ public class SemanticNewNode(List<SemanticNode> arguments, IDataType dataType, T
 }
 
 public class SemanticReturnNode(SemanticNode? value, TextSpan span)
-    : SemanticNode(value?.DataType ?? new PrimitiveDataType(Primitive.Void), span)
+    : SemanticNode(value?.DataType ?? PrimitiveDataType.Void, span)
 {
     public SemanticNode? Value { get; } = value;
 
@@ -266,7 +278,7 @@ public class SemanticBlockNode(List<SemanticNode> expressions, IDataType dataTyp
 }
 
 public class SemanticAttributeNode(Token identifier, List<SemanticNode> arguments, TextSpan span)
-    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
+    : SemanticNode(PrimitiveDataType.Void, span)
 {
     public Token Identifier { get; } = identifier;
 
@@ -320,6 +332,8 @@ public interface ISemanticFunctionDeclaration
     IDataType ReturnType { get; }
 
     FunctionSymbol Symbol { get; }
+
+    TextSpan Span { get; }
 }
 
 public class SemanticFunctionDeclarationNode(
@@ -331,7 +345,7 @@ public class SemanticFunctionDeclarationNode(
     FunctionSymbol symbol,
     TextSpan span
 )
-    : SemanticNode(new PrimitiveDataType(Primitive.Void), span), ISemanticFunctionDeclaration
+    : SemanticNode(PrimitiveDataType.Void, span), ISemanticFunctionDeclaration
 {
     public Token Identifier { get; } = identifier;
 
@@ -402,17 +416,20 @@ public interface ISemanticInstantiableStructureDeclaration : ISemanticStructureD
 public class SemanticClassDeclarationNode(
     Token identifier,
     StructureSymbol? inheritedClass,
+    List<StructureSymbol> implementedProtocols,
     SemanticInitNode init,
     List<SemanticFunctionDeclarationNode> functions,
     List<SemanticFieldDeclarationNode> fields,
     StructureSymbol symbol,
     TextSpan span
 )
-    : SemanticNode(new PrimitiveDataType(Primitive.Void), span), ISemanticStructureDeclaration, ISemanticInstantiableStructureDeclaration
+    : SemanticNode(PrimitiveDataType.Void, span), ISemanticStructureDeclaration, ISemanticInstantiableStructureDeclaration
 {
     public Token Identifier { get; } = identifier;
 
     public StructureSymbol? InheritedClass { get; } = inheritedClass;
+
+    public List<StructureSymbol> ImplementedProtocols { get; } = implementedProtocols;
 
     public SemanticInitNode Init { get; } = init;
 
@@ -450,6 +467,34 @@ public class SemanticClassDeclarationNode(
         var memberFields = Fields.Where(x => !x.IsStatic);
 
         return inheritedFields.Concat(memberFields);
+    }
+}
+
+public class SemanticProtocolDeclarationNode(
+    Token identifier,
+    List<SemanticFunctionDeclarationNode> functions,
+    StructureSymbol symbol,
+    TextSpan span
+)
+    : SemanticNode(PrimitiveDataType.Void, span), ISemanticStructureDeclaration
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SemanticFunctionDeclarationNode> Functions { get; } = functions;
+
+    public List<SemanticFieldDeclarationNode> Fields { get; } = [];
+
+    public StructureSymbol Symbol { get; } = symbol;
+
+    public int FieldStartIndex { get; }
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        foreach (var function in Functions)
+        {
+            function.Traverse(callback);
+            callback(function, this);
+        }
     }
 }
 
@@ -495,7 +540,7 @@ public class SemanticInitNode(
     SemanticBlockNode body,
     TextSpan span
 )
-    : SemanticNode(new PrimitiveDataType(Primitive.Void), span)
+    : SemanticNode(PrimitiveDataType.Void, span)
 {
     public List<SemanticParameterNode> Parameters { get; } = parameters;
 

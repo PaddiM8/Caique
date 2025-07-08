@@ -21,6 +21,10 @@ public class LlvmContentEmitter
     private readonly LlvmModuleCache _moduleCache;
     private readonly NamespaceScope _preludeScope;
     private readonly LlvmSpecialValueBuilder _specialValueBuilder;
+    private readonly LLVMDIBuilderRef _diBuilder;
+    private readonly LLVMMetadataRef _compileUnit;
+    private readonly LLVMMetadataRef _diFile;
+    private LLVMMetadataRef? _currentFunctionMetadata;
 
     private LlvmContentEmitter(SemanticTree semanticTree, LlvmEmitterContext emitterContext, CompilationContext compilationContext)
     {
@@ -33,6 +37,10 @@ public class LlvmContentEmitter
         _moduleCache = emitterContext.ModuleCache;
         _preludeScope = compilationContext.PreludeScope;
         _specialValueBuilder = new LlvmSpecialValueBuilder(emitterContext, _typeBuilder);
+        var (diBuilder, compileUnit, diFile) = SetUpDiBuilder(_context, _module, semanticTree.Root.Span.Start.SyntaxTree.File.FilePath);
+        _diBuilder = diBuilder;
+        _compileUnit = compileUnit;
+        _diFile = diFile;
     }
 
     public static string Emit(
@@ -68,12 +76,39 @@ public class LlvmContentEmitter
             Console.ResetColor();
             Console.Write("  ");
             Console.Error.WriteLine(errorMessage);
-
-            // TODO: Remove this when the strange errors are fixed?
-            emitter.CreateObjectFile(objectPath);
         }
 
         return objectPath;
+    }
+
+    private static (LLVMDIBuilderRef, LLVMMetadataRef, LLVMMetadataRef) SetUpDiBuilder(
+        LLVMContextRef context,
+        LLVMModuleRef module,
+        string sourcePath
+    )
+    {
+        var metadata = LLVMValueRef.CreateConstInt(context.Int32Type, 3);
+        module.AddNamedMetadataOperand("Debug Info Version", context.GetMDNode([metadata]));
+
+        var diBuilder = module.CreateDIBuilder();
+        var file = diBuilder.CreateFile(Path.GetFileName(sourcePath), Path.GetDirectoryName(sourcePath)!);
+        var compileUnit = diBuilder.CreateCompileUnit(
+            SourceLanguage: LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC,
+            FileMetadata: file,
+            Producer: "Caique",
+            IsOptimized: 0,
+            Flags: [],
+            RuntimeVersion: 0,
+            SplitName: string.Empty,
+            DwarfEmissionKind: LLVMDWARFEmissionKind.LLVMDWARFEmissionFull,
+            DWOld: 0,
+            SplitDebugInlining: 0,
+            DebugInfoForProfiling: 0,
+            SysRoot: [],
+            SDK: string.Empty
+        );
+
+        return (diBuilder, compileUnit, file);
     }
 
     private void CreateObjectFile(string path)
@@ -99,6 +134,8 @@ public class LlvmContentEmitter
             LLVMCodeModel.LLVMCodeModelDefault
         );
 
+        _diBuilder.DIBuilderFinalize();
+
         var success = targetMachine.TryEmitToFile(_module, path, LLVMCodeGenFileType.LLVMObjectFile, out var error);
         if (!success)
             throw new Exception(error);
@@ -110,6 +147,7 @@ public class LlvmContentEmitter
 
         return node switch
         {
+            SemanticStatementNode statementNode => Visit(statementNode),
             SemanticLiteralNode literalNode => Visit(literalNode),
             SemanticVariableReferenceNode variableReferenceNode => Visit(variableReferenceNode),
             SemanticFunctionReferenceNode functionReferenceNode => Visit(functionReferenceNode),
@@ -126,6 +164,7 @@ public class LlvmContentEmitter
             SemanticVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
             SemanticFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
             SemanticClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
+            SemanticProtocolDeclarationNode => null,
             _ => throw new NotImplementedException(),
         };
     }
@@ -152,10 +191,32 @@ public class LlvmContentEmitter
         var structure = (ISemanticInstantiableStructureDeclaration)symbol.SemanticDeclaration;
 
         var global = _builder.BuildGlobalString(value);
-        var valuePointer = _builder.BuildBitCast(global, LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0));
+        var valuePointer = _builder.BuildBitCast(global, LLVMTypeRef.CreatePointer(_context.Int8Type, 0));
         BuildConstructorCall(instance, structure, [valuePointer]);
 
         return instance;
+    }
+
+    private LLVMValueRef? Visit(SemanticStatementNode node)
+    {
+        var value = Next(node.Value);
+
+        if (_currentFunctionMetadata.HasValue)
+        {
+            var debugLocation = _context.CreateDebugLocation(
+                Line: (uint)node.Span.Start.Line + 1,
+                Column: (uint)node.Span.Start.Column + 1,
+                Scope: _currentFunctionMetadata.Value,
+                InlinedAt: default
+            );
+
+            unsafe
+            {
+                LLVM.SetCurrentDebugLocation2(_builder, debugLocation);
+            }
+        }
+
+        return value;
     }
 
     private LLVMValueRef Visit(SemanticLiteralNode node)
@@ -167,7 +228,7 @@ public class LlvmContentEmitter
         return primitive.Kind switch
         {
             Primitive.Void => throw new InvalidOperationException(),
-            Primitive.Bool => LlvmUtils.CreateConstBool(node.Value.Kind == TokenKind.True),
+            Primitive.Bool => LlvmUtils.CreateConstBool(_context, node.Value.Kind == TokenKind.True),
             >= Primitive.Int8 and <= Primitive.Int128 => LLVMValueRef.CreateConstInt(
                 _typeBuilder.BuildType(node.DataType),
                 ulong.Parse(node.Value.Value),
@@ -208,12 +269,32 @@ public class LlvmContentEmitter
         var functionDeclaration = _module.GetNamedFunction(functionIdentifier);
         if (string.IsNullOrEmpty(functionDeclaration.Name))
         {
-            var functionType = _typeBuilder.BuildType(new FunctionDataType(node.Symbol));
+            var functionType = BuildFunction(node.Symbol);
 
-            return _module.AddFunction(functionIdentifier, functionType);
+            functionDeclaration = _module.AddFunction(functionIdentifier, functionType);
         }
 
-        return functionDeclaration;
+        var functionPointerType = _typeBuilder.BuildType(node.DataType);
+
+        return _builder.BuildBitCast(functionDeclaration, functionPointerType, "functionPointer");
+    }
+
+    private LLVMTypeRef BuildFunction(FunctionSymbol symbol)
+    {
+        var parameterTypes = symbol.SemanticDeclaration!.Parameters
+            .Select(x => x.DataType)
+            .Select(_typeBuilder.BuildType)
+            .ToList();
+        var returnType = _typeBuilder.BuildType(symbol.SemanticDeclaration.ReturnType);
+
+        if (!symbol.SyntaxDeclaration.IsStatic)
+        {
+            var parentSymbol = ((ISyntaxStructureDeclaration)symbol.SyntaxDeclaration.Parent!).Symbol!;
+            var parentType = LLVMTypeRef.CreatePointer(_context.VoidType, 0);
+            parameterTypes.Insert(0, parentType);
+        }
+
+        return LLVMTypeRef.CreateFunction(returnType, parameterTypes.ToArray());
     }
 
     private LLVMValueRef Visit(SemanticFieldReferenceNode node)
@@ -254,7 +335,7 @@ public class LlvmContentEmitter
 
         if (node.Operator == TokenKind.Exclamation)
         {
-            return _builder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(false), "not");
+            return _builder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(_context, false), "not");
         }
 
         if (node.Operator == TokenKind.Minus)
@@ -389,8 +470,6 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(SemanticCallNode node)
     {
-        var function = Next(node.Left)!.Value;
-        var functionType = _typeBuilder.BuildType(node.Left.DataType);
         var arguments = node.Arguments
             .Select(Next)
             .Select(x => x!.Value)
@@ -398,22 +477,70 @@ public class LlvmContentEmitter
 
         if (node.Left is SemanticFunctionReferenceNode { ObjectInstance: not null } functionReference)
         {
-            var instance = Next(functionReference.ObjectInstance);
-            arguments.Insert(0, instance!.Value);
+            var objectInstance = Next(functionReference.ObjectInstance)!.Value;
+            if (functionReference.ObjectInstance.DataType.IsProtocol() is true)
+                return BuildVirtualCall(node, objectInstance, functionReference, arguments);
+
+            arguments.Insert(0, objectInstance);
         }
 
+        var functionPointer = Next(node.Left)!.Value;
+        var functionType = _typeBuilder.BuildFunctionType(((FunctionDataType)node.Left.DataType).Symbol);
+        var function = _builder.BuildBitCast(functionPointer, functionType, "deref");
         var name = node.DataType.IsVoid()
             ? string.Empty
             : "call";
 
-        return _builder.BuildCall2(functionType, function, arguments.ToArray(), name);
+        return _builder.BuildCall2(functionType, functionPointer, arguments.ToArray(), name);
+    }
+
+    private LLVMValueRef BuildVirtualCall(
+        SemanticCallNode callNode,
+        LLVMValueRef objectInstance,
+        SemanticFunctionReferenceNode functionReference,
+        List<LLVMValueRef> arguments
+    )
+    {
+        var instanceDataType = (StructureDataType)functionReference.ObjectInstance!.DataType;
+        var fatPointerType = _typeBuilder.BuildType(instanceDataType);
+        var instancePointer = _builder.BuildAlloca(fatPointerType, "instancePointer");
+        _builder.BuildStore(objectInstance, instancePointer);
+
+        // Extract the concrete instance from the fat pointer
+        var concreteInstance = _builder.BuildStructGEP2(fatPointerType, instancePointer, 0, "lean");
+        arguments.Insert(0, concreteInstance);
+
+        // Get the vtable
+        var vtableType =_typeBuilder.BuildVtableType(instanceDataType.Symbol);
+        var vtablePointerType = LLVMTypeRef.CreatePointer(vtableType, 0);
+        var vtablePointerPointer = _builder.BuildStructGEP2(fatPointerType, instancePointer, 1, "vtablePointerPointer");
+        var vtablePointer = _builder.BuildLoad2(vtablePointerType, vtablePointerPointer, "vtable");
+
+        // Get the function from the vtable
+        var functionIndex = instanceDataType
+            .Symbol
+            .SemanticDeclaration!
+            .Functions
+            .IndexOf(functionReference.Symbol.SemanticDeclaration!);
+        var functionDeclaration = _typeBuilder.BuildFunctionType(((FunctionDataType)callNode.Left.DataType).Symbol);
+        var functionPointerPointer = _builder.BuildStructGEP2(vtableType, vtablePointer, (uint)functionIndex, "functionPointerPointer");
+        var functionPointer = _builder.BuildLoad2(
+            LLVMTypeRef.CreatePointer(functionDeclaration, 0),
+            functionPointerPointer
+        );
+
+        var name = callNode.DataType.IsVoid()
+            ? string.Empty
+            : "call";
+
+        return _builder.BuildCall2(functionDeclaration, functionPointer, arguments.ToArray(), name);
     }
 
     private LLVMValueRef Visit(SemanticNewNode node)
     {
         var type = _typeBuilder.BuildType(node.DataType);
         var structure = (ISemanticInstantiableStructureDeclaration)((StructureDataType)node.DataType).Symbol.SemanticDeclaration!;
-        var instance = _specialValueBuilder.BuildMalloc(type, "self");
+        var instance = _specialValueBuilder.BuildMalloc(type, "new");
         var arguments = node
             .Arguments
             .Select(Next)
@@ -466,7 +593,7 @@ public class LlvmContentEmitter
         {
             var type =_typeBuilder.BuildType(node.Arguments![0].DataType);
 
-            return LlvmUtils.BuildSizeOf(_module, type);
+            return LlvmUtils.BuildSizeOf(_context, _module, type);
         }
 
         if (node.Keyword.Kind is TokenKind.Self or TokenKind.Base)
@@ -477,18 +604,69 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(SemanticCastNode node)
     {
+        var fromType = node.Value.DataType;
+        var toType = node.DataType;
+
         var value = Next(node.Value)!.Value;
-        if (node.DataType is PrimitiveDataType primitiveDataType)
-            return BuildPrimitiveCast(value, node.Value.DataType, primitiveDataType);
+        if (toType is PrimitiveDataType primitiveDataType)
+            return BuildPrimitiveCast(value, fromType, primitiveDataType);
 
-        if (node.DataType is StructureDataType structureDataType)
+        if (toType.IsClass() && fromType.IsProtocol())
         {
-            var toLlvmType = _typeBuilder.BuildNamedStructType(structureDataType);
+            // Extract the instance pointer from the fat pointer
+            var fatPointerType = _typeBuilder.BuildType((StructureDataType)fromType);
 
-            return _builder.BuildBitCast(value, toLlvmType, "bitcast");
+            return _builder.BuildStructGEP2(fatPointerType, value, 0, "lean");
+        }
+
+        if (toType.IsProtocol() && fromType.IsClass())
+        {
+            // TODO: Runtime check to make sure it's the correct type
+            return BuildFatPointer(value, (StructureDataType)fromType, (StructureDataType)toType);
+        }
+
+        if (toType.IsProtocol() && fromType.IsProtocol())
+        {
+            // TODO: Runtime check to make sure it's the correct type
+
+            // Extract the instance pointer from the existing fat pointer
+            var fatPointerType = _typeBuilder.BuildType((StructureDataType)fromType);
+            var fromTypeInstance = _builder.BuildStructGEP2(fatPointerType, value, 0, "lean");
+
+            return BuildFatPointer(fromTypeInstance, (StructureDataType)fromType, (StructureDataType)toType);
+        }
+
+        if (toType.IsClass() && fromType.IsClass())
+        {
+            // TODO: Runtime check to make sure it's the correct type
+            return value;
         }
 
         throw new NotImplementedException();
+    }
+
+    private LLVMValueRef BuildFatPointer(LLVMValueRef instance, StructureDataType implementorDataType, StructureDataType implementedDataType)
+    {
+        var implementor = implementorDataType.Symbol.SemanticDeclaration!;
+        var implemented = implementedDataType.Symbol.SemanticDeclaration!;
+
+        var fatPointerType = _typeBuilder.BuildType(implementedDataType);
+        var alloca = _builder.BuildAlloca(fatPointerType);
+        var instancePointer = _builder.BuildStructGEP2(fatPointerType, alloca, 0, "instance");
+        var vtablePointer = _builder.BuildStructGEP2(fatPointerType, alloca, 1, "vtable");
+        var vtableValue = GetVtable(implementor, implemented);
+
+        _builder.BuildStore(instance, instancePointer);
+        _builder.BuildStore(vtableValue, vtablePointer);
+
+        return _builder.BuildLoad2(fatPointerType, alloca, "fatPointer");
+    }
+
+    private LLVMValueRef GetVtable(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
+    {
+        var vtableName = _contextCache.GetVtableName(implementor, implemented);
+
+        return _module.GetNamedGlobal(vtableName);
     }
 
     private LLVMValueRef BuildPrimitiveCast(
@@ -590,6 +768,14 @@ public class LlvmContentEmitter
         if (node.Body == null)
             return function;
 
+        var debugName = _contextCache.GetSymbolName(node);
+        BuildFunctionDi(
+            function,
+            node.Span,
+            debugName,
+            isArtificial: false
+        );
+
         var block = function.AppendBasicBlock("entry");
         _moduleCache.SetBlockLlvmValue(node.Body, block);
         _builder.PositionAtEnd(block);
@@ -638,6 +824,39 @@ public class LlvmContentEmitter
         return function;
     }
 
+    private void BuildFunctionDi(LLVMValueRef llvmFunction, TextSpan span, string name, bool isArtificial)
+    {
+        // TODO: Add more type metadata and DI flags?
+        var flags = LLVMDIFlags.LLVMDIFlagZero;
+        if (isArtificial)
+            flags |= LLVMDIFlags.LLVMDIFlagArtificial;
+
+        var functionType = _diBuilder.CreateSubroutineType(_diFile, [], flags);
+        var line = (uint)span.Start.Line + 1;
+        var debugFunction = _diBuilder.CreateFunction(
+            Scope: _compileUnit,
+            Name: name,
+            LinkageName: name,
+            File: _diFile,
+            LineNo: line,
+            Type: functionType,
+            IsLocalToUnit: 1,
+            IsDefinition: 1,
+            ScopeLine: line,
+            Flags: flags,
+            IsOptimized: 0
+        );
+
+        var currentLine = _context.CreateDebugLocation(line, 0, debugFunction, default);
+        _currentFunctionMetadata = debugFunction;
+
+        unsafe
+        {
+            LLVM.SetCurrentDebugLocation2(_builder, currentLine);
+            LLVM.SetSubprogram(llvmFunction, debugFunction);
+        }
+    }
+
     private LLVMValueRef? Visit(SemanticClassDeclarationNode node)
     {
         Visit(node.Init, node);
@@ -659,7 +878,7 @@ public class LlvmContentEmitter
         if (node.Identifier.Value == "Program")
         {
             // Create the entry function
-            var entryFunctionType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, []);
+            var entryFunctionType = LLVMTypeRef.CreateFunction(_context.Int32Type, []);
             var entryFunction = _module.AddFunction("main", entryFunctionType);
             var block = entryFunction.AppendBasicBlock("entry");
             _builder.PositionAtEnd(block);
@@ -671,7 +890,7 @@ public class LlvmContentEmitter
 
             // Build a call to the user-defined main function
             var userMainFunction = _moduleCache.GetNodeLlvmValue(userEntryDeclaration);
-            var userMainFunctionType = _typeBuilder.BuildType(new FunctionDataType(userEntryDeclaration.Symbol));
+            var userMainFunctionType = _typeBuilder.BuildFunctionType(userEntryDeclaration.Symbol);
             var returnsVoid = userEntryDeclaration.ReturnType is PrimitiveDataType { Kind: Primitive.Void };
             var returnValue = _builder.BuildCall2(
                 userMainFunctionType,
@@ -682,7 +901,7 @@ public class LlvmContentEmitter
 
             if (returnsVoid)
             {
-                _builder.BuildRet(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0, false));
+                _builder.BuildRet(LLVMValueRef.CreateConstInt(_context.Int32Type, 0, false));
             }
             else
             {
@@ -696,6 +915,15 @@ public class LlvmContentEmitter
     private LLVMValueRef Visit(SemanticInitNode node, SemanticClassDeclarationNode parentStructure)
     {
         var function = _moduleCache.GetNodeLlvmValue(node);
+
+        var debugName = _contextCache.GetSymbolName(node);
+        BuildFunctionDi(
+            function,
+            parentStructure.Span,
+            debugName,
+            isArtificial: true
+        );
+
         var value = function.AppendBasicBlock("entry");
         _moduleCache.SetBlockLlvmValue(node.Body, value);
         _builder.PositionAtEnd(value);

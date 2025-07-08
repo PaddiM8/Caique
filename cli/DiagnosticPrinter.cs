@@ -14,11 +14,11 @@ public class DiagnosticPrinter(string workingDirectory)
             Console.ResetColor();
             Console.Write(" (");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write(diagnostic.Span.Start.Line);
+            Console.Write(diagnostic.Span.Start.Line + 1);
             Console.ResetColor();
             Console.Write(":");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write(diagnostic.Span.Start.Column);
+            Console.Write(diagnostic.Span.Start.Column + 1);
             Console.ResetColor();
             Console.WriteLine(")");
 

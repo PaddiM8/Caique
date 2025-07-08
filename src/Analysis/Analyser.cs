@@ -59,6 +59,7 @@ public class Analyser
             SyntaxVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
             SyntaxFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
             SyntaxClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
+            SyntaxProtocolDeclarationNode protocolDeclarationNode => Visit(protocolDeclarationNode),
             SyntaxFieldDeclarationNode fieldDeclarationNode => Visit(fieldDeclarationNode),
             SyntaxInitNode initNode => Visit(initNode),
             SyntaxInitParameterNode initParameterNode => Visit(initParameterNode),
@@ -78,9 +79,11 @@ public class Analyser
         return new SemanticKeywordValueNode(token, [], _blankSpan, new StructureDataType(structureSymbol));
     }
 
-    private SemanticNode Visit(SyntaxStatementNode node)
+    private SemanticStatementNode Visit(SyntaxStatementNode node)
     {
-        return Next(node.Expression);
+        var value = Next(node.Expression);
+
+        return new SemanticStatementNode(value);
     }
 
     private SemanticNode Visit(SyntaxGroupNode node)
@@ -148,11 +151,11 @@ public class Analyser
             .Select(Next)
             .Select(x => x.DataType)
             .ToList();
-        ValidateArguments(parameterTypes ?? [], arguments, node.Span);
+        var typeCheckedArguments = TypeCheckArguments(parameterTypes ?? [], arguments, node.Span);
 
         return new SemanticKeywordValueNode(
             node.Keyword,
-            arguments,
+            typeCheckedArguments,
             node.Span,
             new StructureDataType(structure.Symbol)
         );
@@ -296,29 +299,25 @@ public class Analyser
         if (symbolFromStructure is FunctionSymbol functionSymbol2)
         {
             var dataType = new FunctionDataType(functionSymbol2);
+            var instance = functionSymbol2.SyntaxDeclaration.IsStatic
+                ? null
+                : BuildSelfNode(structure!.Symbol);
 
-            return new SemanticFunctionReferenceNode(
-                identifier,
-                functionSymbol2,
-                objectInstance: BuildSelfNode(structure!.Symbol),
-                dataType
-            );
+            return new SemanticFunctionReferenceNode(identifier, functionSymbol2, instance, dataType);
         }
 
         if (symbolFromStructure is FieldSymbol fieldSymbol2)
         {
             var dataType = Next(fieldSymbol2.SyntaxDeclaration.Type).DataType;
+            var instance = fieldSymbol2.SyntaxDeclaration.IsStatic
+                ? null
+                : BuildSelfNode(structure!.Symbol);
 
             Debug.Assert(structure?.Symbol != null);
 
             // TODO: Verify that the parent function isn't static since you can't reference
             // non-static fields from static functions
-            return new SemanticFieldReferenceNode(
-                identifier,
-                fieldSymbol2,
-                objectInstance: BuildSelfNode(structure.Symbol),
-                dataType
-            );
+            return new SemanticFieldReferenceNode(identifier, fieldSymbol2, instance, dataType);
         }
 
         _diagnostics.ReportNotFound(identifier);
@@ -355,11 +354,7 @@ public class Analyser
                 throw Recover();
             }
 
-            if (!right.DataType.IsEquivalent(left.DataType))
-            {
-                _diagnostics.ReportIncompatibleType(left.DataType, right.DataType, right.Span);
-                throw Recover();
-            }
+            right = TypeCheck(right, left.DataType);
         }
         else if (node.Operator is TokenKind.AmpersandAmpersand or TokenKind.PipePipe)
         {
@@ -378,11 +373,7 @@ public class Analyser
         }
         else if (node.Operator is TokenKind.EqualsEquals or TokenKind.NotEquals)
         {
-            if (!right.DataType.IsEquivalent(left.DataType))
-            {
-                _diagnostics.ReportIncompatibleType(left.DataType, right.DataType, right.Span);
-                throw Recover();
-            }
+            right = TypeCheck(right, left.DataType);
         }
 
         return new SemanticBinaryNode(left, node.Operator, right, left.DataType);
@@ -398,10 +389,7 @@ public class Analyser
             _diagnostics.ReportExpectedVariableReferenceInAssignment(node.Span);
         }
 
-        if (!left.DataType.IsEquivalent(right.DataType))
-        {
-            _diagnostics.ReportIncompatibleType(left.DataType, right.DataType, node.Span);
-        }
+        right = TypeCheck(right, left.DataType);
 
         return new SemanticAssignmentNode(left, right, node.Span);
     }
@@ -481,14 +469,14 @@ public class Analyser
             .Parameters
             .Select(x => Next(x.Type).DataType)
             .ToList();
-        ValidateArguments(parameterTypes, arguments, node.Span);
+        var typeCheckedArguments = TypeCheckArguments(parameterTypes, arguments, node.Span);
 
         var declarationReturnType = functionDataType.Symbol.SyntaxDeclaration.ReturnType;
         var dataType = declarationReturnType == null
-            ? new PrimitiveDataType(Primitive.Void)
+            ? PrimitiveDataType.Void
             : Next(declarationReturnType).DataType;
 
-        return new SemanticCallNode(left, arguments, dataType, node.Span);
+        return new SemanticCallNode(left, typeCheckedArguments, dataType, node.Span);
     }
 
     private SemanticNewNode Visit(SyntaxNewNode node)
@@ -500,39 +488,62 @@ public class Analyser
             throw Recover();
         }
 
-        var initNode = structureDataType.Symbol.SyntaxDeclaration switch
+        SyntaxInitNode? initNode;
+        var instantiable = structureDataType.Symbol.SyntaxDeclaration as ISyntaxInstantiableStructureDeclaration;
+        if (instantiable != null)
         {
-            SyntaxClassDeclarationNode classNode => classNode.Init,
-            _ => null,
-        };
-
-        if (initNode == null)
+            initNode = instantiable.Init;
+        }
+        else
         {
+            initNode = null;
             _diagnostics.ReportIncompatibleType("name of instantiable structure", dataType, node.Span);
-            throw Recover();
         }
 
-        var arguments = node.Arguments.Select(Next).ToList();
-        var parameterTypes = initNode
+        var arguments = node
+            .Arguments
+            .Select(Next)
+            .ToList();
+        var parameterTypes = initNode?
             .Parameters
             .Select(Next)
             .Select(x => x.DataType)
-            .ToList();
-        ValidateArguments(parameterTypes, arguments, node.Span);
+            .ToList()
+            ?? [];
+
+        // Will be null if it isn't an instantiable structure (which is an error, so don't try to type check)
+        if (instantiable != null)
+            arguments = TypeCheckArguments(parameterTypes, arguments, node.Span);
 
         return new SemanticNewNode(arguments, dataType, node.Span);
     }
 
-    private void ValidateArguments(List<IDataType> parameterTypes, List<SemanticNode> arguments, TextSpan span)
+    private List<SemanticNode> TypeCheckArguments(List<IDataType> parameterTypes, List<SemanticNode> arguments, TextSpan span)
     {
         if (parameterTypes.Count != arguments.Count)
             _diagnostics.ReportWrongNumberOfArguments(parameterTypes.Count, arguments.Count, span);
 
-        foreach (var (parameterType, argument) in parameterTypes.Zip(arguments))
+        return arguments
+            .Zip(parameterTypes)
+            .Select(x => TypeCheck(x.First, x.Second))
+            .ToList();
+    }
+
+    private SemanticNode TypeCheck(SemanticNode value, IDataType targetDataType)
+    {
+        var equivalence = value.DataType.IsEquivalent(targetDataType);
+        if (equivalence == TypeEquivalence.Incompatible)
         {
-            if (!argument.DataType.IsEquivalent(parameterType))
-                _diagnostics.ReportIncompatibleType(parameterType, argument.DataType, argument.Span);
+            _diagnostics.ReportIncompatibleType(targetDataType, value.DataType, value.Span);
+
+            return value;
         }
+        else if (equivalence == TypeEquivalence.ImplicitCast)
+        {
+            return new SemanticCastNode(value, value.Span, targetDataType);
+        }
+
+        return value;
     }
 
     private SemanticReturnNode Visit(SyntaxReturnNode node)
@@ -548,29 +559,26 @@ public class Analyser
             throw Recover();
         }
 
-        ValidateReturnType(enclosingFunction, value?.DataType, node.Span);
+        value = TypeCheckReturnType(enclosingFunction, value, node.Span);
 
         return new SemanticReturnNode(value, node.Span);
     }
 
-    private void ValidateReturnType(ISyntaxFunctionDeclaration enclosingFunction, IDataType? valueType, TextSpan span)
+    private SemanticNode? TypeCheckReturnType(ISyntaxFunctionDeclaration enclosingFunction, SemanticNode? value, TextSpan span)
     {
         var functionReturnType = enclosingFunction.ReturnType == null
             ? null
             : Next(enclosingFunction.ReturnType).DataType;
 
-        if (functionReturnType == null && valueType != null)
+        if (value == null)
         {
-            _diagnostics.ReportIncompatibleType(Primitive.Void, valueType, span);
+            if (functionReturnType != null)
+                _diagnostics.ReportIncompatibleType(Primitive.Void, functionReturnType, span);
+
+            return null;
         }
-        else if (functionReturnType != null && valueType == null)
-        {
-            _diagnostics.ReportIncompatibleType(Primitive.Void, functionReturnType, span);
-        }
-        else if (functionReturnType != null && valueType != null && !functionReturnType.IsEquivalent(valueType))
-        {
-            _diagnostics.ReportIncompatibleType(functionReturnType, valueType, span);
-        }
+
+        return TypeCheck(value!, functionReturnType ?? PrimitiveDataType.Void);
     }
 
     private SemanticNode Visit(SyntaxBlockNode node)
@@ -591,7 +599,7 @@ public class Analyser
             }
         }
 
-        IDataType dataType = new PrimitiveDataType(Primitive.Void);
+        IDataType dataType = PrimitiveDataType.Void;
         var last = node.Expressions.LastOrDefault();
         if (last == null || ShouldSkipBlockChild(last))
             return new SemanticBlockNode(expressions, dataType, node.Span);
@@ -610,8 +618,8 @@ public class Analyser
         {
             if (node.Parent is ISyntaxFunctionDeclaration enclosingFunction)
             {
-                analysedLast = new SemanticReturnNode(analysedLast, node.Span);
-                ValidateReturnType(enclosingFunction, analysedLast.DataType, node.Span);
+                var typeCheckedValue = TypeCheckReturnType(enclosingFunction, analysedLast, node.Span);
+                analysedLast = new SemanticReturnNode(typeCheckedValue, node.Span);
             }
         }
 
@@ -706,7 +714,14 @@ public class Analyser
     private SemanticNode Visit(SyntaxVariableDeclarationNode node)
     {
         var value = Next(node.Value);
-        var semanticNode = new SemanticVariableDeclarationNode(node.Identifier, value, value.DataType, node.Span);
+        var dataType = value.DataType;
+        if (node.Type != null)
+        {
+            dataType = Next(node.Type).DataType;
+            value = TypeCheck(value, dataType);
+        }
+
+        var semanticNode = new SemanticVariableDeclarationNode(node.Identifier, value, dataType, node.Span);
 
         // Variable symbols are created in the analyser, since they can only be referenced
         // after they have been declared
@@ -747,7 +762,7 @@ public class Analyser
         }
         else
         {
-            returnType = new PrimitiveDataType(Primitive.Void);
+            returnType = PrimitiveDataType.Void;
         }
 
         var structure = _syntaxTree.GetEnclosingStructure(node);
@@ -781,12 +796,24 @@ public class Analyser
             _diagnostics.ReportMultipleInheritance(node.Span);
 
         StructureSymbol? inheritedClass = null;
+        var implementedProtocols = new List<StructureSymbol>();
         foreach (var subTypeNode in node.SubTypes)
         {
             var subTypeDataType = Next(subTypeNode).DataType;
-            if (subTypeDataType is StructureDataType structureDataType && structureDataType.IsClass())
+            if (subTypeDataType is StructureDataType structureDataType)
             {
-                inheritedClass = structureDataType.Symbol;
+                if (structureDataType.IsClass())
+                {
+                    inheritedClass = structureDataType.Symbol;
+                }
+                else if (structureDataType.IsProtocol())
+                {
+                    implementedProtocols.Add(structureDataType.Symbol);
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
             }
             else
             {
@@ -818,7 +845,7 @@ public class Analyser
         SemanticInitNode init;
         if (node.Init == null)
         {
-            var emptyBlock = new SemanticBlockNode([], new PrimitiveDataType(Primitive.Void), _blankSpan);
+            var emptyBlock = new SemanticBlockNode([], PrimitiveDataType.Void, _blankSpan);
             init = new SemanticInitNode([], null, emptyBlock, _blankSpan);
         }
         else
@@ -829,6 +856,7 @@ public class Analyser
         var semanticNode = new SemanticClassDeclarationNode(
             node.Identifier,
             inheritedClass,
+            implementedProtocols,
             init,
             functions,
             fields,
@@ -856,6 +884,36 @@ public class Analyser
         var fieldCount = inheritedClassSyntax.Declarations.Count(x => x is SyntaxFieldDeclarationNode);
 
         return CalculateFieldStartIndex(inheritedClassSyntax) + fieldCount;
+    }
+
+    private SemanticNode Visit(SyntaxProtocolDeclarationNode node)
+    {
+        var functions = new List<SemanticFunctionDeclarationNode>();
+        foreach (var declaration in node.Declarations)
+        {
+            try
+            {
+                if (declaration is SyntaxFunctionDeclarationNode function)
+                {
+                    functions.Add((SemanticFunctionDeclarationNode)Next(function));
+                }
+            }
+            catch (AnalyserRecoveryException)
+            {
+                // Continue
+            }
+        }
+
+        var semanticNode = new SemanticProtocolDeclarationNode(
+            node.Identifier,
+            functions,
+            node.Symbol!,
+            node.Span
+        );
+
+        node.Symbol!.SemanticDeclaration = semanticNode;
+
+        return semanticNode;
     }
 
     private SemanticFieldDeclarationNode Visit(SyntaxFieldDeclarationNode node)

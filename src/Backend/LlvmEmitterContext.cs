@@ -19,9 +19,9 @@ public class LlvmEmitterContext(
 
     public LLVMContextRef LlvmContext { get; } = context;
 
-    public LLVMBuilderRef LlvmBuilder { get; } = LLVMBuilderRef.Create(context);
+    public LLVMBuilderRef LlvmBuilder { get; } = context.CreateBuilder();
 
-    public LLVMModuleRef LlvmModule { get; } = LLVMModuleRef.CreateWithName(moduleName);
+    public LLVMModuleRef LlvmModule { get; } = context.CreateModuleWithName(moduleName);
 
     public void Dispose()
     {

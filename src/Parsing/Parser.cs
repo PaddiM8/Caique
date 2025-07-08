@@ -55,6 +55,7 @@ public class Parser
             {
                 TokenKind.With => ParseWith(),
                 TokenKind.Class => ParseClass(),
+                TokenKind.Protocol => ParseProtocol(),
                 _ => ParseStatement(),
             };
         }
@@ -216,18 +217,6 @@ public class Parser
         return (declarations, constructor, scope);
     }
 
-    private SyntaxAttributeNode ParseAttribute()
-    {
-        var start = EatExpected(TokenKind.Hash).Span;
-        var identifier = EatExpected(TokenKind.Identifier);
-        var arguments = Match(TokenKind.OpenParenthesis)
-            ? ParseArguments()
-            : [];
-        var span = start.Combine(arguments.LastOrDefault()?.Span ?? identifier.Span);
-
-        return new SyntaxAttributeNode(identifier, arguments, span);
-    }
-
     private SyntaxNode ParseStructureDeclaration(StructureScope scope)
     {
         var attributes = new List<SyntaxAttributeNode>();
@@ -245,6 +234,92 @@ public class Parser
             return ParseField(isStatic, attributes, scope);
 
         throw Recover();
+    }
+
+    private SyntaxProtocolDeclarationNode ParseProtocol()
+    {
+        var start = EatExpected(TokenKind.Protocol).Span;
+        var identifier = EatExpected(TokenKind.Identifier);
+
+        var subTypes = new List<SyntaxTypeNode>();
+        if (AdvanceIf(TokenKind.Colon))
+        {
+            do
+            {
+                subTypes.Add(ParseType());
+            }
+            while (AdvanceIf(TokenKind.Comma));
+        }
+
+        EatExpected(TokenKind.OpenBrace);
+        var (declarations, scope) = ParseProtocolBody(identifier);
+
+        var end = EatExpected(TokenKind.ClosedBrace).Span;
+
+        var node = new SyntaxProtocolDeclarationNode(
+            identifier,
+            subTypes,
+            declarations,
+            scope,
+            start.Combine(end)
+        );
+        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
+            _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
+
+        var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
+        node.Symbol = symbol;
+        _fileScope.Namespace.AddSymbol(symbol);
+
+        return node;
+    }
+
+    private (List<SyntaxNode>, StructureScope scope) ParseProtocolBody(Token identifier)
+    {
+        var declarations = new List<SyntaxNode>();
+        var scope = new StructureScope(_fileScope.Namespace);
+        while (!_reachedEnd && !Match(TokenKind.ClosedBrace))
+        {
+            try
+            {
+                var declaration = ParseProtocolDeclaration(scope);
+                declarations.Add(declaration);
+            }
+            catch (ParserRecoveryException ex)
+            {
+                declarations.Add(ex.ErrorNode);
+            }
+        }
+
+        return (declarations, scope);
+    }
+
+    private SyntaxNode ParseProtocolDeclaration(StructureScope scope)
+    {
+        var attributes = new List<SyntaxAttributeNode>();
+        while (Match(TokenKind.Hash))
+            attributes.Add(ParseAttribute());
+
+        if (Match(TokenKind.Fn))
+        {
+            var function = ParseFunction(isStatic: false, attributes, scope);
+            if (function.Body != null)
+                _diagnostics.ReportBodyInProtocol(function.Span);
+
+            return function;
+        }
+
+        throw Recover();
+    }
+    private SyntaxAttributeNode ParseAttribute()
+    {
+        var start = EatExpected(TokenKind.Hash).Span;
+        var identifier = EatExpected(TokenKind.Identifier);
+        var arguments = Match(TokenKind.OpenParenthesis)
+            ? ParseArguments()
+            : [];
+        var span = start.Combine(arguments.LastOrDefault()?.Span ?? identifier.Span);
+
+        return new SyntaxAttributeNode(identifier, arguments, span);
     }
 
     private SyntaxFunctionDeclarationNode ParseFunction(

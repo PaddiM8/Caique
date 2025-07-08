@@ -24,9 +24,16 @@ public enum Primitive
     USize,
 }
 
+public enum TypeEquivalence
+{
+    Incompatible,
+    Identical,
+    ImplicitCast,
+}
+
 public interface IDataType
 {
-    bool IsEquivalent(IDataType other);
+    TypeEquivalence IsEquivalent(IDataType other);
 
     bool IsVoid()
         => false;
@@ -48,10 +55,18 @@ public interface IDataType
 
     bool IsFloat()
         => false;
+
+    bool IsClass()
+        => false;
+
+    bool IsProtocol()
+        => false;
 }
 
 public class PrimitiveDataType(Primitive kind) : IDataType
 {
+    public static PrimitiveDataType Void { get; } = new PrimitiveDataType(Primitive.Void);
+
     public Primitive Kind { get; } = kind;
 
     public int BitSize
@@ -100,14 +115,18 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         };
     }
 
+    public TypeEquivalence IsEquivalent(IDataType other)
+    {
+        return other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind
+            ? TypeEquivalence.Identical
+            : TypeEquivalence.Incompatible;
+    }
+
     public bool IsVoid()
         => Kind == Primitive.Void;
 
     public bool IsBoolean()
         => Kind == Primitive.Bool;
-
-    public bool IsEquivalent(IDataType other)
-        => other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind;
 
     public bool IsNumber()
         => Kind >= Primitive.Int8 && Kind <= Primitive.Float64;
@@ -132,9 +151,12 @@ public class SliceDataType(IDataType subType) : IDataType
 {
     public IDataType SubType { get; } = subType;
 
-    public bool IsEquivalent(IDataType other)
-        => other is SliceDataType otherSlice &&
-            SubType.IsEquivalent(otherSlice.SubType);
+    public TypeEquivalence IsEquivalent(IDataType other)
+    {
+        return other is SliceDataType otherSlice && SubType.IsEquivalent(otherSlice.SubType) == TypeEquivalence.Identical
+            ? TypeEquivalence.Identical
+            : TypeEquivalence.Incompatible;
+    }
 
     public override string ToString()
         => $"[{SubType}]";
@@ -153,11 +175,25 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();
 
+    public TypeEquivalence IsEquivalent(IDataType other)
+    {
+        if (other is StructureDataType otherStructure)
+        {
+            if (otherStructure.Symbol == Symbol)
+                return TypeEquivalence.Identical;
+
+            if (Symbol.SyntaxDeclaration.SubTypes.Any(x => x.ResolvedSymbol == otherStructure.Symbol))
+                return TypeEquivalence.ImplicitCast;
+        }
+
+        return TypeEquivalence.Incompatible;
+    }
+
     public bool IsClass()
         => Symbol is StructureSymbol { SyntaxDeclaration: SyntaxClassDeclarationNode };
 
-    public bool IsEquivalent(IDataType other)
-        => other is StructureDataType otherStructure && otherStructure.Symbol == Symbol;
+    public bool IsProtocol()
+        => Symbol is StructureSymbol { SyntaxDeclaration: SyntaxProtocolDeclarationNode };
 }
 
 public class FunctionDataType(FunctionSymbol symbol) : IDataType
@@ -166,16 +202,27 @@ public class FunctionDataType(FunctionSymbol symbol) : IDataType
 
     public override string ToString()
     {
-        var parameters = Symbol.SyntaxDeclaration.Parameters
-            .Select(x => x.Type.TypeNames)
+        var parameters = Symbol
+            .SyntaxDeclaration
+            .Parameters
+            .Select(x => x.Type.TypeNames.Select(t => t.Value))
             .Select(x => string.Join(":", x));
-        var returnType = string.Join(":", Symbol.SyntaxDeclaration.ReturnType?.TypeNames ?? []);
+        var typeNames = Symbol
+            .SyntaxDeclaration
+            .ReturnType?
+            .TypeNames
+            .Select(x => x.Value);
+        var returnType = string.Join(":", typeNames ?? []);
 
         return $"Fn({string.Join(", ", parameters)})({returnType})";
     }
 
-    public bool IsEquivalent(IDataType other)
-        => other is FunctionDataType otherFunction && otherFunction.Symbol == Symbol;
+    public TypeEquivalence IsEquivalent(IDataType other)
+    {
+        return other is FunctionDataType otherFunction && otherFunction.Symbol == Symbol
+            ? TypeEquivalence.Identical
+            : TypeEquivalence.Incompatible;
+    }
 
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();

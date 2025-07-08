@@ -81,6 +81,9 @@ public class Resolver
                 Visit(attributeNode);
                 break;
             case SyntaxVariableDeclarationNode variableDeclarationNode:
+                if (variableDeclarationNode.Type != null)
+                    Next(variableDeclarationNode.Type, node);
+
                 Next(variableDeclarationNode.Value, node);
                 break;
             case SyntaxFunctionDeclarationNode functionDeclarationNode:
@@ -92,6 +95,9 @@ public class Resolver
                 break;
             case SyntaxClassDeclarationNode classDeclarationNode:
                 Visit(classDeclarationNode);
+                break;
+            case SyntaxProtocolDeclarationNode protocolDeclarationNode:
+                Visit(protocolDeclarationNode);
                 break;
             case SyntaxFieldDeclarationNode fieldDeclarationNode:
                 Visit(fieldDeclarationNode);
@@ -214,6 +220,18 @@ public class Resolver
             node.Init.Parent = node;
             Visit(node.Init, node.Scope);
         }
+    }
+
+    private void Visit(SyntaxProtocolDeclarationNode node)
+    {
+        foreach (var subType in node.SubTypes)
+        {
+            Next(subType, node);
+            ResolveNode(subType);
+        }
+
+        foreach (var declaration in node.Declarations)
+            Next(declaration, node);
     }
 
     private void Visit(SyntaxFieldDeclarationNode node)
