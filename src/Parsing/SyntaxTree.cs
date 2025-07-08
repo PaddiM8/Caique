@@ -344,6 +344,25 @@ public class SyntaxProtocolDeclarationNode(
     public StructureSymbol? Symbol { get; set; }
 }
 
+public class SyntaxModuleDeclarationNode(
+    Token identifier,
+    List<SyntaxNode> declarations,
+    StructureScope scope,
+    TextSpan span
+)
+    : SyntaxNode(span), ISyntaxStructureDeclaration
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SyntaxTypeNode> SubTypes { get; } = [];
+
+    public List<SyntaxNode> Declarations { get; } = declarations;
+
+    public StructureScope Scope { get; } = scope;
+
+    public StructureSymbol? Symbol { get; set; }
+}
+
 public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)
     : SyntaxNode(span)
 {

@@ -514,6 +514,41 @@ public class SemanticProtocolDeclarationNode(
     }
 }
 
+public class SemanticModuleDeclarationNode(
+    Token identifier,
+    List<SemanticFunctionDeclarationNode> functions,
+    List<SemanticFieldDeclarationNode> fields,
+    StructureSymbol symbol,
+    TextSpan span
+)
+    : SemanticNode(PrimitiveDataType.Void, span), ISemanticStructureDeclaration
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SemanticFunctionDeclarationNode> Functions { get; } = functions;
+
+    public List<SemanticFieldDeclarationNode> Fields { get; } = fields;
+
+    public StructureSymbol Symbol { get; } = symbol;
+
+    public int FieldStartIndex { get; }
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        foreach (var function in Functions)
+        {
+            function.Traverse(callback);
+            callback(function, this);
+        }
+
+        foreach (var field in Fields)
+        {
+            field.Traverse(callback);
+            callback(field, this);
+        }
+    }
+}
+
 public class SemanticFieldDeclarationNode(
     Token identifier,
     SemanticNode? value,

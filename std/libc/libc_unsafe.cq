@@ -1,15 +1,15 @@
-class LibcUnsafe
+module LibcUnsafe
 {
     #ffi
-    static stdout usize;
+    stdout usize;
 
     #ffi
-    static func printf(pattern [u8], arg [u8]);
+    func printf(pattern [u8], arg [u8]);
 
     #ffi
-    static func fputs(str [u8], stream usize);
+    func fputs(str [u8], stream usize);
 
-    static func GetStdout() usize
+    func GetStdout() usize
     {
         LibcUnsafe:stdout
     }

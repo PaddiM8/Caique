@@ -149,6 +149,7 @@ public class Lexer
             "func" => TokenKind.Func,
             "class" => TokenKind.Class,
             "protocol" => TokenKind.Protocol,
+            "module" => TokenKind.Module,
             "inheritable" => TokenKind.Inheritable,
             "static" => TokenKind.Static,
             "override" => TokenKind.Override,

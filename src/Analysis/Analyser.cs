@@ -60,6 +60,7 @@ public class Analyser
             SyntaxFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
             SyntaxClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
             SyntaxProtocolDeclarationNode protocolDeclarationNode => Visit(protocolDeclarationNode),
+            SyntaxModuleDeclarationNode moduleDeclarationNode => Visit(moduleDeclarationNode),
             SyntaxFieldDeclarationNode fieldDeclarationNode => Visit(fieldDeclarationNode),
             SyntaxInitNode initNode => Visit(initNode),
             SyntaxInitParameterNode initParameterNode => Visit(initParameterNode),
@@ -925,9 +926,7 @@ public class Analyser
             try
             {
                 if (declaration is SyntaxFunctionDeclarationNode function)
-                {
                     functions.Add((SemanticFunctionDeclarationNode)Next(function));
-                }
             }
             catch (AnalyserRecoveryException)
             {
@@ -938,6 +937,42 @@ public class Analyser
         var semanticNode = new SemanticProtocolDeclarationNode(
             node.Identifier,
             functions,
+            node.Symbol!,
+            node.Span
+        );
+
+        node.Symbol!.SemanticDeclaration = semanticNode;
+
+        return semanticNode;
+    }
+
+    private SemanticNode Visit(SyntaxModuleDeclarationNode node)
+    {
+        var functions = new List<SemanticFunctionDeclarationNode>();
+        var fields = new List<SemanticFieldDeclarationNode>();
+        foreach (var declaration in node.Declarations)
+        {
+            try
+            {
+                if (declaration is SyntaxFunctionDeclarationNode function)
+                {
+                    functions.Add((SemanticFunctionDeclarationNode)Next(function));
+                }
+                else if (declaration is SyntaxFieldDeclarationNode field)
+                {
+                    fields.Add((SemanticFieldDeclarationNode)Next(field));
+                }
+            }
+            catch (AnalyserRecoveryException)
+            {
+                // Continue
+            }
+        }
+
+        var semanticNode = new SemanticModuleDeclarationNode(
+            node.Identifier,
+            functions,
+            fields,
             node.Symbol!,
             node.Span
         );

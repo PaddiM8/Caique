@@ -47,8 +47,8 @@ public class LlvmHeaderEmitter
             case SemanticClassDeclarationNode classNode:
                 Visit(classNode);
                 return;
-            case SemanticProtocolDeclarationNode protocolNode:
-                Visit(protocolNode);
+            case SemanticModuleDeclarationNode moduleNode:
+                Visit(moduleNode);
                 return;
         }
     }
@@ -178,7 +178,12 @@ public class LlvmHeaderEmitter
         _contextCache.SetSymbolName(node, identifier);
     }
 
-    private void Visit(SemanticProtocolDeclarationNode node)
+    private void Visit(SemanticModuleDeclarationNode node)
     {
+         foreach (var staticField in node.Fields.Where(x => x.IsStatic))
+            BuildStaticField(staticField, node);
+
+        foreach (var function in node.Functions)
+            Next(function);
     }
 }

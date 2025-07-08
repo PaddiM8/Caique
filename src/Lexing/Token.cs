@@ -19,7 +19,7 @@ public record TextPosition(int Index, int Line, int Column, SyntaxTree SyntaxTre
 public enum TokenKind
 {
     Unknown,
-    Let, Func, With, Class, Protocol,
+    Let, Func, With, Class, Protocol, Module,
     Static, Override, Inheritable,
     New,
     As,

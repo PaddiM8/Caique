@@ -58,6 +58,7 @@ public class Parser
                 TokenKind.With => ParseWith(),
                 TokenKind.Class => ParseClass(isInheritable),
                 TokenKind.Protocol => ParseProtocol(),
+                TokenKind.Module => ParseModule(),
                 _ => ParseStatement(),
             };
         }
@@ -259,7 +260,7 @@ public class Parser
         }
 
         EatExpected(TokenKind.OpenBrace);
-        var (declarations, scope) = ParseProtocolBody(identifier);
+        var (declarations, scope) = ParseProtocolBody();
 
         var end = EatExpected(TokenKind.ClosedBrace).Span;
 
@@ -280,7 +281,7 @@ public class Parser
         return node;
     }
 
-    private (List<SyntaxNode>, StructureScope scope) ParseProtocolBody(Token identifier)
+    private (List<SyntaxNode>, StructureScope scope) ParseProtocolBody()
     {
         var declarations = new List<SyntaxNode>();
         var scope = new StructureScope(_fileScope.Namespace);
@@ -317,6 +318,68 @@ public class Parser
 
         throw Recover();
     }
+
+    private SyntaxModuleDeclarationNode ParseModule()
+    {
+        var start = EatExpected(TokenKind.Module).Span;
+        var identifier = EatExpected(TokenKind.Identifier);
+
+        EatExpected(TokenKind.OpenBrace);
+        var (declarations, scope) = ParseModuleBody();
+
+        var end = EatExpected(TokenKind.ClosedBrace).Span;
+
+        var node = new SyntaxModuleDeclarationNode(
+            identifier,
+            declarations,
+            scope,
+            start.Combine(end)
+        );
+        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
+            _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
+
+        var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
+        node.Symbol = symbol;
+        _fileScope.Namespace.AddSymbol(symbol);
+
+        return node;
+    }
+
+    private (List<SyntaxNode>, StructureScope scope) ParseModuleBody()
+    {
+        var declarations = new List<SyntaxNode>();
+        var scope = new StructureScope(_fileScope.Namespace);
+        while (!_reachedEnd && !Match(TokenKind.ClosedBrace))
+        {
+            try
+            {
+                var declaration = ParseModuleDeclaration(scope);
+                declarations.Add(declaration);
+            }
+            catch (ParserRecoveryException ex)
+            {
+                declarations.Add(ex.ErrorNode);
+            }
+        }
+
+        return (declarations, scope);
+    }
+
+    private SyntaxNode ParseModuleDeclaration(StructureScope scope)
+    {
+        var attributes = new List<SyntaxAttributeNode>();
+        while (Match(TokenKind.Hash))
+            attributes.Add(ParseAttribute());
+
+        if (Match(TokenKind.Func))
+            return ParseFunction(isStatic: true, isOverride: false, attributes, scope);
+
+        if (Match(TokenKind.Identifier))
+            return ParseField(isStatic: true, attributes, scope);
+
+        throw Recover();
+    }
+
     private SyntaxAttributeNode ParseAttribute()
     {
         var start = EatExpected(TokenKind.Hash).Span;

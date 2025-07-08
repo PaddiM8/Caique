@@ -99,6 +99,9 @@ public class Resolver
             case SyntaxProtocolDeclarationNode protocolDeclarationNode:
                 Visit(protocolDeclarationNode);
                 break;
+            case SyntaxModuleDeclarationNode moduleDeclarationNode:
+                Visit(moduleDeclarationNode);
+                break;
             case SyntaxFieldDeclarationNode fieldDeclarationNode:
                 Visit(fieldDeclarationNode);
                 break;
@@ -230,6 +233,12 @@ public class Resolver
             ResolveNode(subType);
         }
 
+        foreach (var declaration in node.Declarations)
+            Next(declaration, node);
+    }
+
+    private void Visit(SyntaxModuleDeclarationNode node)
+    {
         foreach (var declaration in node.Declarations)
             Next(declaration, node);
     }

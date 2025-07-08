@@ -165,6 +165,7 @@ public class LlvmContentEmitter
             SemanticFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
             SemanticClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
             SemanticProtocolDeclarationNode => null,
+            SemanticModuleDeclarationNode moduleDeclarationNode => Visit(moduleDeclarationNode),
             _ => throw new NotImplementedException(),
         };
     }
@@ -941,54 +942,26 @@ public class LlvmContentEmitter
         Visit(node.Init, node);
 
         foreach (var staticField in node.Fields.Where(x => x.IsStatic))
-        {
-            if (staticField.Attributes.Any(x => x.Identifier.Value == "ffi"))
-                continue;
-
-            var global = _moduleCache.GetNodeLlvmValue(staticField);
-            global.Initializer = staticField.Value == null
-                ? _specialValueBuilder.BuildDefaultValueForType(staticField.DataType)
-                : Next(staticField.Value)!.Value;
-        }
+            BuildStaticField(staticField);
 
         foreach (var function in node.Functions)
             Next(function);
 
         if (node.Identifier.Value == "Program")
-        {
-            // Create the entry function
-            var entryFunctionType = LLVMTypeRef.CreateFunction(_context.Int32Type, []);
-            var entryFunction = _module.AddFunction("main", entryFunctionType);
-            var block = entryFunction.AppendBasicBlock("entry");
-            _builder.PositionAtEnd(block);
-
-            // Find the user-defined main function
-            var userEntryDeclaration = node.Functions.FirstOrDefault(x => x.Identifier.Value == "Main");
-            if (userEntryDeclaration == null)
-                return null;
-
-            // Build a call to the user-defined main function
-            var userMainFunction = _moduleCache.GetNodeLlvmValue(userEntryDeclaration);
-            var userMainFunctionType = _typeBuilder.BuildFunctionType(userEntryDeclaration.Symbol);
-            var returnsVoid = userEntryDeclaration.ReturnType is PrimitiveDataType { Kind: Primitive.Void };
-            var returnValue = _builder.BuildCall2(
-                userMainFunctionType,
-                userMainFunction,
-                Array.Empty<LLVMValueRef>(),
-                returnsVoid ? string.Empty : "main"
-            );
-
-            if (returnsVoid)
-            {
-                _builder.BuildRet(LLVMValueRef.CreateConstInt(_context.Int32Type, 0, false));
-            }
-            else
-            {
-                _builder.BuildRet(returnValue);
-            }
-        }
+            BuildMainFunction(node);
 
         return null;
+    }
+
+    private void BuildStaticField(SemanticFieldDeclarationNode field)
+    {
+        if (field.Attributes.Any(x => x.Identifier.Value == "ffi"))
+            return;
+
+        var global = _moduleCache.GetNodeLlvmValue(field);
+        global.Initializer = field.Value == null
+            ? _specialValueBuilder.BuildDefaultValueForType(field.DataType)
+            : Next(field.Value)!.Value;
     }
 
     private LLVMValueRef Visit(SemanticInitNode node, SemanticClassDeclarationNode parentStructure)
@@ -1086,5 +1059,53 @@ public class LlvmContentEmitter
         var typeTableName = _contextCache.GetTypeTableName(classNode);
 
         return _module.GetNamedGlobal(typeTableName);
+    }
+
+    private LLVMValueRef? Visit(SemanticModuleDeclarationNode node)
+    {
+        foreach (var staticField in node.Fields.Where(x => x.IsStatic))
+            BuildStaticField(staticField);
+
+        foreach (var function in node.Functions)
+            Next(function);
+
+        if (node.Identifier.Value == "Program")
+            BuildMainFunction(node);
+
+        return null;
+    }
+
+    private void BuildMainFunction(ISemanticStructureDeclaration structure)
+    {
+        // Create the entry function
+        var entryFunctionType = LLVMTypeRef.CreateFunction(_context.Int32Type, []);
+        var entryFunction = _module.AddFunction("main", entryFunctionType);
+        var block = entryFunction.AppendBasicBlock("entry");
+        _builder.PositionAtEnd(block);
+
+        // Find the user-defined main function
+        var userEntryDeclaration = structure.Functions.FirstOrDefault(x => x.Identifier.Value == "Main");
+        if (userEntryDeclaration == null)
+            return;
+
+        // Build a call to the user-defined main function
+        var userMainFunction = _moduleCache.GetNodeLlvmValue(userEntryDeclaration);
+        var userMainFunctionType = _typeBuilder.BuildFunctionType(userEntryDeclaration.Symbol);
+        var returnsVoid = userEntryDeclaration.ReturnType is PrimitiveDataType { Kind: Primitive.Void };
+        var returnValue = _builder.BuildCall2(
+            userMainFunctionType,
+            userMainFunction,
+            Array.Empty<LLVMValueRef>(),
+            returnsVoid ? string.Empty : "main"
+        );
+
+        if (returnsVoid)
+        {
+            _builder.BuildRet(LLVMValueRef.CreateConstInt(_context.Int32Type, 0, false));
+        }
+        else
+        {
+            _builder.BuildRet(returnValue);
+        }
     }
 }
