@@ -50,11 +50,22 @@ public class DiagnosticReporter
         ReportError($"Symbol not found: '{identifier.Value}'.", identifier.Span);
     }
 
+    public void ReportNotFound(Token identifier, string context)
+    {
+        ReportError($"Symbol not found in {context}: '{identifier.Value}'.", identifier.Span);
+    }
+
     public void ReportNotFound(List<Token> typeNames)
     {
         var fullName = string.Join(":", typeNames.Select(x => x.Value));
         var span = typeNames.First().Span.Combine(typeNames.Last().Span);
         ReportError($"Symbol not found: {fullName}.", span);
+    }
+
+    public void ReportDuplicateEntry(Token identifier, Token otherIdentifier)
+    {
+        ReportError($"Duplicate entry found: '{identifier.Value}'.", identifier.Span);
+        ReportHint($"Other duplicate defined here.", otherIdentifier.Span);
     }
 
     public void ReportBodyInProtocol(TextSpan span)
@@ -173,6 +184,16 @@ public class DiagnosticReporter
     {
         ReportError($"Unable to override: Base class is not inheritable.", functionSpan);
         ReportHint("Use the 'inheritable' keyword to enable overriding.", baseClassSpan);
+    }
+
+    public void ReportInvalidEnumType(IDataType dataType, TextSpan span)
+    {
+        ReportError($"Invalid enum type: {dataType}. Enums can only have primitive or string values", span);
+    }
+
+    public void ReportInvalidEnumMemberValue(string details, TextSpan span)
+    {
+        ReportError($"Invalid enum member value: {details}.", span);
     }
 
     private void ReportHint(string message, TextSpan span)

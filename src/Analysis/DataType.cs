@@ -56,10 +56,16 @@ public interface IDataType
     bool IsFloat()
         => false;
 
+    bool IsString()
+        => false;
+
     bool IsClass()
         => false;
 
     bool IsProtocol()
+        => false;
+
+    bool IsEnum()
         => false;
 }
 
@@ -115,11 +121,15 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         };
     }
 
+    public override int GetHashCode()
+        => Kind.GetHashCode();
+
     public TypeEquivalence IsEquivalent(IDataType other)
     {
-        return other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind
-            ? TypeEquivalence.Identical
-            : TypeEquivalence.Incompatible;
+        if (other is PrimitiveDataType otherPrimitive && otherPrimitive.Kind == Kind)
+            return TypeEquivalence.Identical;
+
+        return TypeEquivalence.Incompatible;
     }
 
     public bool IsVoid()
@@ -142,14 +152,17 @@ public class PrimitiveDataType(Primitive kind) : IDataType
 
     public bool IsFloat()
         => Kind >= Primitive.Float16 && Kind <= Primitive.Float64;
-
-    public override int GetHashCode()
-        => Kind.GetHashCode();
 }
 
 public class SliceDataType(IDataType subType) : IDataType
 {
     public IDataType SubType { get; } = subType;
+
+    public override string ToString()
+        => $"[{SubType}]";
+
+    public override int GetHashCode()
+        => HashCode.Combine(typeof(SliceDataType), SubType);
 
     public TypeEquivalence IsEquivalent(IDataType other)
     {
@@ -157,12 +170,6 @@ public class SliceDataType(IDataType subType) : IDataType
             ? TypeEquivalence.Identical
             : TypeEquivalence.Incompatible;
     }
-
-    public override string ToString()
-        => $"[{SubType}]";
-
-    public override int GetHashCode()
-        => HashCode.Combine(typeof(SliceDataType), SubType);
 }
 
 public class StructureDataType(StructureSymbol symbol) : IDataType
@@ -188,6 +195,9 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
 
         return TypeEquivalence.Incompatible;
     }
+
+    public bool IsString()
+        => Symbol is StructureSymbol { SyntaxDeclaration.Symbol: { Name: "String", Namespace.Name: "prelude" } };
 
     public bool IsClass()
         => Symbol is StructureSymbol { SyntaxDeclaration: SyntaxClassDeclarationNode };
@@ -217,13 +227,37 @@ public class FunctionDataType(FunctionSymbol symbol) : IDataType
         return $"Fn({string.Join(", ", parameters)})({returnType})";
     }
 
+    public override int GetHashCode()
+        => Symbol.SyntaxDeclaration.GetHashCode();
+
     public TypeEquivalence IsEquivalent(IDataType other)
     {
         return other is FunctionDataType otherFunction && otherFunction.Symbol == Symbol
             ? TypeEquivalence.Identical
             : TypeEquivalence.Incompatible;
     }
+}
+
+public class EnumDataType(EnumSymbol symbol) : IDataType
+{
+    public EnumSymbol Symbol { get; } = symbol;
+
+    public override string ToString()
+        => Symbol.SyntaxDeclaration.Identifier.Value;
 
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();
+
+    public TypeEquivalence IsEquivalent(IDataType other)
+    {
+        if (other is EnumDataType otherDataType && Symbol == otherDataType.Symbol)
+            return TypeEquivalence.Identical;
+
+        return TypeEquivalence.Incompatible;
+    }
+
+    public bool IsEnum()
+    {
+        return true;
+    }
 }

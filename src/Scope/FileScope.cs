@@ -35,19 +35,24 @@ public class FileScope(string name, string filePath, NamespaceScope namespaceSco
         return true;
     }
 
-    public StructureSymbol? ResolveStructure(List<string> typeNames)
+    public ISymbol? ResolveSymbol(List<string> typeNames)
     {
-        var localStructure = Namespace.ResolveStructure(typeNames);
+        var localStructure = Namespace.ResolveSymbol(typeNames);
         if (localStructure != null)
             return localStructure;
 
         foreach (var importedNamespace in ImportedNamespaces)
         {
-            var importedStructure = importedNamespace.ResolveStructure(typeNames);
+            var importedStructure = importedNamespace.ResolveSymbol(typeNames);
             if (importedStructure != null)
                 return importedStructure;
         }
 
         return null;
+    }
+
+    public StructureSymbol? ResolveStructure(List<string> typeNames)
+    {
+        return ResolveSymbol(typeNames) as StructureSymbol;
     }
 }

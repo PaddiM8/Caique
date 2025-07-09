@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Caique.Lexing;
 using Caique.Parsing;
@@ -59,11 +60,12 @@ public class Analyser
             SyntaxVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
             SyntaxFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
             SyntaxClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
-            SyntaxProtocolDeclarationNode protocolDeclarationNode => Visit(protocolDeclarationNode),
-            SyntaxModuleDeclarationNode moduleDeclarationNode => Visit(moduleDeclarationNode),
             SyntaxFieldDeclarationNode fieldDeclarationNode => Visit(fieldDeclarationNode),
             SyntaxInitNode initNode => Visit(initNode),
             SyntaxInitParameterNode initParameterNode => Visit(initParameterNode),
+            SyntaxProtocolDeclarationNode protocolDeclarationNode => Visit(protocolDeclarationNode),
+            SyntaxModuleDeclarationNode moduleDeclarationNode => Visit(moduleDeclarationNode),
+            SyntaxEnumDeclarationNode enumDeclarationNode => Visit(enumDeclarationNode),
             _ => throw new NotImplementedException(),
         };
     }
@@ -186,6 +188,26 @@ public class Analyser
         var value = Next(node.Left);
         var targetDataType = arguments.Single().DataType;
 
+        if (value.DataType is EnumDataType enumValue && (targetDataType is PrimitiveDataType || targetDataType.IsString()))
+        {
+            var enumTypeNode = enumValue.Symbol.SyntaxDeclaration.Type;
+            var enumDataType = enumTypeNode == null
+                ? new PrimitiveDataType(Primitive.Int32)
+                : Next(enumTypeNode).DataType;
+            if (enumDataType.IsEquivalent(targetDataType) == TypeEquivalence.Identical)
+                return new SemanticCastNode(value, node.Span, targetDataType);
+        }
+
+        if ((value.DataType is PrimitiveDataType || value.DataType.IsString()) && targetDataType is EnumDataType targetEnum)
+        {
+            var enumTypeNode = targetEnum.Symbol.SyntaxDeclaration.Type;
+            var enumDataType = enumTypeNode == null
+                ? new PrimitiveDataType(Primitive.Int32)
+                : Next(enumTypeNode).DataType;
+            if (enumDataType.IsEquivalent(value.DataType) == TypeEquivalence.Identical)
+                return new SemanticCastNode(value, node.Span, targetDataType);
+        }
+
         if (value.DataType.GetType() != targetDataType.GetType())
             _diagnostics.ReportInvalidCast(value.DataType, targetDataType, value.Span);
 
@@ -236,14 +258,25 @@ public class Analyser
                 .Take(node.IdentifierList.Count - 1)
                 .Select(x => x.Value)
                 .ToList();
-            var structureSymbol = _syntaxTree.File.ResolveStructure(namespaceNames);
-            if (structureSymbol == null)
+            var lastIdentifier = node.IdentifierList.Last();
+
+            var foundSymbol = _syntaxTree.File.ResolveSymbol(namespaceNames);
+            if (foundSymbol == null)
             {
                 _diagnostics.ReportNotFound(node.IdentifierList);
                 throw Recover();
             }
 
-            var identifierSymbol = structureSymbol.SyntaxDeclaration.Scope.FindSymbol(node.IdentifierList.Last().Value);
+            if (foundSymbol is not StructureSymbol structureSymbol)
+            {
+                if (foundSymbol is EnumSymbol enumSymbol)
+                    return ResolveEnum(enumSymbol, lastIdentifier);
+
+                _diagnostics.ReportNotFound(node.IdentifierList);
+                throw Recover();
+            }
+
+            var identifierSymbol = structureSymbol.SyntaxDeclaration.Scope.FindSymbol(lastIdentifier.Value);
             if (identifierSymbol == null)
             {
                 _diagnostics.ReportNotFound(node.IdentifierList);
@@ -254,13 +287,13 @@ public class Analyser
             {
                 if (!functionSymbol.SyntaxDeclaration.IsStatic)
                 {
-                    _diagnostics.ReportNonStaticSymbolReferencedAsStatic(node.IdentifierList.Last());
+                    _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
                 }
 
                 var dataType = new FunctionDataType(functionSymbol);
 
                 return new SemanticFunctionReferenceNode(
-                    node.IdentifierList.Last(),
+                    lastIdentifier,
                     functionSymbol,
                     objectInstance: null,
                     dataType
@@ -271,14 +304,14 @@ public class Analyser
             {
                 if (!fieldSymbol.SyntaxDeclaration.IsStatic)
                 {
-                    _diagnostics.ReportNonStaticSymbolReferencedAsStatic(node.IdentifierList.Last());
+                    _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
                 }
 
                 // TODO: All fields should be private, so this isn't allowed
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
 
                 return new SemanticFieldReferenceNode(
-                    node.IdentifierList.Last(),
+                    lastIdentifier,
                     fieldSymbol,
                     objectInstance: null,
                     dataType
@@ -323,6 +356,18 @@ public class Analyser
 
         _diagnostics.ReportNotFound(identifier);
         throw Recover();
+    }
+
+    private SemanticEnumReferenceNode ResolveEnum(EnumSymbol symbol, Token memberIdentifier)
+    {
+        var dataType = new EnumDataType(symbol);
+        if (!symbol.SyntaxDeclaration.Members.Any(x => x.Identifier.Value == memberIdentifier.Value))
+        {
+            _diagnostics.ReportNotFound(memberIdentifier, symbol.SyntaxDeclaration.Identifier.Value);
+            throw Recover();
+        }
+
+        return new SemanticEnumReferenceNode(memberIdentifier, symbol, dataType);
     }
 
     private SemanticNode Visit(SyntaxUnaryNode node)
@@ -535,6 +580,18 @@ public class Analyser
         var equivalence = value.DataType.IsEquivalent(targetDataType);
         if (equivalence == TypeEquivalence.Incompatible)
         {
+            if (value is SemanticLiteralNode { Value.Kind: TokenKind.NumberLiteral } literal)
+            {
+                var primitive = (PrimitiveDataType)value.DataType;
+                var isValid = (primitive.IsFloat() && targetDataType.IsFloat()) ||
+                    (primitive.IsInteger() && targetDataType.IsFloat()) ||
+                    (primitive.IsSignedInteger() && targetDataType.IsSignedInteger()) ||
+                    (primitive.IsUnsignedInteger() && targetDataType.IsUnsignedInteger()) ||
+                    (primitive.IsSignedInteger() && targetDataType.IsUnsignedInteger());
+                if (isValid)
+                    return new SemanticLiteralNode(literal.Value, targetDataType);
+            }
+
             _diagnostics.ReportIncompatibleType(targetDataType, value.DataType, value.Span);
 
             return value;
@@ -884,6 +941,11 @@ public class Analyser
             init = (SemanticInitNode)Next(node.Init);
         }
 
+        var staticFieldIdentifiers = fields
+            .Where(x => x.IsStatic)
+            .Select(x => x.Identifier);
+        DetectDuplicateEntries(staticFieldIdentifiers);
+
         var semanticNode = new SemanticClassDeclarationNode(
             node.Identifier,
             inheritedClass,
@@ -904,6 +966,22 @@ public class Analyser
         return semanticNode;
     }
 
+    private void DetectDuplicateEntries(IEnumerable<Token> tokens)
+    {
+        var touched = new Dictionary<string, Token>();
+        foreach (var token in tokens)
+        {
+            if (touched.TryGetValue(token.Value, out var other))
+            {
+                _diagnostics.ReportDuplicateEntry(token, other);
+            }
+            else
+            {
+                touched[token.Value] = token;
+            }
+        }
+    }
+
     private static int CalculateFieldStartIndex(SyntaxClassDeclarationNode classDeclarationNode)
     {
         var inheritedClassSyntax = classDeclarationNode.SubTypes
@@ -916,70 +994,6 @@ public class Analyser
         var fieldCount = inheritedClassSyntax.Declarations.Count(x => x is SyntaxFieldDeclarationNode);
 
         return CalculateFieldStartIndex(inheritedClassSyntax) + fieldCount;
-    }
-
-    private SemanticNode Visit(SyntaxProtocolDeclarationNode node)
-    {
-        var functions = new List<SemanticFunctionDeclarationNode>();
-        foreach (var declaration in node.Declarations)
-        {
-            try
-            {
-                if (declaration is SyntaxFunctionDeclarationNode function)
-                    functions.Add((SemanticFunctionDeclarationNode)Next(function));
-            }
-            catch (AnalyserRecoveryException)
-            {
-                // Continue
-            }
-        }
-
-        var semanticNode = new SemanticProtocolDeclarationNode(
-            node.Identifier,
-            functions,
-            node.Symbol!,
-            node.Span
-        );
-
-        node.Symbol!.SemanticDeclaration = semanticNode;
-
-        return semanticNode;
-    }
-
-    private SemanticNode Visit(SyntaxModuleDeclarationNode node)
-    {
-        var functions = new List<SemanticFunctionDeclarationNode>();
-        var fields = new List<SemanticFieldDeclarationNode>();
-        foreach (var declaration in node.Declarations)
-        {
-            try
-            {
-                if (declaration is SyntaxFunctionDeclarationNode function)
-                {
-                    functions.Add((SemanticFunctionDeclarationNode)Next(function));
-                }
-                else if (declaration is SyntaxFieldDeclarationNode field)
-                {
-                    fields.Add((SemanticFieldDeclarationNode)Next(field));
-                }
-            }
-            catch (AnalyserRecoveryException)
-            {
-                // Continue
-            }
-        }
-
-        var semanticNode = new SemanticModuleDeclarationNode(
-            node.Identifier,
-            functions,
-            fields,
-            node.Symbol!,
-            node.Span
-        );
-
-        node.Symbol!.SemanticDeclaration = semanticNode;
-
-        return semanticNode;
     }
 
     private SemanticFieldDeclarationNode Visit(SyntaxFieldDeclarationNode node)
@@ -1079,4 +1093,173 @@ public class Analyser
 
         return new SemanticParameterNode(node.Identifier, linkedDataType, node.Span);
     }
+
+    private SemanticProtocolDeclarationNode Visit(SyntaxProtocolDeclarationNode node)
+    {
+        var functions = new List<SemanticFunctionDeclarationNode>();
+        foreach (var declaration in node.Declarations)
+        {
+            try
+            {
+                if (declaration is SyntaxFunctionDeclarationNode function)
+                    functions.Add((SemanticFunctionDeclarationNode)Next(function));
+            }
+            catch (AnalyserRecoveryException)
+            {
+                // Continue
+            }
+        }
+
+        var semanticNode = new SemanticProtocolDeclarationNode(
+            node.Identifier,
+            functions,
+            node.Symbol!,
+            node.Span
+        );
+
+        node.Symbol!.SemanticDeclaration = semanticNode;
+
+        return semanticNode;
+    }
+
+    private SemanticModuleDeclarationNode Visit(SyntaxModuleDeclarationNode node)
+    {
+        var functions = new List<SemanticFunctionDeclarationNode>();
+        var fields = new List<SemanticFieldDeclarationNode>();
+        foreach (var declaration in node.Declarations)
+        {
+            try
+            {
+                if (declaration is SyntaxFunctionDeclarationNode function)
+                {
+                    functions.Add((SemanticFunctionDeclarationNode)Next(function));
+                }
+                else if (declaration is SyntaxFieldDeclarationNode field)
+                {
+                    fields.Add((SemanticFieldDeclarationNode)Next(field));
+                }
+            }
+            catch (AnalyserRecoveryException)
+            {
+                // Continue
+            }
+        }
+
+        DetectDuplicateEntries(functions.Select(x => x.Identifier));
+        DetectDuplicateEntries(fields.Select(x => x.Identifier));
+
+        var semanticNode = new SemanticModuleDeclarationNode(
+            node.Identifier,
+            functions,
+            fields,
+            node.Symbol!,
+            node.Span
+        );
+
+        node.Symbol!.SemanticDeclaration = semanticNode;
+
+        return semanticNode;
+    }
+
+    private SemanticEnumDeclarationNode Visit(SyntaxEnumDeclarationNode node)
+    {
+        var members = new List<SemanticEnumMemberNode>();
+        var memberDataType = node.Type == null
+            ? new PrimitiveDataType(Primitive.Int32)
+            : Next(node.Type).DataType;
+
+        if (memberDataType is not PrimitiveDataType && !memberDataType.IsString())
+        {
+            _diagnostics.ReportInvalidEnumType(memberDataType, node.Span);
+            throw Recover();
+        }
+
+        SemanticLiteralNode? lastValue = null;
+        foreach (var member in node.Members)
+        {
+            try
+            {
+                var analysedMember = Visit(member, node, memberDataType, lastValue);
+                members.Add(analysedMember);
+                lastValue = analysedMember.Value;
+            }
+            catch (AnalyserRecoveryException)
+            {
+                // Continue
+            }
+        }
+
+        DetectDuplicateEntries(members.Select(x => x.Identifier));
+
+        var semanticNode = new SemanticEnumDeclarationNode(
+            node.Identifier,
+            members,
+            memberDataType,
+            node.Symbol!,
+            node.Span
+        );
+
+        node.Symbol!.SemanticDeclaration = semanticNode;
+
+        return semanticNode;
+    }
+
+    private SemanticEnumMemberNode Visit(
+        SyntaxEnumMemberNode node,
+        SyntaxEnumDeclarationNode declaration,
+        IDataType targetDataType,
+        SemanticLiteralNode? lastValue
+    )
+    {
+        SemanticNode value;
+        if (node.Value == null && targetDataType.IsInteger())
+        {
+            var oneToken = new Token(TokenKind.NumberLiteral, "1", _blankSpan);
+            var intDataType = new PrimitiveDataType(Primitive.Int32);
+            var oneLiteral = new SemanticLiteralNode(oneToken, intDataType);
+            if (lastValue == null)
+            {
+                var zeroToken = oneToken with { Value = "0" };
+                value = new SemanticLiteralNode(zeroToken, intDataType);
+            }
+            else
+            {
+                value = new SemanticBinaryNode(lastValue, TokenKind.Plus, oneLiteral, intDataType);
+            }
+        }
+        else if (node.Value == null && targetDataType.IsString())
+        {
+            var stringToken = new Token(TokenKind.StringLiteral, node.Identifier.Value, _blankSpan);
+            var stringDataType = new StructureDataType(_preludeScope.ResolveStructure(["String"]!)!);
+            value = new SemanticLiteralNode(stringToken, stringDataType);
+        }
+        else if (node.Value == null)
+        {
+            _diagnostics.ReportInvalidEnumMemberValue($"Expected explicit value for type {targetDataType}", node.Span);
+            throw Recover();
+        }
+        else
+        {
+            value = Next(node.Value);
+        }
+
+        try
+        {
+            var folder = new ConstantFolder(TypeCheck);
+            var foldedValue = folder.Fold(value, targetDataType);
+
+            return new SemanticEnumMemberNode(
+                node.Identifier,
+                foldedValue,
+                new EnumDataType(declaration.Symbol!),
+                node.Span
+            );
+        }
+        catch (Exception ex)
+        {
+            _diagnostics.ReportInvalidEnumMemberValue(ex.Message, node.Span);
+            throw Recover();
+        }
+    }
+
 }

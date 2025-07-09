@@ -128,6 +128,18 @@ public class SemanticFieldReferenceNode(
     }
 }
 
+public class SemanticEnumReferenceNode(Token identifier, EnumSymbol symbol, IDataType dataType)
+    : SemanticNode(dataType, identifier.Span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public EnumSymbol Symbol { get; } = symbol;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+    }
+}
+
 public class SemanticUnaryNode(TokenKind op, SemanticNode value, IDataType dataType, TextSpan span)
     : SemanticNode(dataType, span)
 {
@@ -545,6 +557,57 @@ public class SemanticModuleDeclarationNode(
         {
             field.Traverse(callback);
             callback(field, this);
+        }
+    }
+}
+
+public class SemanticEnumDeclarationNode(
+    Token identifier,
+    List<SemanticEnumMemberNode> members,
+    IDataType memberDataType,
+    EnumSymbol symbol,
+    TextSpan span
+)
+    : SemanticNode(new EnumDataType(symbol), span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SemanticEnumMemberNode> Members { get; } = members;
+
+    public IDataType MemberDataType { get; } = memberDataType;
+
+    public EnumSymbol Symbol { get; } = symbol;
+
+    public int FieldStartIndex { get; }
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        foreach (var member in Members)
+        {
+            member.Traverse(callback);
+            callback(member, this);
+        }
+    }
+}
+
+public class SemanticEnumMemberNode(
+    Token identifier,
+    SemanticLiteralNode value,
+    IDataType dataType,
+    TextSpan span
+)
+    : SemanticNode(dataType, span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public SemanticLiteralNode Value { get; } = value;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        if (Value != null)
+        {
+            Value.Traverse(callback);
+            callback(Value, this);
         }
     }
 }

@@ -152,6 +152,7 @@ public class LlvmContentEmitter
             SemanticVariableReferenceNode variableReferenceNode => Visit(variableReferenceNode),
             SemanticFunctionReferenceNode functionReferenceNode => Visit(functionReferenceNode),
             SemanticFieldReferenceNode fieldReferenceNode => Visit(fieldReferenceNode),
+            SemanticEnumReferenceNode enumReferenceNode => Visit(enumReferenceNode),
             SemanticUnaryNode unaryNode => Visit(unaryNode),
             SemanticBinaryNode binaryNode => Visit(binaryNode),
             SemanticAssignmentNode assignmentNode => Visit(assignmentNode),
@@ -166,6 +167,7 @@ public class LlvmContentEmitter
             SemanticClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
             SemanticProtocolDeclarationNode => null,
             SemanticModuleDeclarationNode moduleDeclarationNode => Visit(moduleDeclarationNode),
+            SemanticEnumDeclarationNode => null,
             _ => throw new NotImplementedException(),
         };
     }
@@ -335,6 +337,18 @@ public class LlvmContentEmitter
         );
 
         return (type, pointer);
+    }
+
+    private LLVMValueRef Visit(SemanticEnumReferenceNode node)
+    {
+        var valueNode = node
+            .Symbol!
+            .SemanticDeclaration!
+            .Members
+            .First(x => x.Identifier.Value == node.Identifier.Value)
+            .Value;
+
+        return Next(valueNode)!.Value;
     }
 
     private LLVMValueRef Visit(SemanticUnaryNode node)
@@ -668,6 +682,12 @@ public class LlvmContentEmitter
         var toType = node.DataType;
 
         var value = Next(node.Value)!.Value;
+        if (toType is EnumDataType toEnum)
+            toType = toEnum.Symbol.SemanticDeclaration!.MemberDataType;
+
+        if (fromType is EnumDataType fromEnum)
+            fromType = fromEnum.Symbol.SemanticDeclaration!.MemberDataType;
+
         if (toType is PrimitiveDataType primitiveDataType)
             return BuildPrimitiveCast(value, fromType, primitiveDataType);
 

@@ -363,6 +363,31 @@ public class SyntaxModuleDeclarationNode(
     public StructureSymbol? Symbol { get; set; }
 }
 
+public class SyntaxEnumDeclarationNode(
+    Token identifier,
+    List<SyntaxEnumMemberNode> members,
+    SyntaxTypeNode? type,
+    TextSpan span
+)
+    : SyntaxNode(span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public List<SyntaxEnumMemberNode> Members { get; } = members;
+
+    public SyntaxTypeNode? Type { get; } = type;
+
+    public EnumSymbol? Symbol { get; set; }
+}
+
+public class SyntaxEnumMemberNode(Token identifier, SyntaxNode? value, TextSpan span)
+    : SyntaxNode(span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public SyntaxNode? Value { get; } = value;
+}
+
 public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)
     : SyntaxNode(span)
 {

@@ -38,16 +38,16 @@ public class Project(string name, string projectFilePath)
         return null;
     }
 
-    public StructureSymbol? ResolveType(List<string> typeNames)
+    public ISymbol? ResolveSymbol(List<string> typeNames)
     {
         if (typeNames.Count == 0)
             return null;
 
         if (ProjectNamespace?.Name == typeNames.First())
-            return ProjectNamespace.ResolveStructure(typeNames[1..]);
+            return ProjectNamespace.ResolveSymbol(typeNames[1..]);
 
         if (Dependencies.TryGetValue(typeNames.First(), out var dependency))
-            return dependency.ResolveType(typeNames);
+            return dependency.ResolveSymbol(typeNames);
 
         return null;
     }

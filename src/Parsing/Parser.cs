@@ -59,6 +59,7 @@ public class Parser
                 TokenKind.Class => ParseClass(isInheritable),
                 TokenKind.Protocol => ParseProtocol(),
                 TokenKind.Module => ParseModule(),
+                TokenKind.Enum => ParseEnum(),
                 _ => ParseStatement(),
             };
         }
@@ -180,7 +181,7 @@ public class Parser
             scope,
             start.Combine(end)
         );
-        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
+        if (_fileScope.Namespace.FindSymbol(node.Identifier.Value) != null)
             _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
 
         var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
@@ -271,7 +272,7 @@ public class Parser
             scope,
             start.Combine(end)
         );
-        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
+        if (_fileScope.Namespace.FindSymbol(node.Identifier.Value) != null)
             _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
 
         var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
@@ -335,10 +336,57 @@ public class Parser
             scope,
             start.Combine(end)
         );
-        if (_fileScope.Namespace.FindType(node.Identifier.Value) != null)
+        if (_fileScope.Namespace.FindSymbol(node.Identifier.Value) != null)
             _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
 
         var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
+        node.Symbol = symbol;
+        _fileScope.Namespace.AddSymbol(symbol);
+
+        return node;
+    }
+
+    private SyntaxEnumDeclarationNode ParseEnum()
+    {
+        var start = EatExpected(TokenKind.Enum).Span;
+        var identifier = EatExpected(TokenKind.Identifier);
+
+        SyntaxTypeNode? type = null;
+        if (AdvanceIf(TokenKind.Colon))
+            type = ParseType();
+
+        EatExpected(TokenKind.OpenBrace);
+
+        var members = new List<SyntaxEnumMemberNode>();
+        do
+        {
+            if (Match(TokenKind.ClosedBrace))
+                break;
+
+            var memberIdentifier = EatExpected(TokenKind.Identifier);
+            var span = memberIdentifier.Span;
+
+            SyntaxNode? value = null;
+            if (AdvanceIf(TokenKind.Equals))
+            {
+                value = ParseExpression();
+                span = span.Combine(value.Span);
+            }
+
+            var member = new SyntaxEnumMemberNode(memberIdentifier, value, span);
+            members.Add(member);
+        }
+        while (!_reachedEnd && AdvanceIf(TokenKind.Comma));
+
+        var end = EatExpected(TokenKind.ClosedBrace).Span;
+        var node = new SyntaxEnumDeclarationNode(
+            identifier,
+            members,
+            type,
+            start.Combine(end)
+        );
+
+        var symbol = new EnumSymbol(identifier.Value, node, _fileScope.Namespace);
         node.Symbol = symbol;
         _fileScope.Namespace.AddSymbol(symbol);
 

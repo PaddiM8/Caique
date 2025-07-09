@@ -28,6 +28,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
             SliceDataType slice => Build(slice),
             FunctionDataType function => Build(function),
             StructureDataType structure => Build(structure),
+            EnumDataType @enum => Build(@enum),
             _ => throw new NotImplementedException(),
         };
 
@@ -208,5 +209,10 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         Debug.Assert(dataType.Symbol.SemanticDeclaration != null);
 
         return BuildNamedStructType(dataType);
+    }
+
+    private LLVMTypeRef Build(EnumDataType dataType)
+    {
+        return BuildType(dataType.Symbol.SemanticDeclaration!.MemberDataType);
     }
 }

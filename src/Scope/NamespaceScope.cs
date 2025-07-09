@@ -15,7 +15,7 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
 
     private readonly Dictionary<string, NamespaceScope> _namespaceScopes = [];
     private readonly Dictionary<string, FileScope> _fileScopes = [];
-    private readonly Dictionary<string, StructureSymbol> _structureSymbols = [];
+    private readonly Dictionary<string, ISymbol> _symbols = [];
 
     public override string ToString()
     {
@@ -35,17 +35,17 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
         _fileScopes[scope.Name] = scope;
     }
 
-    public void AddSymbol(StructureSymbol symbol)
+    public void AddSymbol(ISymbol symbol)
     {
-        _structureSymbols[symbol.Name] = symbol;
+        _symbols[symbol.Name] = symbol;
     }
 
-    public StructureSymbol? FindType(string name)
+    public ISymbol? FindSymbol(string name)
     {
-        if (_structureSymbols.TryGetValue(name, out StructureSymbol? symbol))
+        if (_symbols.TryGetValue(name, out ISymbol? symbol))
             return symbol;
 
-        return (Parent as NamespaceScope)?.FindType(name);
+        return (Parent as NamespaceScope)?.FindSymbol(name);
     }
 
     public NamespaceScope? ResolveNamespace(List<string> path)
@@ -60,18 +60,23 @@ public class NamespaceScope(string name, string filePath, IScope? parent, Projec
         return Project.ResolveNamespace(path);
     }
 
-    public StructureSymbol? ResolveStructure(List<string> typeNames)
+    public ISymbol? ResolveSymbol(List<string> typeNames)
     {
         if (typeNames.Count == 0)
             return null;
 
         if (typeNames.Count == 1)
-            return FindType(typeNames.Single());
+            return FindSymbol(typeNames.Single());
 
         if (_namespaceScopes.TryGetValue(typeNames.First(), out var foundScope))
-            return foundScope.ResolveStructure(typeNames[1..]);
+            return foundScope.ResolveSymbol(typeNames[1..]);
 
-        return Project.ResolveType(typeNames);
+        return Project.ResolveSymbol(typeNames);
+    }
+
+    public StructureSymbol? ResolveStructure(List<string> typeNames)
+    {
+        return ResolveSymbol(typeNames) as StructureSymbol;
     }
 
     public void Traverse(Action<FileScope> callback)

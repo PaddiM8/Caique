@@ -96,14 +96,20 @@ public class Resolver
             case SyntaxClassDeclarationNode classDeclarationNode:
                 Visit(classDeclarationNode);
                 break;
+            case SyntaxFieldDeclarationNode fieldDeclarationNode:
+                Visit(fieldDeclarationNode);
+                break;
             case SyntaxProtocolDeclarationNode protocolDeclarationNode:
                 Visit(protocolDeclarationNode);
                 break;
             case SyntaxModuleDeclarationNode moduleDeclarationNode:
                 Visit(moduleDeclarationNode);
                 break;
-            case SyntaxFieldDeclarationNode fieldDeclarationNode:
-                Visit(fieldDeclarationNode);
+            case SyntaxEnumDeclarationNode enumDeclarationNode:
+                Visit(enumDeclarationNode);
+                break;
+            case SyntaxEnumMemberNode enumMemberNode:
+                Visit(enumMemberNode);
                 break;
             default:
                 break;
@@ -225,24 +231,6 @@ public class Resolver
         }
     }
 
-    private void Visit(SyntaxProtocolDeclarationNode node)
-    {
-        foreach (var subType in node.SubTypes)
-        {
-            Next(subType, node);
-            ResolveNode(subType);
-        }
-
-        foreach (var declaration in node.Declarations)
-            Next(declaration, node);
-    }
-
-    private void Visit(SyntaxModuleDeclarationNode node)
-    {
-        foreach (var declaration in node.Declarations)
-            Next(declaration, node);
-    }
-
     private void Visit(SyntaxFieldDeclarationNode node)
     {
         foreach (var attribute in node.Attributes)
@@ -284,5 +272,38 @@ public class Resolver
         }
 
         node.LinkedField = fieldSymbol.SyntaxDeclaration;
+    }
+
+    private void Visit(SyntaxProtocolDeclarationNode node)
+    {
+        foreach (var subType in node.SubTypes)
+        {
+            Next(subType, node);
+            ResolveNode(subType);
+        }
+
+        foreach (var declaration in node.Declarations)
+            Next(declaration, node);
+    }
+
+    private void Visit(SyntaxModuleDeclarationNode node)
+    {
+        foreach (var declaration in node.Declarations)
+            Next(declaration, node);
+    }
+
+    private void Visit(SyntaxEnumDeclarationNode node)
+    {
+        if (node.Type != null)
+            Next(node.Type, node);
+
+        foreach (var member in node.Members)
+            Next(member, node);
+    }
+
+    private void Visit(SyntaxEnumMemberNode node)
+    {
+        if (node.Value != null)
+            Next(node.Value, node);
     }
 }
