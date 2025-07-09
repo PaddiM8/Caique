@@ -137,7 +137,7 @@ public class DiagnosticReporter
 
     public void ReportNonStaticMainFunction(TextSpan span)
     {
-        ReportError("Main function must be static.", span);
+        ReportError("Main:Run function must be static.", span);
     }
 
     public void ReportNonConstantValueInStaticField(TextSpan span)

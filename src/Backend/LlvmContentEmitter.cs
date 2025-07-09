@@ -967,7 +967,7 @@ public class LlvmContentEmitter
         foreach (var function in node.Functions)
             Next(function);
 
-        if (node.Identifier.Value == "Program")
+        if (node.Identifier.Value == "Main")
             BuildMainFunction(node);
 
         return null;
@@ -1089,7 +1089,7 @@ public class LlvmContentEmitter
         foreach (var function in node.Functions)
             Next(function);
 
-        if (node.Identifier.Value == "Program")
+        if (node.Identifier.Value == "Main")
             BuildMainFunction(node);
 
         return null;
@@ -1104,7 +1104,7 @@ public class LlvmContentEmitter
         _builder.PositionAtEnd(block);
 
         // Find the user-defined main function
-        var userEntryDeclaration = structure.Functions.FirstOrDefault(x => x.Identifier.Value == "Main");
+        var userEntryDeclaration = structure.Functions.FirstOrDefault(x => x.Identifier.Value == "Run");
         if (userEntryDeclaration == null)
             return;
 

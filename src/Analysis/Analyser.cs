@@ -792,8 +792,8 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxFunctionDeclarationNode node)
     {
-        var isMain = node.Identifier.Value == "Main" &&
-            _syntaxTree.GetEnclosingStructure(node)?.Identifier.Value == "Program";
+        var isMain = node.Identifier.Value == "Run" &&
+            _syntaxTree.GetEnclosingStructure(node)?.Identifier.Value == "Main";
         if (isMain && !node.IsStatic)
             _diagnostics.ReportNonStaticMainFunction(node.Span);
 
