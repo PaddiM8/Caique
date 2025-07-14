@@ -409,7 +409,19 @@ public class Analyser
             return new SemanticFieldReferenceNode(identifier, fieldSymbol2, instance, dataType);
         }
 
-        _diagnostics.ReportNotFound(identifier);
+        var block = _syntaxTree.GetEnclosingBlock(node);
+        if (block?.Scope?.Namespace.ResolveSymbol([identifier.Value]) != null)
+        {
+            _diagnostics.ReportExpectedValueGotType(identifier);
+
+            if (node.Parent is SyntaxMemberAccessNode memberAccess)
+                _diagnostics.HintColonInsteadOfDot(memberAccess.Identifier.Span);
+        }
+        else
+        {
+            _diagnostics.ReportNotFound(identifier);
+        }
+
         throw Recover();
     }
 

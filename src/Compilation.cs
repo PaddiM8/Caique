@@ -14,35 +14,37 @@ namespace Caique;
 
 public class Compilation
 {
-    public static IEnumerable<Diagnostic> Compile(string projectFilePath, CompilationOptions? options = null)
+    public static IReadOnlyList<Diagnostic> Compile(string projectFilePath, CompilationOptions? options = null)
+    {
+        var project = Preprocessor.Process("root", projectFilePath);
+
+        return Compile(project, options);
+    }
+
+    public static IReadOnlyList<Diagnostic> Compile(Project project, CompilationOptions? options = null)
     {
         options ??= new CompilationOptions();
 
         var stdProject = Preprocessor.Process("std", "/home/paddi/projects/caique/std");
 
         // TODO: The actual project name should be defined in the project file
-        var project = Preprocessor.Process("root", projectFilePath);
         var context = new CompilationContext(stdProject.ProjectNamespace!);
         project.AddDependency(stdProject);
 
         Parse(project, context);
 
         if (!context.DiagnosticReporter.Errors.Any())
-        {
             Resolve(project, context);
-        }
 
         List<SemanticTree> semanticTrees = [];
         if (!context.DiagnosticReporter.Errors.Any())
-        {
             semanticTrees = Analyse(project, context);
-        }
 
         if (!context.DiagnosticReporter.Errors.Any())
         {
             var loweredTrees = Lower(semanticTrees, context);
-            var objectFilePaths = Emit(loweredTrees, projectFilePath, context, options);
-            Link(objectFilePaths, project, GetTargetDirectory(projectFilePath));
+            var objectFilePaths = Emit(loweredTrees, project.ProjectFilePath, options);
+            Link(objectFilePaths, project, GetTargetDirectory(project.ProjectFilePath));
         }
 
         return context.DiagnosticReporter.Diagnostics;
@@ -54,15 +56,13 @@ public class Compilation
         {
             dependency.ProjectNamespace!.Traverse(scope =>
             {
-                var content = File.ReadAllText(scope.FilePath);
-                scope.SyntaxTree = Parser.Parse(content, scope, context);
+                scope.SyntaxTree = Parser.Parse(scope, context);
             });
         }
 
         project.ProjectNamespace!.Traverse(scope =>
         {
-            var content = File.ReadAllText(scope.FilePath);
-            scope.SyntaxTree = Parser.Parse(content, scope, context);
+            scope.SyntaxTree = Parser.Parse(scope, context);
         });
     }
 
@@ -123,7 +123,6 @@ public class Compilation
     private static List<string> Emit(
         List<LoweredTree> loweredTrees,
         string projectFilePath,
-        CompilationContext compilationContext,
         CompilationOptions options
     )
     {

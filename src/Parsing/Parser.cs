@@ -26,10 +26,10 @@ public class Parser
         _peek = _enumerator.Current;
     }
 
-    public static SyntaxTree Parse(string input, FileScope fileScope, CompilationContext compilationContext)
+    public static SyntaxTree Parse(FileScope fileScope, CompilationContext compilationContext)
     {
-        var syntaxTree = new SyntaxTree(input, fileScope);
-        var tokens = Lexer.Lex(input, syntaxTree, compilationContext);
+        var syntaxTree = new SyntaxTree(fileScope.FileContent, fileScope);
+        var tokens = Lexer.Lex(fileScope.FileContent, syntaxTree, compilationContext);
         var parser = new Parser(tokens, fileScope, compilationContext);
         var nodes = new List<SyntaxNode>();
         while (!parser._reachedEnd)

@@ -2,11 +2,13 @@ using Caique.Parsing;
 
 namespace Caique.Scope;
 
-public class FileScope(string name, string filePath, NamespaceScope namespaceScope) : IScope
+public class FileScope(string name, string filePath, string fileContent, NamespaceScope namespaceScope) : IScope
 {
     public string Name { get; } = name;
 
     public string FilePath { get; } = filePath;
+
+    public string FileContent { get; } = fileContent;
 
     public IScope? Parent { get; } = namespaceScope;
 

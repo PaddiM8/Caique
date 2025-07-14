@@ -50,6 +50,16 @@ public class DiagnosticReporter
         ReportError($"Expected type but got {got}.", span);
     }
 
+    public void ReportExpectedValueGotType(Token token)
+    {
+        ReportError($"Expected value but got type: '{token.Value}'.", token.Span);
+    }
+
+    public void HintColonInsteadOfDot(TextSpan span)
+    {
+        ReportHint($"Did you mean to use a colon instead of a dot?", span);
+    }
+
     public void ReportNotFound(Token identifier)
     {
         ReportError($"Symbol not found: '{identifier.Value}'.", identifier.Span);

@@ -27,7 +27,8 @@ public class Preprocessor
         foreach (var filePath in Directory.GetFiles(directoryPath, "*.cq"))
         {
             string fileScopeName = Path.GetFileNameWithoutExtension(filePath);
-            var fileScope = new FileScope(fileScopeName, filePath, scope);
+            var fileContent = File.ReadAllText(filePath);
+            var fileScope = new FileScope(fileScopeName, filePath, fileContent, scope);
             scope.AddScope(fileScope);
         }
 

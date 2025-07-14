@@ -1,0 +1,90 @@
+using System.Diagnostics;
+using System.Text;
+using Caique.Scope;
+
+namespace Caique.Tests.Utilities;
+
+public class TestProject
+{
+    private readonly string _name;
+    private readonly string _path;
+    private readonly Project _project;
+
+    private TestProject(string name, string path, Project project)
+    {
+        _name = name;
+        _path = path;
+        _project = project;
+    }
+
+    public static TestProject Create()
+    {
+        var name = "testProject";
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, name);
+        Directory.CreateDirectory(path);
+
+        var project = new Project(name, path);
+        var projectNamespace = new NamespaceScope(name, path, parent: null, project);
+        project.Initialise(projectNamespace);
+
+        return new TestProject(name, path, project);
+    }
+
+    public IEnumerable<Diagnostic> Compile()
+        => Compilation.Compile(_project);
+
+    public RunResult Run()
+    {
+        var diagnostics = Compilation.Compile(_project);
+        if (diagnostics.Any(x => x.Severity >= DiagnosticSeverity.Error))
+        {
+            return new RunResult
+            {
+                Diagnostics = diagnostics,
+                Stdout = string.Empty,
+                Stderr = string.Empty,
+                ExitCode = 0,
+            };
+        }
+
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = Path.Combine(_path, "target", _name),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            }
+        };
+
+        process.Start();
+        process.WaitForExit();
+
+        return new RunResult
+        {
+            Diagnostics = diagnostics,
+            Stdout = process.StandardOutput.ReadToEnd(),
+            Stderr = process.StandardError.ReadToEnd(),
+            ExitCode = process.ExitCode,
+        };
+    }
+
+    public TestProject AddNamespace(string name, Func<TestNamespace, TestNamespace> callback)
+    {
+        var testNamespace = new TestNamespace(name, _project, parent: null);
+        var scope = callback(testNamespace).Build();
+        _project.ProjectNamespace!.AddScope(scope);
+
+        return this;
+    }
+
+    public TestProject AddFile(string name, string content)
+    {
+        var filePath = Path.Combine(_path, $"{name}.cq");
+        var file = new FileScope(name, filePath, content, _project.ProjectNamespace!);
+        _project.ProjectNamespace!.AddScope(file);
+
+        return this;
+    }
+}
