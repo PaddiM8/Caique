@@ -6,5 +6,5 @@ public class CompilationContext(NamespaceScope preludeScope)
 {
     public DiagnosticReporter DiagnosticReporter { get; } = new();
 
-    public NamespaceScope PreludeScope { get; } = preludeScope;
+    public NamespaceScope StdScope { get; } = preludeScope;
 }

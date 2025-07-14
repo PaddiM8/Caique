@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Caique.Analysis;
 using Caique.Backend;
 using Caique.Linking;
+using Caique.Lowering;
 using Caique.Parsing;
 using Caique.Preprocessing;
 using Caique.Resolving;
@@ -17,14 +18,11 @@ public class Compilation
     {
         options ??= new CompilationOptions();
 
-        // var preludeProject = Preprocessor.Process("prelude", "/home/paddi/projects/caique/prelude", prelude: null);
-        var stdProject = Preprocessor.Process("std", "/home/paddi/projects/caique/std", prelude: null);
-        var preludeScope = stdProject.ResolveNamespace(["std", "prelude"])!;
+        var stdProject = Preprocessor.Process("std", "/home/paddi/projects/caique/std");
 
         // TODO: The actual project name should be defined in the project file
-        var project = Preprocessor.Process("root", projectFilePath, preludeScope);
-        var context = new CompilationContext(preludeScope);
-        // project.AddDependency(preludeProject);
+        var project = Preprocessor.Process("root", projectFilePath);
+        var context = new CompilationContext(stdProject.ProjectNamespace!);
         project.AddDependency(stdProject);
 
         Parse(project, context);
@@ -34,7 +32,7 @@ public class Compilation
             Resolve(project, context);
         }
 
-        List<(SemanticTree, FileScope)> semanticTrees = [];
+        List<SemanticTree> semanticTrees = [];
         if (!context.DiagnosticReporter.Errors.Any())
         {
             semanticTrees = Analyse(project, context);
@@ -42,7 +40,8 @@ public class Compilation
 
         if (!context.DiagnosticReporter.Errors.Any())
         {
-            var objectFilePaths = Emit(semanticTrees, projectFilePath, context, options);
+            var loweredTrees = Lower(semanticTrees, context);
+            var objectFilePaths = Emit(loweredTrees, projectFilePath, context, options);
             Link(objectFilePaths, project, GetTargetDirectory(projectFilePath));
         }
 
@@ -85,16 +84,16 @@ public class Compilation
         });
     }
 
-    private static List<(SemanticTree, FileScope)> Analyse(Project project, CompilationContext context)
+    private static List<SemanticTree> Analyse(Project project, CompilationContext context)
     {
-        var semanticTrees = new List<(SemanticTree, FileScope)>();
+        var semanticTrees = new List<SemanticTree>();
         foreach (var dependency in project.Dependencies.Values)
         {
             dependency.ProjectNamespace!.Traverse(scope =>
             {
                 Debug.Assert(scope.SyntaxTree != null);
                 var semanticTree = Analyser.Analyse(scope.SyntaxTree, context);
-                semanticTrees.Add((semanticTree, scope));
+                semanticTrees.Add(semanticTree);
             });
         }
 
@@ -102,37 +101,45 @@ public class Compilation
         {
             Debug.Assert(scope.SyntaxTree != null);
             var semanticTree = Analyser.Analyse(scope.SyntaxTree, context);
-            semanticTrees.Add((semanticTree, scope));
+            semanticTrees.Add(semanticTree);
         });
 
         return semanticTrees;
     }
 
+    private static List<LoweredTree> Lower(List<SemanticTree> semanticTrees, CompilationContext compilationContext
+    )
+    {
+        var loweredTrees = new List<LoweredTree>();
+        foreach (var semanticTree in semanticTrees)
+        {
+            var tree = Lowerer.Lower(semanticTree, compilationContext.StdScope);
+            loweredTrees.Add(tree);
+        }
+
+        return loweredTrees;
+    }
+
     private static List<string> Emit(
-        List<(SemanticTree, FileScope)> semanticTrees,
+        List<LoweredTree> loweredTrees,
         string projectFilePath,
         CompilationContext compilationContext,
         CompilationOptions options
     )
     {
         using var llvmContext = LLVMContextRef.Create();
-        var emitterContextMap = new Dictionary<SemanticTree, LlvmEmitterContext>();
-        var llvmContextCache = new LlvmContextCache();
-        foreach (var (semanticTree, scope) in semanticTrees)
-        {
-            var moduleName = scope.Namespace.ToString() + "_" + Path.GetFileNameWithoutExtension(scope.FilePath);
-            var emitterContext = new LlvmEmitterContext(moduleName, llvmContext, llvmContextCache);
-            LlvmHeaderEmitter.Emit(semanticTree, emitterContext);
-
-            emitterContextMap[semanticTree] = emitterContext;
-        }
-
         var objectFilePaths = new List<string>();
-        foreach (var (semanticTree, scope) in semanticTrees)
+        foreach (var loweredTree in loweredTrees)
         {
-            var emitterContext = emitterContextMap[semanticTree];
+            var emitterContext = new LlvmEmitterContext(loweredTree.ModuleName, llvmContext);
             var targetPath = GetTargetDirectory(projectFilePath);
-            string objectFilePath = LlvmContentEmitter.Emit(semanticTree, emitterContext, targetPath, compilationContext, options);
+            var objectFilePath = LlvmContentEmitter.Emit(
+                loweredTree,
+                emitterContext,
+                targetPath,
+                options
+            );
+
             objectFilePaths.Add(objectFilePath);
             emitterContext.Dispose();
         }

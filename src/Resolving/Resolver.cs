@@ -25,7 +25,7 @@ public class Resolver
         var resolver = new Resolver(syntaxTree, compilationContext);
         Debug.Assert(syntaxTree.Root != null);
 
-        syntaxTree.File.ImportNamespace(compilationContext.PreludeScope);
+        syntaxTree.File.ImportNamespace(compilationContext.StdScope.ResolveNamespace(["prelude"])!);
         resolver.Next(syntaxTree.Root, null);
     }
 

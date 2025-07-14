@@ -3,9 +3,11 @@ using Caique.Scope;
 
 namespace Caique.Analysis;
 
-public class SemanticTree(SemanticNode root)
+public class SemanticTree(SemanticNode root, FileScope file)
 {
     public SemanticNode Root { get; } = root;
+
+    public FileScope File { get; } = file;
 
     public SemanticBlockNode? GetEnclosingBlock(SemanticNode node)
     {
@@ -420,6 +422,8 @@ public interface ISemanticStructureDeclaration
 
     List<SemanticFieldDeclarationNode> Fields { get; }
 
+    List<SemanticAttributeNode> Attributes { get; }
+
     int FieldStartIndex { get; }
 }
 
@@ -456,6 +460,8 @@ public class SemanticClassDeclarationNode(
     public bool IsInheritable { get; } = isInheritable;
 
     public StructureSymbol Symbol { get; } = symbol;
+
+    public List<SemanticAttributeNode> Attributes { get; } = [];
 
     public int FieldStartIndex { get; init; }
 
@@ -514,6 +520,8 @@ public class SemanticProtocolDeclarationNode(
 
     public StructureSymbol Symbol { get; } = symbol;
 
+    public List<SemanticAttributeNode> Attributes { get; init; } = [];
+
     public int FieldStartIndex { get; }
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
@@ -542,6 +550,8 @@ public class SemanticModuleDeclarationNode(
     public List<SemanticFieldDeclarationNode> Fields { get; } = fields;
 
     public StructureSymbol Symbol { get; } = symbol;
+
+    public List<SemanticAttributeNode> Attributes { get; init; } = [];
 
     public int FieldStartIndex { get; }
 

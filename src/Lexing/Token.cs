@@ -23,7 +23,7 @@ public enum TokenKind
     Static, Override, Inheritable,
     New,
     As,
-    Return, Self, Base,
+    Return, Self, Base, Default,
     Equals, Colon, ColonColon, Semicolon, Comma, Hash,
     Identifier,
     OpenParenthesis, ClosedParenthesis, OpenBracket, ClosedBracket, OpenBrace, ClosedBrace,

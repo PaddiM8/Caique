@@ -92,6 +92,7 @@ public class Parser
 
     private SyntaxTypeNode ParseType()
     {
+        var start = _current?.Span;
         var isSlice = AdvanceIf(TokenKind.OpenBracket);
 
         var typeNames = new List<Token>();
@@ -112,7 +113,21 @@ public class Parser
         if (isSlice)
             EatExpected(TokenKind.ClosedBracket);
 
-        return new SyntaxTypeNode(typeNames, isSlice);
+        var typeArguments = new List<SyntaxTypeNode>();
+        if (AdvanceIf(TokenKind.OpenBracket))
+        {
+            do
+            {
+                typeArguments.Add(ParseType());
+            }
+            while (AdvanceIf(TokenKind.Comma));
+
+            EatExpected(TokenKind.ClosedBracket);
+        }
+
+        var span = start!.Combine(_previous!.Span);
+
+        return new SyntaxTypeNode(typeNames, isSlice, typeArguments, span);
     }
 
     private SyntaxVariableDeclarationNode ParseLet()
@@ -167,6 +182,10 @@ public class Parser
             while (AdvanceIf(TokenKind.Comma));
         }
 
+        var typeParameters = new List<Token>();
+        if (Match(TokenKind.OpenBracket))
+            typeParameters = ParseTypeParameters();
+
         EatExpected(TokenKind.OpenBrace);
 
         var (declarations, constructor, scope) = ParseStructureBody(identifier);
@@ -184,11 +203,30 @@ public class Parser
         if (_fileScope.Namespace.FindSymbol(node.Identifier.Value) != null)
             _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
 
+        foreach (var typeParameter in typeParameters)
+            scope.AddTypeParameter(new TypeSymbol(typeParameter.Value));
+
         var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
         node.Symbol = symbol;
         _fileScope.Namespace.AddSymbol(symbol);
 
         return node;
+    }
+
+    private List<Token> ParseTypeParameters()
+    {
+        EatExpected(TokenKind.OpenBracket);
+
+        var typeParameters = new List<Token>();
+        do
+        {
+            typeParameters.Add(EatExpected(TokenKind.Identifier));
+        }
+        while (AdvanceIf(TokenKind.Comma));
+
+        EatExpected(TokenKind.ClosedBracket);
+
+        return typeParameters;
     }
 
     private (List<SyntaxNode>, SyntaxInitNode? constructor, StructureScope scope) ParseStructureBody(Token identifier)
@@ -735,7 +773,7 @@ public class Parser
         if (Match(TokenKind.Identifier) && _current?.Value == "size_of")
             return ParseKeywordValue(areTypeArguments: true);
 
-        if (Match(TokenKind.Base))
+        if (Match(TokenKind.Self, TokenKind.Base, TokenKind.Default))
             return ParseKeywordValue(areTypeArguments: false);
 
         if (Match(TokenKind.Identifier))

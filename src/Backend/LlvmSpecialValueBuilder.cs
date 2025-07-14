@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Caique.Analysis;
+using Caique.Lowering;
 using LLVMSharp.Interop;
 
 namespace Caique.Backend;
@@ -65,39 +66,17 @@ public class LlvmSpecialValueBuilder(LlvmEmitterContext emitterContext, LlvmType
         return phi;
     }
 
-    public LLVMValueRef BuildDefaultValueForType(IDataType dataType)
+    public LLVMValueRef BuildDefaultValueForType(ILoweredDataType dataType)
     {
         var type = _typeBuilder.BuildType(dataType);
+        var primitive = (dataType as LoweredPrimitiveDataType)?.Primitive;
 
-        return dataType switch
+        return primitive switch
         {
-            PrimitiveDataType d when d.IsInteger() => LLVMValueRef.CreateConstInt(type, 0, true),
-            PrimitiveDataType d when d.IsFloat() => LLVMValueRef.CreateConstReal(type, 0),
-            PrimitiveDataType { Kind: Primitive.Bool } => LlvmUtils.CreateConstBool(_context, false),
-            PrimitiveDataType or SliceDataType or FunctionDataType or StructureDataType => LLVMValueRef.CreateConstNull(type),
-            _ => throw new NotImplementedException(),
+            var d when d?.IsInteger() is true => LLVMValueRef.CreateConstInt(type, 0, true),
+            var d when d?.IsFloat() is true => LLVMValueRef.CreateConstReal(type, 0),
+            Primitive.Bool => LlvmUtils.CreateConstBool(_context, false),
+            _ => LLVMValueRef.CreateConstNull(type),
         };
-    }
-
-    public LLVMValueRef BuildMalloc(LLVMTypeRef type, string label = "malloc")
-    {
-        var sizeType = _typeBuilder.BuildType(new PrimitiveDataType(Primitive.Int64));
-        LLVMTypeRef mallocType = LLVMTypeRef.CreateFunction(
-            LLVMTypeRef.CreatePointer(_context.Int8Type, 0),
-            [sizeType]
-        );
-
-        LLVMValueRef mallocValue = _module.GetNamedFunction("malloc");
-        if (mallocValue.Handle == IntPtr.Zero)
-            mallocValue = _module.AddFunction("malloc", mallocType);
-
-        var call = _builder.BuildCall2(
-            mallocType,
-            mallocValue,
-            new LLVMValueRef[] { LlvmUtils.BuildSizeOf(_context, _module, type) },
-            label
-        );
-
-        return _builder.BuildBitCast(call, LLVMTypeRef.CreatePointer(mallocType, 0), "cast");
     }
 }

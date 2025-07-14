@@ -9,6 +9,9 @@ module LibcUnsafe
     #ffi
     func fputs(str [u8], stream usize);
 
+    #ffi
+    func malloc(size usize) usize;
+
     func GetStdout() usize
     {
         LibcUnsafe:stdout

@@ -11,13 +11,13 @@ public class Analyser
     private readonly TextSpan _blankSpan;
     private readonly SyntaxTree _syntaxTree;
     private readonly DiagnosticReporter _diagnostics;
-    private readonly NamespaceScope _preludeScope;
+    private readonly NamespaceScope _stdScope;
 
     private Analyser(SyntaxTree syntaxTree, CompilationContext compilationContext)
     {
         _syntaxTree = syntaxTree;
         _diagnostics = compilationContext.DiagnosticReporter;
-        _preludeScope = compilationContext.PreludeScope;
+        _stdScope = compilationContext.StdScope;
         _blankSpan = new TextSpan(
             new TextPosition(-1, -1, -1, syntaxTree),
             new TextPosition(-1, -1, -1, syntaxTree)
@@ -31,7 +31,7 @@ public class Analyser
         var root = analyser.Next(syntaxTree.Root);
         root.Traverse((node, parent) => node.Parent = parent);
 
-        return new SemanticTree(root);
+        return new SemanticTree(root, syntaxTree.File);
     }
 
     private SemanticNode Next(SyntaxNode node)
@@ -101,24 +101,37 @@ public class Analyser
             .Select(Next)
             .ToList();
 
-        if (node.Keyword.Value == "size_of")
-            return NextSizeOfKeyword(node, arguments);
-
-        if (node.Keyword.Kind == TokenKind.Base)
-            return NextBaseKeyword(node, arguments);
-
-        throw new UnreachableException();
+        return node.Keyword switch
+        {
+            { Kind: TokenKind.Self } => NextSelfKeyword(node, arguments),
+            { Kind: TokenKind.Base } => NextBaseKeyword(node, arguments),
+            { Kind: TokenKind.Default } => NextDefaultKeyword(node, arguments),
+            { Value: "size_of" } => NextSizeOfKeyword(node, arguments),
+            _ => throw new UnreachableException(),
+        };
     }
 
-    private SemanticKeywordValueNode NextSizeOfKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
+    private SemanticKeywordValueNode NextSelfKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
     {
-        if (arguments?.Count != 1)
+        if (arguments?.Count > 0)
+            _diagnostics.ReportWrongNumberOfArguments(0, arguments.Count, node.Span);
+
+        var function = _syntaxTree.GetEnclosingFunction(node);
+        var isWithinMethod = function?.IsStatic is false;
+        if (!isWithinMethod)
         {
-            arguments = [];
-            _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+            _diagnostics.ReportMisplacedSelf(node.Span);
+            throw Recover();
         }
 
-        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span, new PrimitiveDataType(Primitive.Int64));
+        var structure = _syntaxTree.GetEnclosingStructure(node);
+
+        return new SemanticKeywordValueNode(
+            node.Keyword,
+            null,
+            node.Span,
+            new StructureDataType(structure!.Symbol!)
+        );
     }
 
     private SemanticKeywordValueNode NextBaseKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
@@ -126,9 +139,25 @@ public class Analyser
         var structure = _syntaxTree.GetEnclosingStructure(node);
         if (arguments == null)
         {
-            Debug.Assert(structure?.Symbol != null);
+            var function = _syntaxTree.GetEnclosingFunction(node);
+            var isWithinMethod = function?.IsStatic is false;
+            var isWithinInheritingStructure = structure?
+                .SubTypes
+                .Any(x => x.ResolvedSymbol?.SyntaxDeclaration is SyntaxClassDeclarationNode)
+                is true;
 
-            return new SemanticKeywordValueNode(node.Keyword, null, node.Span, new StructureDataType(structure.Symbol));
+            if (!isWithinMethod || !isWithinInheritingStructure)
+            {
+                _diagnostics.ReportMisplacedBase(node.Span);
+                throw Recover();
+            }
+
+            return new SemanticKeywordValueNode(
+                node.Keyword,
+                null,
+                node.Span,
+                new StructureDataType(structure!.Symbol!)
+            );
         }
 
         if (node.Parent?.Parent?.Parent is not SyntaxInitNode)
@@ -162,6 +191,32 @@ public class Analyser
             node.Span,
             new StructureDataType(structure.Symbol)
         );
+    }
+
+    private SemanticKeywordValueNode NextDefaultKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
+    {
+        if (arguments?.Count != 1)
+        {
+            _diagnostics.ReportWrongNumberOfArguments(1, arguments?.Count ?? 0, node.Span);
+            throw Recover();
+        }
+
+        var dataType = arguments.First().DataType;
+        if (arguments.First() is not SemanticTypeNode)
+            _diagnostics.ReportExpectedType(arguments.First().Span, got: "value");
+
+        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span, dataType);
+    }
+
+    private SemanticKeywordValueNode NextSizeOfKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
+    {
+        if (arguments?.Count != 1)
+        {
+            arguments = [];
+            _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+        }
+
+        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span, new PrimitiveDataType(Primitive.Int64));
     }
 
     private SemanticNode Visit(SyntaxDotKeywordNode node)
@@ -241,7 +296,7 @@ public class Analyser
 
         if (node.Value.Kind == TokenKind.StringLiteral)
         {
-            var symbol = _preludeScope.ResolveStructure(["String"])!;
+            var symbol = _stdScope.ResolveStructure(["prelude", "String"])!;
             var dataType = new StructureDataType(symbol);
 
             return new SemanticLiteralNode(node.Value, dataType);
@@ -676,8 +731,14 @@ public class Analyser
         {
             if (node.Parent is ISyntaxFunctionDeclaration enclosingFunction)
             {
-                var typeCheckedValue = TypeCheckReturnType(enclosingFunction, analysedLast, node.Span);
-                analysedLast = new SemanticReturnNode(typeCheckedValue, node.Span);
+                var analysedLastStatement = (SemanticStatementNode)analysedLast;
+                var typeCheckedValue = TypeCheckReturnType(
+                    enclosingFunction,
+                    analysedLastStatement.Value,
+                    node.Span
+                );
+                var returnNode = new SemanticReturnNode(typeCheckedValue, node.Span);
+                analysedLast = new SemanticStatementNode(returnNode);
             }
         }
 
@@ -827,6 +888,9 @@ public class Analyser
         if (node.Identifier.Value == structure?.Identifier.Value)
             _diagnostics.ReportFunctionNameSameAsParentStructure(node.Identifier);
 
+        if (structure != null && node.Identifier.Value == "init")
+            _diagnostics.ReportInvalidSymbolName(node.Identifier);
+
         if (structure is SyntaxProtocolDeclarationNode)
             node.Symbol!.IsVirtual = true;
 
@@ -880,7 +944,7 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxClassDeclarationNode node)
     {
-        if (node.SubTypes.Count > 1)
+        if (node.SubTypes.Where(x => x.ResolvedSymbol!.SyntaxDeclaration is SyntaxClassDeclarationNode).Count() > 1)
             _diagnostics.ReportMultipleInheritance(node.Span);
 
         StructureSymbol? inheritedClass = null;
@@ -998,6 +1062,9 @@ public class Analyser
 
     private SemanticFieldDeclarationNode Visit(SyntaxFieldDeclarationNode node)
     {
+        if (node.Identifier.Value == "init")
+            _diagnostics.ReportInvalidSymbolName(node.Identifier);
+
         var attributes = node
             .Attributes
             .Select(Next)
@@ -1230,7 +1297,7 @@ public class Analyser
         else if (node.Value == null && targetDataType.IsString())
         {
             var stringToken = new Token(TokenKind.StringLiteral, node.Identifier.Value, _blankSpan);
-            var stringDataType = new StructureDataType(_preludeScope.ResolveStructure(["String"]!)!);
+            var stringDataType = new StructureDataType(_stdScope.ResolveStructure(["prelude", "String"]!)!);
             value = new SemanticLiteralNode(stringToken, stringDataType);
         }
         else if (node.Value == null)

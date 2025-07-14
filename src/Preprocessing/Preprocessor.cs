@@ -4,13 +4,13 @@ namespace Caique.Preprocessing;
 
 public class Preprocessor
 {
-    public static Project Process(string projectName, string projectFilePath, NamespaceScope? prelude)
+    public static Project Process(string projectName, string projectFilePath)
     {
         var project = new Project(projectName, projectFilePath);
         // TODO: Project files don't exist yet
         //var directoryPath = Path.GetDirectoryName(projectFilePath)!;
         var directoryPath = projectFilePath;
-        var namespaceScope = BuildScope(projectName, directoryPath, null, project, prelude);
+        var namespaceScope = BuildScope(projectName, directoryPath, null, project);
         project.Initialise(namespaceScope);
 
         return project;
@@ -20,8 +20,7 @@ public class Preprocessor
         string name,
         string directoryPath,
         NamespaceScope? parent,
-        Project project,
-        NamespaceScope? prelude
+        Project project
     )
     {
         var scope = new NamespaceScope(name, directoryPath, parent, project);
@@ -40,7 +39,7 @@ public class Preprocessor
                 continue;
             }
 
-            var childScope = BuildScope(directoryName, childDirectoryPath, scope, project, prelude);
+            var childScope = BuildScope(directoryName, childDirectoryPath, scope, project);
             scope.AddScope(childScope);
         }
 

@@ -3,17 +3,9 @@ using LLVMSharp.Interop;
 
 namespace Caique.Backend;
 
-public class LlvmEmitterContext(
-    string moduleName,
-    LLVMContextRef context,
-    LlvmContextCache contextCache
-) : IDisposable
+public class LlvmEmitterContext(string moduleName, LLVMContextRef context) : IDisposable
 {
     public string ModuleName { get; } = moduleName;
-
-    public LlvmContextCache ContextCache { get; } = contextCache;
-
-    public LlvmModuleCache ModuleCache { get; } = new LlvmModuleCache();
 
     public LlvmTypeBuilder LlvmTypeBuilder { get; } = new LlvmTypeBuilder(context);
 

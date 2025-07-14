@@ -24,6 +24,48 @@ public enum Primitive
     USize,
 }
 
+public static class PrimitiveExtensions
+{
+    public static int GetBitSize(this Primitive primitive)
+    {
+        return primitive switch
+        {
+            Primitive.Void => 0,
+            Primitive.Bool => 1,
+            Primitive.Int8 => 8,
+            Primitive.Int16 => 16,
+            Primitive.Int32 => 32,
+            Primitive.Int64 => 64,
+            Primitive.Int128 => 128,
+            Primitive.Uint8 => 8,
+            Primitive.Uint16 => 16,
+            Primitive.Uint32 => 32,
+            Primitive.Uint64 => 64,
+            Primitive.Uint128 => 128,
+            Primitive.Float16 => 16,
+            Primitive.Float32 => 32,
+            Primitive.Float64 => 64,
+            Primitive.ISize => 64,
+            Primitive.USize => 64,
+        };
+    }
+
+    public static bool IsNumber(this Primitive primitive)
+        => primitive >= Primitive.Int8 && primitive <= Primitive.Float64;
+
+    public static bool IsInteger(this Primitive primitive)
+        => primitive >= Primitive.Int8 && primitive <= Primitive.USize;
+
+    public static bool IsSignedInteger(this Primitive primitive)
+        => primitive >= Primitive.Int8 && primitive <= Primitive.ISize;
+
+    public static bool IsUnsignedInteger(this Primitive primitive)
+        => primitive >= Primitive.Uint8 && primitive <= Primitive.USize;
+
+    public static bool IsFloat(this Primitive primitive)
+        => primitive >= Primitive.Float16 && primitive <= Primitive.Float64;
+}
+
 public enum TypeEquivalence
 {
     Incompatible,
@@ -76,26 +118,7 @@ public class PrimitiveDataType(Primitive kind) : IDataType
     public Primitive Kind { get; } = kind;
 
     public int BitSize
-        => Kind switch
-        {
-            Primitive.Void => 0,
-            Primitive.Bool => 1,
-            Primitive.Int8 => 8,
-            Primitive.Int16 => 16,
-            Primitive.Int32 => 32,
-            Primitive.Int64 => 64,
-            Primitive.Int128 => 128,
-            Primitive.Uint8 => 8,
-            Primitive.Uint16 => 16,
-            Primitive.Uint32 => 32,
-            Primitive.Uint64 => 64,
-            Primitive.Uint128 => 128,
-            Primitive.Float16 => 16,
-            Primitive.Float32 => 32,
-            Primitive.Float64 => 64,
-            Primitive.ISize => 64,
-            Primitive.USize => 64,
-        };
+        => Kind.GetBitSize();
 
     public override string ToString()
     {
@@ -139,19 +162,19 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         => Kind == Primitive.Bool;
 
     public bool IsNumber()
-        => Kind >= Primitive.Int8 && Kind <= Primitive.Float64;
+        => Kind.IsNumber();
 
     public bool IsInteger()
-        => Kind >= Primitive.Int8 && Kind <= Primitive.USize;
+        => Kind.IsInteger();
 
     public bool IsSignedInteger()
-        => Kind >= Primitive.Int8 && Kind <= Primitive.ISize;
+        => Kind.IsSignedInteger();
 
     public bool IsUnsignedInteger()
-        => Kind >= Primitive.Uint8 && Kind <= Primitive.USize;
+        => Kind.IsUnsignedInteger();
 
     public bool IsFloat()
-        => Kind >= Primitive.Float16 && Kind <= Primitive.Float64;
+        => Kind.IsFloat();
 }
 
 public class SliceDataType(IDataType subType) : IDataType
@@ -243,7 +266,7 @@ public class EnumDataType(EnumSymbol symbol) : IDataType
     public EnumSymbol Symbol { get; } = symbol;
 
     public override string ToString()
-        => Symbol.SyntaxDeclaration.Identifier.Value;
+        => $"{Symbol.Namespace}:{Symbol.SyntaxDeclaration.Identifier.Value}";
 
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();

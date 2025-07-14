@@ -45,6 +45,11 @@ public class DiagnosticReporter
         ReportError($"Wrong number of arguments. Expected {expected} but got {got}.", span);
     }
 
+    public void ReportExpectedType(TextSpan span, string got)
+    {
+        ReportError($"Expected type but got {got}.", span);
+    }
+
     public void ReportNotFound(Token identifier)
     {
         ReportError($"Symbol not found: '{identifier.Value}'.", identifier.Span);
@@ -92,6 +97,11 @@ public class DiagnosticReporter
     public void ReportSymbolAlreadyExists(Token token)
     {
         ReportError($"A symbol with the name '{token.Value}' already exists.", token.Span);
+    }
+
+    public void ReportInvalidSymbolName(Token token)
+    {
+        ReportError($"The name '{token.Value}' is invalid/reserved in the current context.", token.Span);
     }
 
     public void ReportIncompatibleType(string expected, IDataType got, TextSpan span)
@@ -163,6 +173,16 @@ public class DiagnosticReporter
     public void ReportMultipleInheritance(TextSpan span)
     {
         ReportError("Inheriting from multiple classes is not allowed.", span);
+    }
+
+    public void ReportMisplacedSelf(TextSpan span)
+    {
+        ReportError("A 'self' keyword must be placed within a non-static member function.", span);
+    }
+
+    public void ReportMisplacedBase(TextSpan span)
+    {
+        ReportError("A 'base' keyword must be placed within a non-static member function of an inheriting structure.", span);
     }
 
     public void ReportMisplacedBaseCall(TextSpan span)

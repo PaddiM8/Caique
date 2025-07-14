@@ -199,12 +199,19 @@ public class SyntaxParameterNode(Token identifier, SyntaxTypeNode type, TextSpan
     public SyntaxTypeNode Type { get; } = type;
 }
 
-public class SyntaxTypeNode(List<Token> typeNames, bool isSlice)
-    : SyntaxNode(typeNames.First().Span.Combine(typeNames.Last().Span))
+public class SyntaxTypeNode(
+    List<Token> typeNames,
+    bool isSlice,
+    List<SyntaxTypeNode> typeArguments,
+    TextSpan span
+)
+    : SyntaxNode(span)
 {
     public List<Token> TypeNames { get; } = typeNames;
 
     public bool IsSlice { get; } = isSlice;
+
+    public List<SyntaxTypeNode> TypeArguments { get; } = typeArguments;
 
     public StructureSymbol? ResolvedSymbol { get; set; }
 }
