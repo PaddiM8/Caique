@@ -49,7 +49,7 @@ public class LoweredLiteralNode(string value, TokenKind kind, ILoweredDataType d
 }
 
 public class LoweredVariableReferenceNode(ILoweredVariableDeclaration declaration, ILoweredDataType dataType)
-    : LoweredNode(dataType)
+    : LoweredNode(new LoweredPointerDataType(dataType))
 {
     public ILoweredVariableDeclaration Declaration { get; } = declaration;
 }

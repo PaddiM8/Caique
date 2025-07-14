@@ -170,7 +170,7 @@ public class Lowerer
 
     private LoweredLoadNode Visit(SemanticVariableReferenceNode node)
     {
-        var dataType = new LoweredPointerDataType(_typeBuilder.BuildType(node.DataType));
+        var dataType = _typeBuilder.BuildType(node.DataType);
         var declaration = _variableDeclarationCache[node.Symbol.SemanticDeclaration!];
         var reference = new LoweredVariableReferenceNode(declaration, dataType);
 
@@ -420,7 +420,7 @@ public class Lowerer
         var mallocInstanceReference = new LoweredLoadNode(
             new LoweredVariableReferenceNode(
                 instanceDeclaration,
-                new LoweredPointerDataType(instanceDeclaration.DataType)
+                instanceDeclaration.DataType
             )
         );
         var call = BuildConstructorCall(
@@ -542,7 +542,7 @@ public class Lowerer
 
         var reference = new LoweredVariableReferenceNode(
             declaration,
-            new LoweredPointerDataType(fatPointerType)
+            fatPointerType
         );
 
         var instanceIndex = (int)FatPointerField.Instance;
