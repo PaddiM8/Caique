@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Caique.Analysis;
 using Caique.Backend;
 using Caique.Lexing;
@@ -187,7 +189,7 @@ public class Lowerer
 
     private LoweredNode Visit(SemanticFieldReferenceNode node)
     {
-        var dataType = new LoweredPointerDataType(_typeBuilder.BuildType(node.DataType));
+        var dataType = _typeBuilder.BuildType(node.DataType);
         if (node.ObjectInstance == null)
         {
             var name = BuildStaticFieldName(node.Symbol.SemanticDeclaration!);
@@ -197,7 +199,7 @@ public class Lowerer
         }
 
         var instance = Next(node.ObjectInstance)!;
-        var structure = _tree.GetEnclosingStructure(node)!;
+        var structure = _tree.GetEnclosingStructure(node.Symbol.SemanticDeclaration!)!;
         var declaration = node.Symbol.SemanticDeclaration!;
 
         var fieldOffset = 0;
@@ -293,6 +295,15 @@ public class Lowerer
         List<LoweredNode> arguments
     )
     {
+        var loweredInstanceType = _typeBuilder.BuildType(new StructureDataType(objectInstanceDataType.Symbol));
+        var instancePointerDeclaration = new LoweredVariableDeclarationNode(
+            "instancePointer",
+            objectInstance,
+            loweredInstanceType
+        );
+        Add(instancePointerDeclaration);
+        var instancePointerReference = new LoweredVariableReferenceNode(instancePointerDeclaration, loweredInstanceType);
+
         int functionIndex;
         LoweredPointerDataType vtableType;
         LoweredNode vtableReference;
@@ -302,7 +313,11 @@ public class Lowerer
 
             // Get the type table
             var typeTableType = _typeBuilder.BuildTypeTableType(classNode);
-            var typeTableReference = new LoweredFieldReferenceNode(objectInstance, 0, typeTableType);
+            var typeTableReference = new LoweredFieldReferenceNode(
+                instancePointerReference,
+                0,
+                new LoweredPointerDataType(typeTableType)
+            );
 
             // Get the vtable from the type table
             vtableType = new LoweredPointerDataType(_typeBuilder.BuildVtableType(classNode));
@@ -322,22 +337,12 @@ public class Lowerer
         {
             // Protocol
             var fatPointerType = (LoweredStructDataType)_typeBuilder.BuildType(objectInstanceDataType);
-            var loweredInstanceType = _typeBuilder.BuildType(new StructureDataType(objectInstanceDataType.Symbol));
-            var instancePointerDeclaration = new LoweredVariableDeclarationNode(
-                "instancePointer",
-                objectInstance,
-                loweredInstanceType
-            );
-            Add(instancePointerDeclaration);
-            var instancePointerReference = new LoweredVariableReferenceNode(instancePointerDeclaration, loweredInstanceType);
 
             // Extract the concrete instance from the fat pointer
             var concreteInstanceReference = new LoweredFieldReferenceNode(
                 instancePointerReference,
                 (int)FatPointerField.Instance,
-                new LoweredPointerDataType(
-                    new LoweredPointerDataType(loweredInstanceType)
-                )
+                new LoweredPointerDataType(loweredInstanceType)
             );
             var concreteInstancePointer = new LoweredLoadNode(concreteInstanceReference);
             arguments.Insert(0, concreteInstancePointer);
@@ -348,7 +353,7 @@ public class Lowerer
             vtableReference = new LoweredFieldReferenceNode(
                 instancePointerReference,
                 vtableIndex,
-                new LoweredPointerDataType(vtableType)
+                vtableType
             );
 
             functionIndex = objectInstanceDataType
@@ -366,7 +371,7 @@ public class Lowerer
         var actualFunctionReference = new LoweredFieldReferenceNode(
             vtablePointer,
             functionIndex,
-            new LoweredPointerDataType(functionType)
+            functionType
         );
         var actualFunctionPointer = new LoweredLoadNode(actualFunctionReference);
 
@@ -494,15 +499,21 @@ public class Lowerer
             fromType = fromEnum.Symbol.SemanticDeclaration!.MemberDataType;
 
         var loweredToType = _typeBuilder.BuildType(toType);
-        if (toType is PrimitiveDataType primitiveDataType)
+        if (toType is PrimitiveDataType)
             return new LoweredCastNode(value, loweredToType);
 
         if (toType.IsClass() && fromType.IsProtocol())
         {
             // Extract the instance pointer from the fat pointer
-            var fatPointerType = _typeBuilder.BuildType((StructureDataType)fromType);
+            var valueDeclaration = new LoweredVariableDeclarationNode("instance", value, value.DataType);
+            Add(valueDeclaration);
+            var valueReference = new LoweredVariableReferenceNode(valueDeclaration, value.DataType);
 
-            return new LoweredFieldReferenceNode(value, (int)FatPointerField.Instance, fatPointerType);
+            var instanceIndex = (int)FatPointerField.Instance;
+            var instanceType = ((LoweredStructDataType)value.DataType).FieldTypes[instanceIndex];
+            var instanceReference = new LoweredFieldReferenceNode(valueReference, instanceIndex, instanceType);
+
+            return new LoweredLoadNode(instanceReference);
         }
 
         if (toType.IsProtocol() && fromType.IsClass())
@@ -810,7 +821,7 @@ public class Lowerer
         );
         _globals[vtableType.Name!] = global;
 
-        return new LoweredGlobalReferenceNode(vtableType.Name!, new LoweredPointerDataType(vtableType));
+        return new LoweredGlobalReferenceNode(vtableType.Name!, vtableType);
     }
 
     private LoweredNode BuildTypeTable(SemanticClassDeclarationNode classNode)

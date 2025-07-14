@@ -61,7 +61,7 @@ public class LoweredFunctionReferenceNode(string name, ILoweredDataType dataType
 }
 
 public class LoweredFieldReferenceNode(LoweredNode instance, int index, ILoweredDataType dataType)
-    : LoweredNode(dataType)
+    : LoweredNode(new LoweredPointerDataType(dataType))
 {
     public LoweredNode Instance { get; } = instance;
 
@@ -69,7 +69,7 @@ public class LoweredFieldReferenceNode(LoweredNode instance, int index, ILowered
 }
 
 public class LoweredGlobalReferenceNode(string identifier, ILoweredDataType dataType)
-    : LoweredNode(dataType)
+    : LoweredNode(new LoweredPointerDataType(dataType))
 {
     public string Identifier { get; } = identifier;
 }

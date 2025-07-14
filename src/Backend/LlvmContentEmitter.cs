@@ -288,9 +288,7 @@ public class LlvmContentEmitter
     private LLVMValueRef Visit(LoweredFieldReferenceNode node)
     {
         var instance = Next(node.Instance)!.Value;
-        var loweredInstanceType = node.Instance.DataType is LoweredPointerDataType pointerType
-            ? pointerType.InnerType
-            : node.Instance.DataType;
+        var loweredInstanceType = node.Instance.DataType.Dereference();
         var instanceType = _typeBuilder.BuildType(loweredInstanceType);
 
         return _builder.BuildStructGEP2(
