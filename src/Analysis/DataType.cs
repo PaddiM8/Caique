@@ -16,12 +16,12 @@ public enum Primitive
     Uint16,
     Uint32,
     Uint64,
+    ISize,
+    USize,
     Uint128,
     Float16,
     Float32,
     Float64,
-    ISize,
-    USize,
 }
 
 public static class PrimitiveExtensions

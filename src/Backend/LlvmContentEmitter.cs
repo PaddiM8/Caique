@@ -507,11 +507,12 @@ public class LlvmContentEmitter
         LoweredPrimitiveDataType toPrimitive
     )
     {
-        if (fromDataType is not PrimitiveDataType fromPrimitive)
+        if (fromDataType is not LoweredPrimitiveDataType fromPrimitiveDataType)
             throw new NotImplementedException();
 
-        bool isUpcast = toPrimitive.Primitive.GetBitSize() > fromPrimitive.BitSize;
-        bool isDowncast = toPrimitive.Primitive.GetBitSize() < fromPrimitive.BitSize;
+        var fromPrimitive = fromPrimitiveDataType.Primitive;
+        bool isUpcast = toPrimitive.Primitive.GetBitSize() > fromPrimitive.GetBitSize();
+        bool isDowncast = toPrimitive.Primitive.GetBitSize() < fromPrimitive.GetBitSize();
         var toLlvmType = _typeBuilder.BuildType(toPrimitive);
 
         LLVMOpcode? opCode;
