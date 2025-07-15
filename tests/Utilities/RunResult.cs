@@ -10,9 +10,12 @@ public class RunResult
 
     public required int ExitCode { get; init;}
 
+    public IEnumerable<Diagnostic> ErrorDiagnostics
+        => Diagnostics.Where(x => x.Severity >= DiagnosticSeverity.Warning);
+
     public RunResult AssertNoBuildErrors()
     {
-        Assert.That(Diagnostics.Where(x => x.Severity >= DiagnosticSeverity.Warning), Is.Empty);
+        Assert.That(ErrorDiagnostics, Is.Empty);
 
         return this;
     }

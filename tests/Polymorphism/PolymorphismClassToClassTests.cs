@@ -44,4 +44,25 @@ public class PolymorphismClassToClassTests
 
         Assert.That(result.ExitCode, Is.EqualTo(42 + 12));
     }
+
+    [Test]
+    public void TestInheritFromNonInheritableClass_Error()
+    {
+        var mainFile = """
+            class Duck : Animal
+            {
+            }
+
+            class Animal
+            {
+            }
+            """;
+        var result = TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile();
+
+        var errors = result.ErrorDiagnostics;
+        Assert.That(errors, Has.Exactly(1).Matches<Diagnostic>(x => x.Code == DiagnosticCode.ErrorBaseClassNotInheritable));
+    }
 }

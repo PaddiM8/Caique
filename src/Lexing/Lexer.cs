@@ -246,7 +246,7 @@ public class Lexer
 
         if (text.Count(c => c == '.') > 1)
         {
-            _diagnostics.UnrecognisedToken(text, new TextSpan(start, end));
+            _diagnostics.ReportUnrecognisedToken(text, new TextSpan(start, end));
         }
 
         return new Token(

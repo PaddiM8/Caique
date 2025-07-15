@@ -30,8 +30,12 @@ public class TestProject
         return new TestProject(name, path, project);
     }
 
-    public IEnumerable<Diagnostic> Compile()
-        => Compilation.Compile(_project);
+    public CompilationResult Compile()
+    {
+        var diagnostics = Compilation.Compile(_project);
+
+        return new CompilationResult(diagnostics);
+    }
 
     public RunResult Run()
     {

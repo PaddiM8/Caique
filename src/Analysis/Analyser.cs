@@ -914,7 +914,7 @@ public class Analyser
         if (parentClass != null && node.IsOverride)
         {
             if (!parentClass.IsInheritable)
-                _diagnostics.ReportBaseClassIsNotInheritable(node.Span, parentClass.Span);
+                _diagnostics.ReportBaseClassNotInheritable(node.Span, parentClass.Span);
 
             // TODO: If it does not exist in the parent, throw an error.
             // If it does exist, mark the base function as virtual
@@ -956,8 +956,16 @@ public class Analyser
 
     private SemanticNode Visit(SyntaxClassDeclarationNode node)
     {
-        if (node.SubTypes.Where(x => x.ResolvedSymbol!.SyntaxDeclaration is SyntaxClassDeclarationNode).Count() > 1)
+        var inheritedClasses = node
+            .SubTypes
+            .Select(x => x.ResolvedSymbol!.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .Where(x => x != null);
+
+        if (inheritedClasses.Count() > 1)
             _diagnostics.ReportMultipleInheritance(node.Span);
+
+        if (inheritedClasses.FirstOrDefault()?.IsInheritable is false)
+            _diagnostics.ReportBaseClassNotInheritable(node.Span, inheritedClasses.First()!.Span);
 
         StructureSymbol? inheritedClass = null;
         var implementedProtocols = new List<StructureSymbol>();

@@ -10,7 +10,7 @@ public enum DiagnosticSeverity
     Error,
 }
 
-public record Diagnostic(DiagnosticSeverity Severity, string Message, TextSpan Span)
+public record Diagnostic(DiagnosticCode Code, DiagnosticSeverity Severity, string Message, TextSpan Span)
 {
     public override string ToString()
     {
