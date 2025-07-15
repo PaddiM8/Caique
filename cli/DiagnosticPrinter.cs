@@ -9,18 +9,21 @@ public class DiagnosticPrinter(string workingDirectory)
         foreach (var diagnostic in diagnostics)
         {
             Console.ForegroundColor = ConsoleColor.Gray;
-            var path = Path.GetRelativePath(_workingDirectory, diagnostic.Span.Start.SyntaxTree.File.FilePath);
-            Console.Write(path);
-            Console.ResetColor();
-            Console.Write(" (");
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write(diagnostic.Span.Start.Line + 1);
-            Console.ResetColor();
-            Console.Write(":");
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write(diagnostic.Span.Start.Column + 1);
-            Console.ResetColor();
-            Console.WriteLine(")");
+            if (diagnostic.Span != null)
+            {
+                var path = Path.GetRelativePath(_workingDirectory, diagnostic.Span.Start.SyntaxTree.File.FilePath);
+                Console.Write(path);
+                Console.ResetColor();
+                Console.Write(" (");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write(diagnostic.Span.Start.Line + 1);
+                Console.ResetColor();
+                Console.Write(":");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write(diagnostic.Span.Start.Column + 1);
+                Console.ResetColor();
+                Console.WriteLine(")");
+            }
 
             if (diagnostic.Severity == DiagnosticSeverity.Hint)
             {

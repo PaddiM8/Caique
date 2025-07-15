@@ -43,8 +43,15 @@ public class Compilation
         if (!context.DiagnosticReporter.Errors.Any())
         {
             var loweredTrees = Lower(semanticTrees, context);
-            var objectFilePaths = Emit(loweredTrees, project.ProjectFilePath, options);
-            Link(objectFilePaths, project, GetTargetDirectory(project.ProjectFilePath));
+            var (objectFilePaths, success) = Emit(loweredTrees, project.ProjectFilePath, options);
+            if (success)
+            {
+                Link(objectFilePaths, project, GetTargetDirectory(project.ProjectFilePath));
+            }
+            else
+            {
+                context.DiagnosticReporter.ReportCompilerError();
+            }
         }
 
         return context.DiagnosticReporter.Diagnostics;
@@ -120,7 +127,7 @@ public class Compilation
         return loweredTrees;
     }
 
-    private static List<string> Emit(
+    private static (List<string> objectFilePaths, bool success) Emit(
         List<LoweredTree> loweredTrees,
         string projectFilePath,
         CompilationOptions options
@@ -132,18 +139,21 @@ public class Compilation
         {
             var emitterContext = new LlvmEmitterContext(loweredTree.ModuleName, llvmContext);
             var targetPath = GetTargetDirectory(projectFilePath);
-            var objectFilePath = LlvmContentEmitter.Emit(
+            var result = LlvmContentEmitter.Emit(
                 loweredTree,
                 emitterContext,
                 targetPath,
                 options
             );
 
-            objectFilePaths.Add(objectFilePath);
+            if (!result.Success)
+                return ([], success: false);
+
+            objectFilePaths.Add(result.ObjectFilePath);
             emitterContext.Dispose();
         }
 
-        return objectFilePaths;
+        return (objectFilePaths, success: true);
     }
 
     private static void Link(IEnumerable<string> objectFilePaths, Project project, string targetPath)

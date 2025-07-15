@@ -10,13 +10,17 @@ public enum DiagnosticSeverity
     Error,
 }
 
-public record Diagnostic(DiagnosticCode Code, DiagnosticSeverity Severity, string Message, TextSpan Span)
+public record Diagnostic(DiagnosticCode Code, DiagnosticSeverity Severity, string Message, TextSpan? Span)
 {
     public override string ToString()
     {
         var builder = new StringBuilder();
-        builder.Append(Span.Start.SyntaxTree.File.FilePath);
-        builder.Append($" [{Span.Start.Line}:{Span.Start.Column}]");
+        if (Span != null)
+        {
+            builder.Append(Span.Start.SyntaxTree.File.FilePath);
+            builder.Append($" [{Span.Start.Line}:{Span.Start.Column}]");
+        }
+
         builder.Append($" {Severity}: {Message}");
 
         return builder.ToString();

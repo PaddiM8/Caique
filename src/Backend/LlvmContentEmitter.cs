@@ -9,6 +9,8 @@ using LLVMSharp.Interop;
 
 namespace Caique.Backend;
 
+public record EmitResult(string ObjectFilePath, bool Success);
+
 public class LlvmContentEmitter
 {
     private readonly LoweredTree _tree;
@@ -39,7 +41,7 @@ public class LlvmContentEmitter
         _diFile = diFile;
     }
 
-    public static string Emit(
+    public static EmitResult Emit(
         LoweredTree tree,
         LlvmEmitterContext emitterContext,
         string targetDirectory,
@@ -76,7 +78,7 @@ public class LlvmContentEmitter
             Console.Error.WriteLine(errorMessage);
         }
 
-        return objectPath;
+        return new EmitResult(objectPath, isValid);
     }
 
     private static (LLVMDIBuilderRef, LLVMMetadataRef, LLVMMetadataRef) SetUpDiBuilder(

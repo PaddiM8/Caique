@@ -11,6 +11,7 @@ public enum DiagnosticCode
     HintUseInheritableKeyword,
 
     // Errors
+    ErrorCompilerError,
     ErrorUnexpectedToken,
     ErrorUnrecognisedToken,
     ErrorUnexpectedEnd,
@@ -63,6 +64,11 @@ public class DiagnosticReporter
             $"Did you mean to use a colon instead of a dot?",
             span
         );
+    }
+
+    public void ReportCompilerError()
+    {
+        ReportError(DiagnosticCode.ErrorCompilerError, $"Internal compiler error.", null);
     }
 
     public void ReportUnexpectedToken(Token unexpected)
@@ -429,7 +435,7 @@ public class DiagnosticReporter
         _diagnostics.Add(diagnostic);
     }
 
-    private void ReportError(DiagnosticCode code, string message, TextSpan span)
+    private void ReportError(DiagnosticCode code, string message, TextSpan? span)
     {
         var diagnostic = new Diagnostic(code, DiagnosticSeverity.Error, message, span);
         _diagnostics.Add(diagnostic);
