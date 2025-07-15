@@ -358,11 +358,9 @@ public class Analyser
             if (identifierSymbol is FieldSymbol fieldSymbol)
             {
                 if (!fieldSymbol.SyntaxDeclaration.IsStatic)
-                {
                     _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
-                }
 
-                // TODO: All fields should be private, so this isn't allowed
+                // TODO: All fields should probaby(?) be private, so this isn't allowed
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
 
                 return new SemanticFieldReferenceNode(

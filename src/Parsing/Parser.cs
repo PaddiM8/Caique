@@ -546,7 +546,7 @@ public class Parser
 
             var identifier = EatExpected(TokenKind.Identifier);
             SyntaxTypeNode? type = null;
-            if (AdvanceIf(TokenKind.Colon))
+            if (!Match(TokenKind.Comma, TokenKind.ClosedParenthesis))
                 type = ParseType();
 
             parameters.Add(new SyntaxInitParameterNode(identifier, type));

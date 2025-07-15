@@ -2,9 +2,9 @@ using Caique.Scope;
 
 namespace Caique;
 
-public class CompilationContext(NamespaceScope preludeScope)
+public class CompilationContext(NamespaceScope stdScope)
 {
     public DiagnosticReporter DiagnosticReporter { get; } = new();
 
-    public NamespaceScope StdScope { get; } = preludeScope;
+    public NamespaceScope StdScope { get; } = stdScope;
 }

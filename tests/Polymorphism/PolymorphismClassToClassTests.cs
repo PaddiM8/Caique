@@ -36,13 +36,11 @@ public class PolymorphismClassToClassTests
                 }
             }
             """;
-        var result = TestProject
+        TestProject
             .Create()
             .AddFile("main", mainFile)
             .Run()
-            .AssertNoBuildErrors();
-
-        Assert.That(result.ExitCode, Is.EqualTo(42 + 12));
+            .AssertSuccessWithExitCode(42 + 12);
     }
 
     [Test]
@@ -57,12 +55,10 @@ public class PolymorphismClassToClassTests
             {
             }
             """;
-        var result = TestProject
+        TestProject
             .Create()
             .AddFile("main", mainFile)
-            .Compile();
-
-        var errors = result.ErrorDiagnostics;
-        Assert.That(errors, Has.Exactly(1).Matches<Diagnostic>(x => x.Code == DiagnosticCode.ErrorBaseClassNotInheritable));
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorBaseClassNotInheritable);
     }
 }

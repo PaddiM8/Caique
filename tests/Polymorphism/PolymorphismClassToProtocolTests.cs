@@ -30,13 +30,11 @@ public class PolymorphismClassToProtocolTests
                 func Speak() i32;
             }
             """;
-        var result = TestProject
+        TestProject
             .Create()
             .AddFile("main", mainFile)
             .Run()
-            .AssertNoBuildErrors();
-
-        Assert.That(result.ExitCode, Is.EqualTo(42));
+            .AssertSuccessWithExitCode(42);
     }
 
     [Test]
@@ -70,13 +68,11 @@ public class PolymorphismClassToProtocolTests
                 func Speak() i32;
             }
             """;
-        var result = TestProject
+        TestProject
             .Create()
             .AddFile("main", mainFile)
             .Run()
-            .AssertNoBuildErrors();
-
-        Assert.That(result.ExitCode, Is.EqualTo(42));
+            .AssertSuccessWithExitCode(42);
     }
 
     [Test]
@@ -106,12 +102,48 @@ public class PolymorphismClassToProtocolTests
                 func Speak() i32;
             }
             """;
-        var result = TestProject
+        TestProject
             .Create()
             .AddFile("main", mainFile)
             .Run()
-            .AssertNoBuildErrors();
+            .AssertSuccessWithExitCode(42);
+    }
 
-        Assert.That(result.ExitCode, Is.EqualTo(42));
+    [Test]
+    public void TestClassToProtocolByVariableThenPassAsArgument()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let speakable Speakable = new Duck();
+                    Speak(speakable)
+                }
+
+                func Speak(speakable Speakable) i32
+                {
+                    speakable.Speak()
+                }
+            }
+
+            class Duck : Speakable
+            {
+                func Speak() i32
+                {
+                    42
+                }
+            }
+
+            protocol Speakable
+            {
+                func Speak() i32;
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(42);
     }
 }

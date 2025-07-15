@@ -31,4 +31,16 @@ public class RunResult
 
         return this;
     }
+
+    public RunResult AssertSuccessWithExitCode(int expectedExitCode)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(Diagnostics.Where(x => x.Severity >= DiagnosticSeverity.Warning), Is.Empty);
+            Assert.That(Stderr, Is.Empty);
+            Assert.That(ExitCode, Is.EqualTo(expectedExitCode));
+        });
+
+        return this;
+    }
 }
