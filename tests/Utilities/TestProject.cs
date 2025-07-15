@@ -20,7 +20,11 @@ public class TestProject
     public static TestProject Create()
     {
         var name = "testProject";
-        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, name);
+        var path = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            name,
+            Guid.NewGuid().ToString()
+        );
         Directory.CreateDirectory(path);
 
         var project = new Project(name, path);
