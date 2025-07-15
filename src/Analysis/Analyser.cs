@@ -833,7 +833,7 @@ public class Analyser
 
         if (symbol == null)
         {
-            _diagnostics.ReportNotFound(node.TypeNames);
+            _diagnostics.ReportTypeNotFound(node.TypeNames);
             throw Recover();
         }
 

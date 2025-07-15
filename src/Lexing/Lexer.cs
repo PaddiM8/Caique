@@ -238,6 +238,12 @@ public class Lexer
 
         while (!ReachedEnd && (char.IsDigit(Current!.Value) || Current == '.'))
         {
+            // If the dot isn't followed by a digit, the dot should be lexed
+            // as a separate token, to allow things like `2.as(i64)`.
+            var peek = Peek();
+            if (Current == '.' && peek.HasValue && !char.IsDigit(peek.Value))
+                break;
+
             builder.Append(Eat());
         }
 

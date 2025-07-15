@@ -133,4 +133,42 @@ public class CastTests
             .Run()
             .AssertSuccessWithExitCode(41);
     }
+
+    [Test]
+    public void TestCastToPrimitiveToStruct_Error()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run()
+                {
+                    2.as(String);
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorInvalidCast);
+    }
+
+    [Test]
+    public void TestCastStructToPrimitive()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run()
+                {
+                    "hello".as(i32);
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorInvalidCast);
+    }
 }

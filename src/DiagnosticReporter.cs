@@ -19,6 +19,7 @@ public enum DiagnosticCode
     ErrorExpectedType,
     ErrorExpectedValueGotType,
     ErrorNotFound,
+    ErrorTypeNotFound,
     ErrorDuplicateEntry,
     ErrorBodyInProtocol,
     ErrorInvalidNamespace,
@@ -164,6 +165,22 @@ public class DiagnosticReporter
         var fullName = string.Join(":", typeNames.Select(x => x.Value));
         var span = typeNames.First().Span.Combine(typeNames.Last().Span);
         ReportError(DiagnosticCode.ErrorNotFound, $"Symbol not found: {fullName}.", span);
+    }
+
+    public void ReportTypeNotFound(Token identifier)
+    {
+        ReportError(
+            DiagnosticCode.ErrorTypeNotFound,
+            $"Type not found: '{identifier.Value}'.",
+            identifier.Span
+        );
+    }
+
+    public void ReportTypeNotFound(List<Token> typeNames)
+    {
+        var fullName = string.Join(":", typeNames.Select(x => x.Value));
+        var span = typeNames.First().Span.Combine(typeNames.Last().Span);
+        ReportError(DiagnosticCode.ErrorTypeNotFound, $"Type not found: {fullName}.", span);
     }
 
     public void ReportDuplicateEntry(Token identifier, Token otherIdentifier)
