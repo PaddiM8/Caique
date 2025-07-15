@@ -341,7 +341,7 @@ public class LlvmContentEmitter
         var right = Next(node.Right);
         Debug.Assert(right.HasValue);
 
-        var primitive = (node.DataType as PrimitiveDataType)?.Kind;
+        var primitive = (node.DataType as LoweredPrimitiveDataType)?.Primitive;
         if (node.Operator is
             TokenKind.EqualsEquals or
             TokenKind.NotEquals or

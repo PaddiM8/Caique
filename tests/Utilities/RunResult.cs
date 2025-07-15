@@ -10,7 +10,14 @@ public class RunResult
 
     public required int ExitCode { get; init;}
 
-    public void AssertSuccess()
+    public RunResult AssertNoBuildErrors()
+    {
+        Assert.That(Diagnostics.Where(x => x.Severity >= DiagnosticSeverity.Warning), Is.Empty);
+
+        return this;
+    }
+
+    public RunResult AssertSuccess()
     {
         Assert.Multiple(() =>
         {
@@ -19,5 +26,6 @@ public class RunResult
             Assert.That(ExitCode, Is.EqualTo(0));
         });
 
+        return this;
     }
 }
