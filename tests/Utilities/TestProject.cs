@@ -9,6 +9,10 @@ public class TestProject
     private readonly string _name;
     private readonly string _path;
     private readonly Project _project;
+    private readonly CompilationOptions _compilationOptions = new()
+    {
+        DumpIr = true,
+    };
 
     private TestProject(string name, string path, Project project)
     {
@@ -17,14 +21,9 @@ public class TestProject
         _project = project;
     }
 
-    public static TestProject Create()
+    public static TestProject Create(string name)
     {
-        var name = "testProject";
-        var path = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            name,
-            Guid.NewGuid().ToString()
-        );
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output", name);
         Directory.CreateDirectory(path);
 
         var project = new Project(name, path);
@@ -36,14 +35,14 @@ public class TestProject
 
     public CompilationResult Compile()
     {
-        var diagnostics = Compilation.Compile(_project);
+        var diagnostics = Compilation.Compile(_project, _compilationOptions);
 
         return new CompilationResult(diagnostics);
     }
 
     public RunResult Run()
     {
-        var diagnostics = Compilation.Compile(_project);
+        var diagnostics = Compilation.Compile(_project, _compilationOptions);
         if (diagnostics.Any(x => x.Severity >= DiagnosticSeverity.Error))
         {
             return new RunResult

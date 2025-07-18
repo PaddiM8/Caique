@@ -53,6 +53,7 @@ public class Analyser
             SyntaxReturnNode returnNode => Visit(returnNode),
             SyntaxKeywordValueNode keywordValueNode => Visit(keywordValueNode),
             SyntaxDotKeywordNode dotKeywordNode => Visit(dotKeywordNode),
+            SyntaxIfNode ifNode => Visit(ifNode),
             SyntaxBlockNode blockNode => Visit(blockNode),
             SyntaxAttributeNode attributeNode => Visit(attributeNode),
             SyntaxParameterNode parameterNode => Visit(parameterNode),
@@ -704,7 +705,21 @@ public class Analyser
         return TypeCheck(value!, functionReturnType ?? PrimitiveDataType.Void);
     }
 
-    private SemanticNode Visit(SyntaxBlockNode node)
+    private SemanticIfNode Visit(SyntaxIfNode node)
+    {
+        var condition = Next(node.Condition);
+        var thenBranch = Visit(node.ThenBranch);
+        var elseBranch = node.ElseBranch == null
+            ? null
+            : Visit(node.ElseBranch);
+
+        if (elseBranch != null && thenBranch.DataType.IsEquivalent(elseBranch.DataType) == TypeEquivalence.Incompatible)
+            _diagnostics.ReportIncompatibleType(thenBranch.DataType, elseBranch.DataType, node.Span);
+
+        return new SemanticIfNode(condition, thenBranch, elseBranch, node.Span, thenBranch.DataType);
+    }
+
+    private SemanticBlockNode Visit(SyntaxBlockNode node)
     {
         var expressions = new List<SemanticNode>();
         foreach (var child in node.Expressions.SkipLast(1))
@@ -737,8 +752,10 @@ public class Analyser
             return new SemanticBlockNode(expressions, dataType, node.Span);
         }
 
-        if (last is SyntaxStatementNode { IsReturnValue: true })
+        if (IsReturnValue(last, analysedLast))
         {
+            dataType = analysedLast.DataType;
+
             if (node.Parent is ISyntaxFunctionDeclaration enclosingFunction)
             {
                 var analysedLastStatement = (SemanticStatementNode)analysedLast;
@@ -755,6 +772,20 @@ public class Analyser
         expressions.Add(analysedLast);
 
         return new SemanticBlockNode(expressions, dataType, node.Span);
+    }
+
+    private bool IsReturnValue(SyntaxNode syntaxNode, SemanticNode semanticNode)
+    {
+        if (syntaxNode is SyntaxStatementNode { HasTrailingSemicolon: true })
+            return false;
+
+        if (semanticNode is SemanticStatementNode { Value: SemanticBlockNode semanticBlockNode })
+            return !semanticBlockNode.DataType.IsVoid();
+
+        if (semanticNode is SemanticStatementNode { Value: SemanticIfNode semanticIfNode })
+            return !semanticIfNode.ThenBranch.DataType.IsVoid();
+
+        return true;
     }
 
     private bool ShouldSkipBlockChild(SyntaxNode child)

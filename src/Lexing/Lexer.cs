@@ -159,6 +159,8 @@ public class Lexer
             "return" => TokenKind.Return,
             "base" => TokenKind.Base,
             "default" => TokenKind.Default,
+            "if" => TokenKind.If,
+            "else" => TokenKind.Else,
             "true" => TokenKind.True,
             "false" => TokenKind.False,
             "void" => TokenKind.Void,

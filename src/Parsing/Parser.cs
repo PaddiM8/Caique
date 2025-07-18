@@ -73,12 +73,16 @@ public class Parser
     {
         var expressionStatement = ParseExpression();
 
-        // The last statement in a block doesn't need to end with a semicolon
-        bool isReturnValue = Match(TokenKind.ClosedBrace);
-        if (!isReturnValue)
+        // The last statement in a block doesn't need to end with a semicolon (except for return statements)
+        bool hasTrailingSemicolon = false;
+        if ((!Match(TokenKind.ClosedBrace) && expressionStatement is not (SyntaxBlockNode or SyntaxIfNode)) ||
+            expressionStatement is SyntaxReturnNode)
+        {
             EatExpected(TokenKind.Semicolon, insert: true);
+            hasTrailingSemicolon = true;
+        }
 
-        return new SyntaxStatementNode(expressionStatement, isReturnValue);
+        return new SyntaxStatementNode(expressionStatement, hasTrailingSemicolon);
     }
 
     private SyntaxNode ParseExpression()
@@ -767,7 +771,7 @@ public class Parser
         if (Match(TokenKind.OpenParenthesis))
             return ParseParenthesis();
 
-        if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral))
+        if (Match(TokenKind.NumberLiteral, TokenKind.StringLiteral, TokenKind.True, TokenKind.False))
             return ParseLiteral();
 
         if (Match(TokenKind.Identifier) && _current?.Value == "size_of")
@@ -775,6 +779,9 @@ public class Parser
 
         if (Match(TokenKind.Self, TokenKind.Base, TokenKind.Default))
             return ParseKeywordValue(areTypeArguments: false);
+
+        if (Match(TokenKind.If))
+            return ParseIf();
 
         if (Match(TokenKind.Identifier))
             return ParseIdentifier();
@@ -840,9 +847,37 @@ public class Parser
 
     private SyntaxLiteralNode ParseLiteral()
     {
-        var token = EatExpected(TokenKind.NumberLiteral, TokenKind.StringLiteral);
+        var token = EatExpected(TokenKind.True, TokenKind.False, TokenKind.NumberLiteral, TokenKind.StringLiteral);
 
         return new SyntaxLiteralNode(token);
+    }
+
+    private SyntaxIfNode ParseIf()
+    {
+        var start = EatExpected(TokenKind.If).Span;
+        var condition = ParseExpression();
+        var thenBranch = ParseBlock();
+
+        SyntaxBlockNode? elseBranch = null;
+        if (AdvanceIf(TokenKind.Else))
+        {
+            var innerStatement = ParseStatement();
+            if (innerStatement.Expression is SyntaxBlockNode elseBlock)
+            {
+                elseBranch = elseBlock;
+            }
+            else
+            {
+                elseBranch = new SyntaxBlockNode([innerStatement], innerStatement.Span);
+            }
+        }
+
+        return new SyntaxIfNode(
+            condition,
+            thenBranch,
+            elseBranch,
+            start.Combine(_previous!.Span)
+        );
     }
 
     private SyntaxIdentifierNode ParseIdentifier()
@@ -870,9 +905,9 @@ public class Parser
     private SyntaxReturnNode ParseReturn()
     {
         var start = EatExpected(TokenKind.Return).Span;
-        var value = AdvanceIf(TokenKind.Semicolon)
+        var value = Match(TokenKind.Semicolon)
             ? null
-            : ParseStatement();
+            : ParseExpression();
 
         return new SyntaxReturnNode(value, start.Combine(value?.Span ?? start));
     }

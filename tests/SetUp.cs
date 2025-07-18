@@ -6,7 +6,8 @@ public class SetUp
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
-        var binPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "testProject");
-        Directory.Delete(binPath, recursive: true);
+        var binPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output");
+        if (Directory.Exists(binPath))
+            Directory.Delete(binPath, recursive: true);
     }
 }

@@ -204,6 +204,7 @@ public class LlvmContentEmitter
             LoweredCallNode callNode => Visit(callNode),
             LoweredReturnNode returnNode => Visit(returnNode),
             LoweredKeywordValueNode keywordValueNode => Visit(keywordValueNode),
+            LoweredIfNode ifNode => Visit(ifNode),
             LoweredCastNode castNode => Visit(castNode),
             LoweredBlockNode blockNode => Visit(blockNode),
             LoweredVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
@@ -253,6 +254,7 @@ public class LlvmContentEmitter
         return primitive.Primitive switch
         {
             Primitive.Void => throw new InvalidOperationException(),
+            Primitive.Null => LLVMValueRef.CreateConstNull(LLVMTypeRef.Void),
             Primitive.Bool => LlvmUtils.CreateConstBool(_context, node.Kind == TokenKind.True),
             >= Primitive.Int8 and <= Primitive.Int128 => LLVMValueRef.CreateConstInt(
                 _typeBuilder.BuildType(node.DataType),
@@ -488,6 +490,47 @@ public class LlvmContentEmitter
         throw new UnreachableException();
     }
 
+    private LLVMValueRef? Visit(LoweredIfNode node)
+    {
+        var thenBlockReturns = node.ThenBranch.Expressions.LastOrDefault() is LoweredReturnNode;
+        var elseBlockReturns = node.ElseBranch?.Expressions.LastOrDefault() is LoweredReturnNode;
+
+        var parent = _builder.InsertBlock.Parent;
+        var thenBlock = parent.AppendBasicBlock("then");
+        var elseBlock = parent.AppendBasicBlock("else");
+        var mergeBlock = thenBlockReturns && elseBlockReturns
+            ? null
+            : parent.AppendBasicBlock("endIf");
+
+        var condition = Next(node.Condition)!.Value;
+        _builder.BuildCondBr(condition, thenBlock, elseBlock);
+
+        _builder.PositionAtEnd(thenBlock);
+        Visit(node.ThenBranch, thenBlock);
+        if (!thenBlockReturns)
+            _builder.BuildBr(mergeBlock);
+
+        _builder.PositionAtEnd(elseBlock);
+        if (node.ElseBranch != null)
+            Visit(node.ElseBranch, elseBlock);
+
+        if (!elseBlockReturns)
+            _builder.BuildBr(mergeBlock);
+
+        if (mergeBlock != null)
+            _builder.PositionAtEnd(mergeBlock);
+
+        if (node.ThenBranch.ReturnValueDeclaration != null)
+        {
+            var type = _typeBuilder.BuildType(node.DataType);
+            var returnValueDeclaration = _variables[node.ThenBranch.ReturnValueDeclaration];
+
+            return _builder.BuildLoad2(type, returnValueDeclaration, "returnValue");
+        }
+
+        return null;
+    }
+
     private LLVMValueRef Visit(LoweredCastNode node)
     {
         var fromType = node.Value.DataType;
@@ -559,17 +602,28 @@ public class LlvmContentEmitter
         return _builder.BuildIntToPtr(value, type, "intToPtr");
     }
 
-    private LLVMValueRef Visit(LoweredBlockNode node)
+    private LLVMValueRef Visit(LoweredBlockNode node, LLVMBasicBlockRef? branch = null)
     {
         var function = _builder.InsertBlock.Parent;
-        var value = function.AppendBasicBlock("entry");
-        _builder.PositionAtEnd(value);
 
-        LLVMValueRef? lastValue = null;
+        if (!branch.HasValue)
+        {
+            branch = function.AppendBasicBlock("entry");
+            _builder.PositionAtEnd(branch.Value);
+        }
+
         foreach (var expression in node.Expressions)
-            lastValue = Next(expression);
+            Next(expression);
 
-        return lastValue ?? LLVMValueRef.CreateConstNull(LLVMTypeRef.CreatePointer(_context.Int8Type, 0));
+        if (node.ReturnValueDeclaration != null)
+        {
+            var type = _typeBuilder.BuildType(node.DataType);
+            var returnDeclaration = _variables[node.ReturnValueDeclaration];
+
+            return _builder.BuildLoad2(type, returnDeclaration, "returnValue");
+        }
+
+        return LLVMValueRef.CreateConstNull(LLVMTypeRef.CreatePointer(_context.Int8Type, 0));
     }
 
     private LLVMValueRef? Visit(LoweredVariableDeclarationNode node)
@@ -592,10 +646,10 @@ public class LlvmContentEmitter
             var value = Next(node.Value);
             _builder.BuildStore(value!.Value, alloca);
 
-            return value.Value;
+            return alloca;
         }
 
-        return null;
+        return alloca;
     }
 
     private LLVMValueRef? Visit(LoweredFunctionDeclarationNode node)

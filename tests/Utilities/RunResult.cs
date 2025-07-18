@@ -34,9 +34,9 @@ public class RunResult
 
     public RunResult AssertSuccessWithExitCode(int expectedExitCode)
     {
+        Assert.That(Diagnostics.Where(x => x.Severity >= DiagnosticSeverity.Warning), Is.Empty);
         Assert.Multiple(() =>
         {
-            Assert.That(Diagnostics.Where(x => x.Severity >= DiagnosticSeverity.Warning), Is.Empty);
             Assert.That(Stderr, Is.Empty);
             Assert.That(ExitCode, Is.EqualTo(expectedExitCode));
         });

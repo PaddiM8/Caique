@@ -6,6 +6,7 @@ namespace Caique.Analysis;
 public enum Primitive
 {
     Void,
+    Null,
     Bool,
     Int8,
     Int16,
@@ -31,6 +32,7 @@ public static class PrimitiveExtensions
         return primitive switch
         {
             Primitive.Void => 0,
+            Primitive.Null => GetBitSize(Primitive.USize),
             Primitive.Bool => 1,
             Primitive.Int8 => 8,
             Primitive.Int16 => 16,
@@ -125,6 +127,7 @@ public class PrimitiveDataType(Primitive kind) : IDataType
         return Kind switch
         {
             Primitive.Void => "void",
+            Primitive.Null => "null",
             Primitive.Bool => "bool",
             Primitive.Int8 => "i8",
             Primitive.Int16 => "i16",

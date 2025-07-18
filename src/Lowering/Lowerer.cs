@@ -61,6 +61,7 @@ public class Lowerer
             SemanticNewNode newNode => Visit(newNode),
             SemanticReturnNode returnNode => Visit(returnNode),
             SemanticKeywordValueNode keywordValueNode => Visit(keywordValueNode),
+            SemanticIfNode ifNode => Visit(ifNode),
             SemanticCastNode castNode => Visit(castNode),
             SemanticBlockNode blockNode => Visit(blockNode),
             SemanticParameterNode parameterNode => Visit(parameterNode),
@@ -486,6 +487,30 @@ public class Lowerer
         return new LoweredKeywordValueNode(kind, arguments!, dataType);
     }
 
+    private LoweredIfNode Visit(SemanticIfNode node)
+    {
+        LoweredVariableDeclarationNode? returnValueDeclaration = null;
+        if (!node.ThenBranch.DataType.IsVoid())
+        {
+            var dataType = _typeBuilder.BuildType(node.ThenBranch.DataType);
+            returnValueDeclaration = new LoweredVariableDeclarationNode("blockReturnValue", null, dataType);
+            Add(returnValueDeclaration);
+        }
+
+        var condition = Next(node.Condition)!;
+        var thenBranch = Visit(node.ThenBranch, returnValueDeclaration)!;
+        var elseBranch = node.ElseBranch == null
+            ? null
+            : Visit(node.ElseBranch, returnValueDeclaration);
+
+        return new LoweredIfNode(
+            condition,
+            thenBranch,
+            elseBranch,
+            thenBranch.DataType
+        );
+    }
+
     private LoweredNode Visit(SemanticCastNode node)
     {
         var fromType = node.Value.DataType;
@@ -575,15 +600,31 @@ public class Lowerer
         return new LoweredLoadNode(reference);
     }
 
-    private LoweredBlockNode Visit(SemanticBlockNode node)
+    private LoweredBlockNode Visit(SemanticBlockNode node, LoweredVariableDeclarationNode? returnValueDeclaration = null)
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
         var previousBlock = _currentBlock;
-        var block = new LoweredBlockNode([], dataType);
+
+        // While lowering things like if expressions, they may provide a return value declaration when calling this
+        // function for the branches, to capture the return value of the block. However, free standing blocks can
+        // also have return values. In those cases, we will create the variable declaration in here instead.
+        if (returnValueDeclaration == null && !node.DataType.IsVoid() && node.Parent is not ISemanticFunctionDeclaration)
+        {
+            returnValueDeclaration = new LoweredVariableDeclarationNode("returnValue", null, dataType);
+            Add(returnValueDeclaration);
+        }
+
+        var block = new LoweredBlockNode([], returnValueDeclaration, dataType);
 
         _currentBlock = block;
         foreach (var child in node.Expressions)
             Next(child);
+
+        var returnValueReference = returnValueDeclaration == null
+            ? null
+            : new LoweredVariableReferenceNode(returnValueDeclaration, dataType);
+        if (returnValueReference != null)
+            block.Expressions[^1] = new LoweredAssignmentNode(returnValueReference, block.Expressions[^1]);
 
         _currentBlock = previousBlock;
 
@@ -706,7 +747,7 @@ public class Lowerer
 
     private LoweredFunctionDeclarationNode Visit(SemanticInitNode node, ISemanticStructureDeclaration parentStructure)
     {
-        var block = new LoweredBlockNode([], new LoweredPrimitiveDataType(Primitive.Void));
+        var block = new LoweredBlockNode([], null, new LoweredPrimitiveDataType(Primitive.Void));
         var previousBlock = _currentBlock;
         _currentBlock = block;
 

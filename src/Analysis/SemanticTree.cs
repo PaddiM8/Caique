@@ -260,6 +260,37 @@ public class SemanticKeywordValueNode(Token keyword, List<SemanticNode>? argumen
     }
 }
 
+public class SemanticIfNode(
+    SemanticNode condition,
+    SemanticBlockNode thenBranch,
+    SemanticBlockNode? elseBranch,
+    TextSpan span,
+    IDataType dataType
+)
+    : SemanticNode(dataType, span)
+{
+    public SemanticNode Condition { get; } = condition;
+
+    public SemanticBlockNode ThenBranch { get; } = thenBranch;
+
+    public SemanticBlockNode? ElseBranch { get; } = elseBranch;
+
+    public override void Traverse(Action<SemanticNode, SemanticNode> callback)
+    {
+        Condition.Traverse(callback);
+        callback(Condition, this);
+
+        ThenBranch.Traverse(callback);
+        callback(ThenBranch, this);
+
+        if (ElseBranch != null)
+        {
+            ElseBranch.Traverse(callback);
+            callback(ElseBranch, this);
+        }
+    }
+}
+
 public class SemanticCastNode(
     SemanticNode value,
     TextSpan span,

@@ -88,7 +88,7 @@ public class SyntaxStatementNode(SyntaxNode expression, bool isReturnValue)
 {
     public SyntaxNode Expression { get; } = expression;
 
-    public bool IsReturnValue { get; } = isReturnValue;
+    public bool HasTrailingSemicolon { get; } = isReturnValue;
 }
 
 public class SyntaxGroupNode(SyntaxNode value, TextSpan span)
@@ -181,6 +181,16 @@ public class SyntaxDotKeywordNode(SyntaxNode left, Token keyword, List<SyntaxNod
     public Token Keyword { get; } = keyword;
 
     public List<SyntaxNode>? Arguments { get; } = arguments;
+}
+
+public class SyntaxIfNode(SyntaxNode condition, SyntaxBlockNode thenBranch, SyntaxBlockNode? elseBranch, TextSpan span)
+    : SyntaxNode(span)
+{
+    public SyntaxNode Condition { get; } = condition;
+
+    public SyntaxBlockNode ThenBranch { get; } = thenBranch;
+
+    public SyntaxBlockNode? ElseBranch { get; } = elseBranch;
 }
 
 public class SyntaxBlockNode(List<SyntaxNode> expressions, TextSpan span)

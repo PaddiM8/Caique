@@ -35,6 +35,7 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         return dataType.Primitive switch
         {
             Primitive.Void => _context.VoidType,
+            Primitive.Null => LLVMTypeRef.CreatePointer(_context.VoidType, 0),
             Primitive.Bool => _context.Int1Type,
             Primitive.Int8 => _context.Int8Type,
             Primitive.Int16 => _context.Int16Type,

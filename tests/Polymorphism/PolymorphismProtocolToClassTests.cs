@@ -34,7 +34,7 @@ public class PolymorphismProtocolToClassTests
             }
             """;
         var result = TestProject
-            .Create()
+            .Create(nameof(TestProtocolToClassByCast))
             .AddFile("main", mainFile)
             .Run()
             .AssertNoBuildErrors();

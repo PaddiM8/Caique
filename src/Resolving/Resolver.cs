@@ -74,6 +74,9 @@ public class Resolver
             case SyntaxDotKeywordNode dotKeywordNode:
                 Visit(dotKeywordNode);
                 break;
+            case SyntaxIfNode ifNode:
+                Visit(ifNode);
+                break;
             case SyntaxBlockNode blockNode:
                 Visit(blockNode);
                 break;
@@ -148,6 +151,15 @@ public class Resolver
         Next(node.Type, node);
         foreach (var argument in node.Arguments)
             Next(argument, node);
+    }
+
+    private void Visit(SyntaxIfNode node)
+    {
+        Next(node.Condition, node);
+        Next(node.ThenBranch, node);
+
+        if (node.ElseBranch != null)
+            Next(node.ElseBranch, node);
     }
 
     private void Visit(SyntaxKeywordValueNode node)

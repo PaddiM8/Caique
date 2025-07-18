@@ -25,7 +25,7 @@ public class ImportTests
             }
             """;
         TestProject
-            .Create()
+            .Create(nameof(TestImportModuleFunction))
             .AddFile("main", mainFile)
             .AddFile("sub", subFile)
             .Run()
@@ -53,7 +53,7 @@ public class ImportTests
             }
             """;
         TestProject
-            .Create()
+            .Create(nameof(TestImportClass))
             .AddFile("main", mainFile)
             .AddFile("sub", subFile)
             .Run()
@@ -83,7 +83,7 @@ public class ImportTests
             }
             """;
         TestProject
-            .Create()
+            .Create(nameof(TestImportNamespace))
             .AddFile("main", mainFile)
             .AddNamespace("nested", builder =>
                 builder.AddFile("sub", subFile)

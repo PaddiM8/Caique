@@ -136,17 +136,37 @@ public class LoweredKeywordValueNode(KeywordValueKind kind, List<LoweredNode> ar
     public List<LoweredNode> Arguments { get; } = arguments;
 }
 
-public class LoweredCastNode(LoweredNode value, ILoweredDataType dataType
+public class LoweredIfNode(
+    LoweredNode condition,
+    LoweredBlockNode thenBranch,
+    LoweredBlockNode? elseBranch,
+    ILoweredDataType dataType
 )
+    : LoweredNode(dataType)
+{
+    public LoweredNode Condition { get; } = condition;
+
+    public LoweredBlockNode ThenBranch { get; } = thenBranch;
+
+    public LoweredBlockNode? ElseBranch { get; } = elseBranch;
+}
+
+public class LoweredCastNode(LoweredNode value, ILoweredDataType dataType)
     : LoweredNode(dataType)
 {
     public LoweredNode Value { get; } = value;
 }
 
-public class LoweredBlockNode(List<LoweredNode> expressions, ILoweredDataType dataType)
+public class LoweredBlockNode(
+    List<LoweredNode> expressions,
+    LoweredVariableDeclarationNode? returnValueDeclaration,
+    ILoweredDataType dataType
+)
     : LoweredNode(dataType)
 {
     public List<LoweredNode> Expressions { get; } = expressions;
+
+    public LoweredVariableDeclarationNode? ReturnValueDeclaration { get; } = returnValueDeclaration;
 }
 
 public class LoweredTypeNode(ILoweredDataType dataType)
