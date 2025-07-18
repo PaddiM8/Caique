@@ -21,8 +21,9 @@ public class TestProject
         _project = project;
     }
 
-    public static TestProject Create(string name)
+    public static TestProject Create()
     {
+        var name = TestContext.CurrentContext.Test.Name;
         var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output", name);
         Directory.CreateDirectory(path);
 

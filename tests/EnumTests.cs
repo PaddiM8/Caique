@@ -24,7 +24,7 @@ public class EnumTests
             }
             """;
         TestProject
-            .Create(nameof(TestDefaultEnumWithCast))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -50,7 +50,7 @@ public class EnumTests
             }
             """;
         TestProject
-            .Create(nameof(TestEnumWithAssignedValueForOneMemberAndCast))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(11);

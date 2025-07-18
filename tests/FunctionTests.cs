@@ -22,7 +22,7 @@ public class FunctionTests
             }
             """;
         TestProject
-            .Create(nameof(TestFunctionCallSameModule))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -49,7 +49,7 @@ public class FunctionTests
             }
             """;
         TestProject
-            .Create(nameof(TestFunctionCallDifferentModule))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);

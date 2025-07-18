@@ -26,7 +26,7 @@ public class ClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassWithFieldAccess))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -62,7 +62,7 @@ public class ClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassWithFieldsAndMethod))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(5);
@@ -88,7 +88,7 @@ public class ClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassWithMethod_CallAsStatic_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorNonStaticSymbolReferencedAsStatic);
@@ -115,7 +115,7 @@ public class ClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassWithStaticFunction_CallAsStaticFunction))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -142,7 +142,7 @@ public class ClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassWithStaticFunction_CallAsMethod_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorStaticSymbolReferencedAsNonStatic);
@@ -169,7 +169,7 @@ public class ClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassWithStaticFunction_CallWithDotNotation_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorExpectedValueGotType);

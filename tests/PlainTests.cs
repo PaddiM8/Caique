@@ -17,7 +17,7 @@ public class PlainTests
             }
             """;
         TestProject
-            .Create(nameof(TestEmptyRunFunction))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccess();

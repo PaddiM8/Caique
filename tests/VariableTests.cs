@@ -18,7 +18,7 @@ public class VariableTests
             }
             """;
         TestProject
-            .Create(nameof(TestVariable))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -38,7 +38,7 @@ public class VariableTests
             }
             """;
         TestProject
-            .Create(nameof(TestVariableReferenceBeforeDeclaration_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorNotFound);

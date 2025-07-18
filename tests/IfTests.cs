@@ -24,7 +24,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestNonValueIf_WithReturn))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(2);
@@ -50,7 +50,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestNonValueElse_WithReturn))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -78,7 +78,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestNonValueElseIf_WithReturn))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -107,7 +107,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestNonValueIf_WithoutReturn))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(2);
@@ -136,7 +136,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestNonValueElse_WithoutReturn))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
@@ -162,7 +162,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestValueIf_WithImplicitReturn))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(2);
@@ -190,7 +190,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestValueIf_WithVariable))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(2);
@@ -216,7 +216,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestValueIf_WithDifferentReturnTypes_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorIncompatibleType);
@@ -242,7 +242,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestValueIf_WithoutReturnTypeForElse))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorIncompatibleType);
@@ -265,7 +265,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestEmptyNonValueIf))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(2);
@@ -290,7 +290,7 @@ public class IfTests
             }
             """;
         TestProject
-            .Create(nameof(TestValueIf_WithEmptyElse))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorIncompatibleType);

@@ -37,7 +37,7 @@ public class PolymorphismClassToClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassToClass))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(42 + 12);
@@ -56,7 +56,7 @@ public class PolymorphismClassToClassTests
             }
             """;
         TestProject
-            .Create(nameof(TestInheritFromNonInheritableClass_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorBaseClassNotInheritable);

@@ -24,7 +24,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastToInt16))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(41);
@@ -50,7 +50,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastToInt32))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(41);
@@ -76,7 +76,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastToInt64))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(41);
@@ -102,7 +102,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastToFloat32))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(41);
@@ -128,7 +128,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastToFloat64))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(41);
@@ -147,7 +147,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastToPrimitiveToStruct_Error))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorInvalidCast);
@@ -166,7 +166,7 @@ public class CastTests
             }
             """;
         TestProject
-            .Create(nameof(TestCastStructToPrimitive))
+            .Create()
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorInvalidCast);

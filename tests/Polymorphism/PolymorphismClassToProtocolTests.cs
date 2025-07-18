@@ -31,7 +31,7 @@ public class PolymorphismClassToProtocolTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassToProtocolByVariable))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(42);
@@ -69,7 +69,7 @@ public class PolymorphismClassToProtocolTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassToProtocolByParameter))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(42);
@@ -103,7 +103,7 @@ public class PolymorphismClassToProtocolTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassToProtocolByCast))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(42);
@@ -141,7 +141,7 @@ public class PolymorphismClassToProtocolTests
             }
             """;
         TestProject
-            .Create(nameof(TestClassToProtocolByVariableThenPassAsArgument))
+            .Create()
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(42);
