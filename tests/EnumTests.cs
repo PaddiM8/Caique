@@ -59,6 +59,33 @@ public class EnumTests
     [Test]
     public void TestEnumComparison()
     {
-        // TODO: Test eg. A:B == A:B when if statements are a thing
+        var mainFile = """
+            enum A
+            {
+                A,
+                B = 5,
+                C,
+            }
+
+            module Main
+            {
+                func Run() i32
+                {
+                    if A:B == A:B
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
     }
 }

@@ -21,6 +21,7 @@ public class LoweredTypeBuilder
             SliceDataType sliceDataType => Build(sliceDataType),
             StructureDataType structureDataType => Build(structureDataType),
             FunctionDataType functionDataType => Build(functionDataType),
+            EnumDataType enumDataType => Build(enumDataType),
             _ => throw new NotImplementedException(),
         };
         _generalCache[dataType] = lowered;
@@ -162,4 +163,8 @@ public class LoweredTypeBuilder
         return new LoweredPointerDataType(BuildFunctionType(dataType.Symbol));
     }
 
+    private ILoweredDataType Build(EnumDataType dataType)
+    {
+        return BuildType(dataType.Symbol.SemanticDeclaration!.MemberDataType);
+    }
 }
