@@ -495,25 +495,25 @@ public class LlvmContentEmitter
         var thenBlockReturns = node.ThenBranch.Expressions.LastOrDefault() is LoweredReturnNode;
         var elseBlockReturns = node.ElseBranch?.Expressions.LastOrDefault() is LoweredReturnNode;
 
-        // TODO: Use phi
         var parent = _builder.InsertBlock.Parent;
-        var thenBlock = parent.AppendBasicBlock("then");
-        var elseBlock = parent.AppendBasicBlock("else");
+        var thenBlock = parent.AppendBasicBlock("if.then");
+        var elseBlock = parent.AppendBasicBlock("if.else");
         var mergeBlock = thenBlockReturns && elseBlockReturns
             ? null
-            : parent.AppendBasicBlock("endIf");
+            : parent.AppendBasicBlock("if.end");
 
         var condition = Next(node.Condition)!.Value;
         _builder.BuildCondBr(condition, thenBlock, elseBlock);
 
         _builder.PositionAtEnd(thenBlock);
-        Visit(node.ThenBranch, thenBlock);
+        var thenValue = Visit(node.ThenBranch, thenBlock);
         if (!thenBlockReturns)
             _builder.BuildBr(mergeBlock);
 
         _builder.PositionAtEnd(elseBlock);
+        LLVMValueRef elseValue = LLVMValueRef.CreateConstNull(_context.Int8Type);
         if (node.ElseBranch != null)
-            Visit(node.ElseBranch, elseBlock);
+            elseValue = Visit(node.ElseBranch, elseBlock);
 
         if (!elseBlockReturns)
             _builder.BuildBr(mergeBlock);
@@ -524,9 +524,11 @@ public class LlvmContentEmitter
         if (node.ThenBranch.ReturnValueDeclaration != null)
         {
             var type = _typeBuilder.BuildType(node.DataType);
-            var returnValueDeclaration = _variables[node.ThenBranch.ReturnValueDeclaration];
+            var phi = _builder.BuildPhi(type, "if.phi");
+            phi.AddIncoming([thenValue], [thenBlock], 1);
+            phi.AddIncoming([elseValue], [elseBlock], 1);
 
-            return _builder.BuildLoad2(type, returnValueDeclaration, "returnValue");
+            return phi;
         }
 
         return null;
