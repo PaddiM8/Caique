@@ -407,10 +407,17 @@ public class SyntaxEnumMemberNode(Token identifier, SyntaxNode? value, TextSpan 
     public SyntaxNode? Value { get; } = value;
 }
 
-public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)
+public class SyntaxFieldDeclarationNode(
+    bool isMutable,
+    Token identifier,
+    SyntaxTypeNode type,
+    SyntaxNode? value,
+    bool isStatic,
+    TextSpan span
+)
     : SyntaxNode(span)
 {
-    public bool IsMutable { get; } = true;
+    public bool IsMutable { get; } = isMutable;
 
     public Token Identifier { get; } = identifier;
 

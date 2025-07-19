@@ -21,8 +21,8 @@ public class ClassTests
 
             class C
             {
-                a i32;
-                b i32;
+                let a i32;
+                let b i32;
             }
             """;
         TestProject
@@ -47,8 +47,8 @@ public class ClassTests
 
             class C
             {
-                a i32;
-                b i32;
+                let a i32;
+                var b i32;
 
                 init(a, x i32)
                 {
@@ -66,6 +66,27 @@ public class ClassTests
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(5);
+    }
+
+    [Test]
+    public void TestClassFieldAssignment_WithImmutable_Error()
+    {
+        var mainFile = """
+            class C
+            {
+                let a i32;
+
+                init()
+                {
+                    a = 3;
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorAssignmentToImmutable);
     }
 
     public void TestClassWithMethod_CallAsStatic_Error()

@@ -288,7 +288,7 @@ public class Parser
         if (_current is { Kind: TokenKind.Identifier, Value: "init" })
             return ParseInit();
 
-        if (Match(TokenKind.Identifier))
+        if (Match(TokenKind.Let, TokenKind.Var))
             return ParseField(isStatic, attributes, scope);
 
         throw Recover();
@@ -471,7 +471,7 @@ public class Parser
         if (Match(TokenKind.Func))
             return ParseFunction(isStatic: true, isOverride: false, attributes, scope);
 
-        if (Match(TokenKind.Identifier))
+        if (Match(TokenKind.Let, TokenKind.Var))
             return ParseField(isStatic: true, attributes, scope);
 
         throw Recover();
@@ -575,6 +575,7 @@ public class Parser
         StructureScope scope
     )
     {
+        var keyword = EatExpected(TokenKind.Let, TokenKind.Var);
         var identifier = EatExpected(TokenKind.Identifier);
         var type = ParseType();
 
@@ -584,11 +585,12 @@ public class Parser
 
         var end = EatExpected(TokenKind.Semicolon).Span;
         var node = new SyntaxFieldDeclarationNode(
+            isMutable: keyword.Kind == TokenKind.Var,
             identifier,
             type,
             value,
             isStatic,
-            identifier.Span.Combine(end)
+            keyword.Span.Combine(end)
         )
         {
             Attributes = attributes,

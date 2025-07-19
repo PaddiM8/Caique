@@ -1,7 +1,7 @@
 module LibcUnsafe
 {
     #ffi
-    stdout usize;
+    let stdout usize;
 
     #ffi
     func printf(pattern [u8], arg [u8]);

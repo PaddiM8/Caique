@@ -50,7 +50,7 @@ public class VariableTests
         var mainFile = """
             module Main
             {
-                func Run() i32 i32
+                func Run() i32
                 {
                     var x = 2;
                     x = 3;
@@ -67,7 +67,7 @@ public class VariableTests
     }
 
     [Test]
-    public void TestVariableAssignment_WithImmutable()
+    public void TestVariableAssignment_WithImmutable_Error()
     {
         var mainFile = """
             module Main
@@ -76,8 +76,6 @@ public class VariableTests
                 {
                     let x = 2;
                     x = 3;
-
-                    x
                 }
             }
             """;

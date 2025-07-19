@@ -1,6 +1,6 @@
 class String
 {
-    chars [u8];
+    var chars [u8];
 
     init(chars)
     {
