@@ -506,14 +506,14 @@ public class LlvmContentEmitter
         _builder.BuildCondBr(condition, thenBlock, elseBlock);
 
         _builder.PositionAtEnd(thenBlock);
-        var thenValue = Visit(node.ThenBranch, thenBlock);
+        var thenValue = Visit(node.ThenBranch);
         if (!thenBlockReturns)
             _builder.BuildBr(mergeBlock);
 
         _builder.PositionAtEnd(elseBlock);
         LLVMValueRef elseValue = LLVMValueRef.CreateConstNull(_context.Int8Type);
         if (node.ElseBranch != null)
-            elseValue = Visit(node.ElseBranch, elseBlock);
+            elseValue = Visit(node.ElseBranch);
 
         if (!elseBlockReturns)
             _builder.BuildBr(mergeBlock);
@@ -605,15 +605,9 @@ public class LlvmContentEmitter
         return _builder.BuildIntToPtr(value, type, "intToPtr");
     }
 
-    private LLVMValueRef Visit(LoweredBlockNode node, LLVMBasicBlockRef? branch = null)
+    private LLVMValueRef Visit(LoweredBlockNode node)
     {
         var function = _builder.InsertBlock.Parent;
-
-        if (!branch.HasValue)
-        {
-            branch = function.AppendBasicBlock("entry");
-            _builder.PositionAtEnd(branch.Value);
-        }
 
         foreach (var expression in node.Expressions)
             Next(expression);
