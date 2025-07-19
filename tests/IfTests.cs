@@ -295,4 +295,25 @@ public class IfTests
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorIncompatibleType);
     }
+
+    [Test]
+    public void TestNonValueIf_WithDo()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    if true
+                        do 2
+                        else 3
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
 }

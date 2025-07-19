@@ -69,14 +69,15 @@ public class Parser
         }
     }
 
-    private SyntaxStatementNode ParseStatement()
+    private SyntaxStatementNode ParseStatement(bool isSingleExpressionBlock = false)
     {
         var expressionStatement = ParseExpression();
 
         // The last statement in a block doesn't need to end with a semicolon (except for return statements)
         bool hasTrailingSemicolon = false;
-        if ((!Match(TokenKind.ClosedBrace) && expressionStatement is not (SyntaxBlockNode or SyntaxIfNode)) ||
-            expressionStatement is SyntaxReturnNode)
+        var isBlockNode = expressionStatement is SyntaxBlockNode or SyntaxIfNode;
+        var isReturnValue = isSingleExpressionBlock || Match(TokenKind.ClosedBrace) || isBlockNode;
+        if (!isReturnValue || expressionStatement is SyntaxReturnNode)
         {
             EatExpected(TokenKind.Semicolon, insert: true);
             hasTrailingSemicolon = true;
@@ -836,6 +837,27 @@ public class Parser
         return new SyntaxBlockNode(expressions, start.Combine(end));
     }
 
+    private SyntaxBlockNode ParseBlockOrDo()
+    {
+        if (AdvanceIf(TokenKind.Do))
+        {
+            var start = _previous!.Span;
+            SyntaxNode expression;
+            try
+            {
+                expression = ParseStatement(isSingleExpressionBlock: true);
+            }
+            catch (ParserRecoveryException recovery)
+            {
+                expression = recovery.ErrorNode;
+            }
+
+            return new SyntaxBlockNode([expression], start.Combine(expression.Span));
+        }
+
+        return ParseBlock();
+    }
+
     private SyntaxGroupNode ParseParenthesis()
     {
         var start = EatExpected(TokenKind.OpenParenthesis).Span;
@@ -856,7 +878,7 @@ public class Parser
     {
         var start = EatExpected(TokenKind.If).Span;
         var condition = ParseExpression();
-        var thenBranch = ParseBlock();
+        var thenBranch = ParseBlockOrDo();
 
         SyntaxBlockNode? elseBranch = null;
         if (AdvanceIf(TokenKind.Else))
