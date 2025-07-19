@@ -115,6 +115,8 @@ public interface IDataType
 
 public class PrimitiveDataType(Primitive kind) : IDataType
 {
+    public static PrimitiveDataType Bool { get; } = new PrimitiveDataType(Primitive.Bool);
+
     public static PrimitiveDataType Void { get; } = new PrimitiveDataType(Primitive.Void);
 
     public Primitive Kind { get; } = kind;

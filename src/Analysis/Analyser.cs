@@ -458,6 +458,7 @@ public class Analyser
     {
         var left = Next(node.Left);
         var right = Next(node.Right);
+        var dataType = left.DataType;
         if (node.Operator is TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash)
         {
             if (!left.DataType.IsNumber())
@@ -482,13 +483,18 @@ public class Analyser
                 throw Recover();
             }
 
+            dataType = PrimitiveDataType.Bool;
+
         }
-        else if (node.Operator is TokenKind.EqualsEquals or TokenKind.NotEquals)
+        else if (node.Operator is TokenKind.EqualsEquals or TokenKind.NotEquals or
+            TokenKind.Greater or TokenKind.GreaterEquals or
+            TokenKind.Less or TokenKind.LessEquals)
         {
             right = TypeCheck(right, left.DataType);
+            dataType = PrimitiveDataType.Bool;
         }
 
-        return new SemanticBinaryNode(left, node.Operator, right, left.DataType);
+        return new SemanticBinaryNode(left, node.Operator, right, dataType);
     }
 
     private SemanticAssignmentNode Visit(SyntaxAssignmentNode node)

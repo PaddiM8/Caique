@@ -315,15 +315,15 @@ public class LlvmContentEmitter
 
         if (node.Operator == TokenKind.Exclamation)
         {
-            return _builder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(_context, false), "not");
+            return _builder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(_context, true), "not");
         }
 
         if (node.Operator == TokenKind.Minus)
         {
             return node.DataType switch
             {
-                PrimitiveDataType n when n.IsInteger() => _builder.BuildNeg(value.Value, "neg"),
-                PrimitiveDataType n when n.IsFloat() => _builder.BuildFNeg(value.Value, "neg"),
+                LoweredPrimitiveDataType n when n.Primitive.IsInteger() => _builder.BuildNeg(value.Value, "neg"),
+                LoweredPrimitiveDataType n when n.Primitive.IsFloat() => _builder.BuildFNeg(value.Value, "neg"),
                 _ => throw new InvalidOperationException(),
             };
         }
@@ -345,7 +345,7 @@ public class LlvmContentEmitter
         var right = Next(node.Right);
         Debug.Assert(right.HasValue);
 
-        var primitive = (node.DataType as LoweredPrimitiveDataType)?.Primitive;
+        var primitive = (node.Left.DataType as LoweredPrimitiveDataType)?.Primitive;
         if (node.Operator is
             TokenKind.EqualsEquals or
             TokenKind.NotEquals or
@@ -495,6 +495,7 @@ public class LlvmContentEmitter
         var thenBlockReturns = node.ThenBranch.Expressions.LastOrDefault() is LoweredReturnNode;
         var elseBlockReturns = node.ElseBranch?.Expressions.LastOrDefault() is LoweredReturnNode;
 
+        // TODO: Use phi
         var parent = _builder.InsertBlock.Parent;
         var thenBlock = parent.AppendBasicBlock("then");
         var elseBlock = parent.AppendBasicBlock("else");
