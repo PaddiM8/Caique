@@ -234,9 +234,11 @@ public class SyntaxAttributeNode(Token identifier, List<SyntaxNode> arguments, T
     public List<SyntaxNode> Arguments { get; } = arguments;
 }
 
-public class SyntaxVariableDeclarationNode(Token identifier, SyntaxTypeNode? type, SyntaxNode value, TextSpan span)
+public class SyntaxVariableDeclarationNode(bool isMutable, Token identifier, SyntaxTypeNode? type, SyntaxNode value, TextSpan span)
     : SyntaxNode(span)
 {
+    public bool IsMutable { get; } = isMutable;
+
     public Token Identifier { get; } = identifier;
 
     public SyntaxTypeNode? Type { get; } = type;
@@ -408,6 +410,8 @@ public class SyntaxEnumMemberNode(Token identifier, SyntaxNode? value, TextSpan 
 public class SyntaxFieldDeclarationNode(Token identifier, SyntaxTypeNode type, SyntaxNode? value, bool isStatic, TextSpan span)
     : SyntaxNode(span)
 {
+    public bool IsMutable { get; } = true;
+
     public Token Identifier { get; } = identifier;
 
     public SyntaxTypeNode Type { get; } = type;

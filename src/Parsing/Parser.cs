@@ -90,7 +90,7 @@ public class Parser
     {
         return _current?.Kind switch
         {
-            TokenKind.Let => ParseLet(),
+            TokenKind.Let or TokenKind.Var => ParseVariableDeclaration(),
             _ => ParseAssignment(),
         };
     }
@@ -135,9 +135,9 @@ public class Parser
         return new SyntaxTypeNode(typeNames, isSlice, typeArguments, span);
     }
 
-    private SyntaxVariableDeclarationNode ParseLet()
+    private SyntaxVariableDeclarationNode ParseVariableDeclaration()
     {
-        var start = EatExpected(TokenKind.Let).Span;
+        var keyword = EatExpected(TokenKind.Let, TokenKind.Var);
         var identifier = EatExpected(TokenKind.Identifier);
         var type = Match(TokenKind.Equals)
             ? null
@@ -145,7 +145,13 @@ public class Parser
         EatExpected(TokenKind.Equals);
         var value = ParseExpression();
 
-        return new SyntaxVariableDeclarationNode(identifier, type, value, start.Combine(value.Span));
+        return new SyntaxVariableDeclarationNode(
+            isMutable: keyword.Kind == TokenKind.Var,
+            identifier,
+            type,
+            value,
+            keyword.Span.Combine(value.Span)
+        );
     }
 
     private SyntaxParameterNode ParseParameter()

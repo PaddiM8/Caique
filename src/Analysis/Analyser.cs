@@ -502,10 +502,22 @@ public class Analyser
         var left = Next(node.Left);
         var right = Next(node.Right);
 
-        if (left is not (SemanticVariableReferenceNode or SemanticFieldReferenceNode))
+        ISemanticVariableDeclaration? declaration = null;
+        if (left is SemanticVariableReferenceNode variableReference)
+        {
+            declaration = variableReference.Symbol.SemanticDeclaration;
+        }
+        else if (left is SemanticFieldReferenceNode fieldReference)
+        {
+            declaration = fieldReference.Symbol.SemanticDeclaration;
+        }
+        else
         {
             _diagnostics.ReportExpectedVariableReferenceInAssignment(node.Span);
         }
+
+        if (declaration != null && !declaration.IsMutable)
+            _diagnostics.ReportAssignmentToImmutable(node.Span, declaration.Identifier.Span);
 
         right = TypeCheck(right, left.DataType);
 
@@ -887,7 +899,13 @@ public class Analyser
             value = TypeCheck(value, dataType);
         }
 
-        var semanticNode = new SemanticVariableDeclarationNode(node.Identifier, value, dataType, node.Span);
+        var semanticNode = new SemanticVariableDeclarationNode(
+            node.IsMutable,
+            node.Identifier,
+            value,
+            dataType,
+            node.Span
+        );
 
         // Variable symbols are created in the analyser, since they can only be referenced
         // after they have been declared
@@ -1135,6 +1153,7 @@ public class Analyser
             _diagnostics.ReportNonConstantValueInStaticField(value.Span);
 
         var semanticNode = new SemanticFieldDeclarationNode(
+            node.IsMutable,
             node.Identifier,
             value,
             node.IsStatic,

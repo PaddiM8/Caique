@@ -349,14 +349,24 @@ public class SemanticTypeNode(IDataType dataType, TextSpan span)
 
 public interface ISemanticVariableDeclaration
 {
+    bool IsMutable { get; }
+
     Token Identifier { get; }
 
     IDataType DataType { get; }
 }
 
-public class SemanticVariableDeclarationNode(Token identifier, SemanticNode value, IDataType dataType, TextSpan span)
+public class SemanticVariableDeclarationNode(
+    bool isMutable,
+    Token identifier,
+    SemanticNode value,
+    IDataType dataType,
+    TextSpan span
+)
     : SemanticNode(dataType, span), ISemanticVariableDeclaration
 {
+    public bool IsMutable { get; } = isMutable;
+
     public Token Identifier { get; } = identifier;
 
     public SemanticNode Value { get; } = value;
@@ -434,6 +444,8 @@ public class SemanticFunctionDeclarationNode(
 public class SemanticParameterNode(Token identifier, IDataType dataType, TextSpan span)
     : SemanticNode(dataType, span), ISemanticVariableDeclaration
 {
+    public bool IsMutable { get; } = true;
+
     public Token Identifier { get; } = identifier;
 
     public override void Traverse(Action<SemanticNode, SemanticNode> callback)
@@ -654,6 +666,7 @@ public class SemanticEnumMemberNode(
 }
 
 public class SemanticFieldDeclarationNode(
+    bool isMutable,
     Token identifier,
     SemanticNode? value,
     bool isStatic,
@@ -661,8 +674,10 @@ public class SemanticFieldDeclarationNode(
     FieldSymbol symbol,
     TextSpan span
 )
-    : SemanticNode(dataType, span)
+    : SemanticNode(dataType, span), ISemanticVariableDeclaration
 {
+    public bool IsMutable { get; } = isMutable;
+
     public Token Identifier { get; } = identifier;
 
     public SemanticNode? Value { get; } = value;

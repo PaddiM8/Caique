@@ -9,6 +9,7 @@ public enum DiagnosticCode
     HintColonInsteadOfDot,
     HintOtherDuplicate,
     HintUseInheritableKeyword,
+    HintAssigneeHere,
 
     // Errors
     ErrorCompilerError,
@@ -46,6 +47,7 @@ public enum DiagnosticCode
     ErrorBaseClassNotInheritable,
     ErrorInvalidEnumType,
     ErrorInvalidEnumMemberValue,
+    ErrorAssignmentToImmutable,
 }
 
 public class DiagnosticReporter
@@ -437,6 +439,20 @@ public class DiagnosticReporter
             DiagnosticCode.ErrorInvalidEnumMemberValue,
             $"Invalid enum member value: {details}.",
             span
+        );
+    }
+
+    public void ReportAssignmentToImmutable(TextSpan assignmentSpan, TextSpan declarationSpan)
+    {
+        ReportError(
+            DiagnosticCode.ErrorAssignmentToImmutable,
+            $"Cannot assign to immutable value.",
+            assignmentSpan
+        );
+        ReportHint(
+            DiagnosticCode.HintAssigneeHere,
+            $"The assignee is defined here.",
+            declarationSpan
         );
     }
 

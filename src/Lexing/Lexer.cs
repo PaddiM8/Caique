@@ -148,6 +148,7 @@ public class Lexer
         {
             "with" => TokenKind.With,
             "let" => TokenKind.Let,
+            "var" => TokenKind.Var,
             "func" => TokenKind.Func,
             "class" => TokenKind.Class,
             "protocol" => TokenKind.Protocol,

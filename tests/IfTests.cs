@@ -92,7 +92,7 @@ public class IfTests
             {
                 func Run() i32
                 {
-                    let result = 0;
+                    var result = 0;
                     if true
                     {
                         result = 2;
@@ -121,7 +121,7 @@ public class IfTests
             {
                 func Run() i32
                 {
-                    let result = 0;
+                    var result = 0;
                     if false
                     {
                         result = 2;
