@@ -297,16 +297,14 @@ public class IfTests
     }
 
     [Test]
-    public void TestNonValueIf_WithDo()
+    public void TestNonValueIf_WithArrow()
     {
         var mainFile = """
             module Main
             {
                 func Run() i32
                 {
-                    if true
-                        do 2
-                        else 3
+                    if true -> 2 else 3
                 }
             }
             """;

@@ -24,7 +24,7 @@ public enum TokenKind
     New,
     As,
     Return, Self, Base, Default,
-    If, Else, Do,
+    If, Else, Arrow,
     Equals, Colon, ColonColon, Semicolon, Comma, Hash,
     Identifier,
     OpenParenthesis, ClosedParenthesis, OpenBracket, ClosedBracket, OpenBrace, ClosedBrace,

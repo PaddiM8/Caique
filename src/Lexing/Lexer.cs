@@ -62,7 +62,9 @@ public class Lexer
         var (kind, content) = Current switch
         {
             '+' => (TokenKind.Plus, Eat()),
-            '-' => (TokenKind.Minus, Eat()),
+            '-' => Peek() == '>'
+                ? (TokenKind.Arrow, Eat(2))
+                : (TokenKind.Minus, Eat()),
             '*' => (TokenKind.Star, Eat()),
             '/' => (TokenKind.Slash, Eat()),
             '&' => Peek() == '&'
@@ -161,7 +163,6 @@ public class Lexer
             "default" => TokenKind.Default,
             "if" => TokenKind.If,
             "else" => TokenKind.Else,
-            "do" => TokenKind.Do,
             "true" => TokenKind.True,
             "false" => TokenKind.False,
             "void" => TokenKind.Void,

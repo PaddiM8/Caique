@@ -837,9 +837,9 @@ public class Parser
         return new SyntaxBlockNode(expressions, start.Combine(end));
     }
 
-    private SyntaxBlockNode ParseBlockOrDo()
+    private SyntaxBlockNode ParseBlockOrArrow()
     {
-        if (AdvanceIf(TokenKind.Do))
+        if (AdvanceIf(TokenKind.Arrow))
         {
             var start = _previous!.Span;
             SyntaxNode expression;
@@ -878,7 +878,7 @@ public class Parser
     {
         var start = EatExpected(TokenKind.If).Span;
         var condition = ParseExpression();
-        var thenBranch = ParseBlockOrDo();
+        var thenBranch = ParseBlockOrArrow();
 
         SyntaxBlockNode? elseBranch = null;
         if (AdvanceIf(TokenKind.Else))
