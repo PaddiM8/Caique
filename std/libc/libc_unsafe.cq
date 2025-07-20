@@ -4,15 +4,15 @@ module LibcUnsafe
     let stdout usize;
 
     #ffi
-    func printf(pattern [u8], arg [u8]);
+    pub func printf(pattern [u8], arg [u8]);
 
     #ffi
-    func fputs(str [u8], stream usize);
+    pub func fputs(str [u8], stream usize);
 
     #ffi
-    func malloc(size usize) usize;
+    pub func malloc(size usize) usize;
 
-    func GetStdout() usize
+    pub func GetStdout() usize
     {
         LibcUnsafe:stdout
     }

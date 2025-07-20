@@ -282,19 +282,17 @@ public class Parser
         while (Match(TokenKind.Hash))
             attributes.Add(ParseAttribute());
 
+        bool isPublic = AdvanceIf(TokenKind.Pub);
         bool isStatic = AdvanceIf(TokenKind.Static);
         bool isOverride = AdvanceIf(TokenKind.Override);
         if (Match(TokenKind.Func))
-            return ParseFunction(isStatic, isOverride, attributes, scope);
-
-        if (Match(TokenKind.With))
-            return ParseFunction(isStatic, isOverride, attributes, scope);
+            return ParseFunction(isPublic, isStatic, isOverride, attributes, scope);
 
         if (_current is { Kind: TokenKind.Identifier, Value: "init" })
             return ParseInit();
 
         if (Match(TokenKind.Let, TokenKind.Var))
-            return ParseField(isStatic, attributes, scope);
+            return ParseField(isPublic, isStatic, attributes, scope);
 
         throw Recover();
     }
@@ -364,7 +362,7 @@ public class Parser
 
         if (Match(TokenKind.Func))
         {
-            var function = ParseFunction(isStatic: false, isOverride: false, attributes, scope);
+            var function = ParseFunction(isPublic: true, isStatic: false, isOverride: false, attributes, scope);
             if (function.Body != null)
                 _diagnostics.ReportBodyInProtocol(function.Span);
 
@@ -473,11 +471,12 @@ public class Parser
         while (Match(TokenKind.Hash))
             attributes.Add(ParseAttribute());
 
+        var isPublic = AdvanceIf(TokenKind.Pub);
         if (Match(TokenKind.Func))
-            return ParseFunction(isStatic: true, isOverride: false, attributes, scope);
+            return ParseFunction(isPublic, isStatic: true, isOverride: false, attributes, scope);
 
         if (Match(TokenKind.Let, TokenKind.Var))
-            return ParseField(isStatic: true, attributes, scope);
+            return ParseField(isPublic: false, isStatic: true, attributes, scope);
 
         throw Recover();
     }
@@ -495,6 +494,7 @@ public class Parser
     }
 
     private SyntaxFunctionDeclarationNode ParseFunction(
+        bool isPublic,
         bool isStatic,
         bool isOverride,
         List<SyntaxAttributeNode> attributes,
@@ -516,6 +516,7 @@ public class Parser
             parameters,
             returnType,
             body,
+            isPublic,
             isStatic,
             isOverride,
             start.Combine(_previous!.Span)
@@ -575,6 +576,7 @@ public class Parser
     }
 
     private SyntaxFieldDeclarationNode ParseField(
+        bool isPublic,
         bool isStatic,
         List<SyntaxAttributeNode> attributes,
         StructureScope scope
@@ -603,10 +605,11 @@ public class Parser
 
         var end = _previous!.Span;
         var node = new SyntaxFieldDeclarationNode(
-            isMutable: keyword.Kind == TokenKind.Var,
             identifier,
             type,
             value,
+            isMutable: keyword.Kind == TokenKind.Var,
+            isPublic,
             isStatic,
             getter,
             setter,

@@ -20,21 +20,21 @@ public class PropertyTests
 
             class C
             {
-                let a i32 { 2 }
+                pub let a i32 { 2 }
 
-                let b i32
+                pub let b i32
                 {
                     get -> 3;
                 }
 
-                let c i32
+                pub let c i32
                 {
                     get { 5 }
                 }
 
-                let d i32 -> 7;
+                pub let d i32 -> 7;
 
-                let e i32
+                pub let e i32
                 {
                     get
                     {
@@ -68,7 +68,7 @@ public class PropertyTests
 
             class C
             {
-                var a i32
+                pub var a i32
                 {
                     get -> internal;
                     set -> internal = value * 2;
@@ -90,7 +90,7 @@ public class PropertyTests
         var mainFile = """
             class C
             {
-                var a i32
+                pub var a i32
                 {
                     set -> internal = value * 2;
                 }
@@ -111,7 +111,7 @@ public class PropertyTests
         var mainFile = """
             class C
             {
-                let a i32
+                pub let a i32
                 {
                     get -> internal;
                     set -> internal = value * 2;

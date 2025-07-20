@@ -22,7 +22,7 @@ public class PolymorphismClassToClassTests
 
             class Duck : Animal
             {
-                func Speak() i32
+                pub func Speak() i32
                 {
                     42
                 }
@@ -30,7 +30,7 @@ public class PolymorphismClassToClassTests
 
             inheritable class Animal
             {
-                func Speak() i32
+                pub func Speak() i32
                 {
                     12
                 }

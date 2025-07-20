@@ -1,16 +1,16 @@
 module Libc
 {
-    func Printf(pattern String, arg String)
+    pub func Printf(pattern String, arg String)
     {
         LibcUnsafe:printf(pattern.ToByteArray(), arg.ToByteArray());
     }
 
-    func Fputs(str String, stream usize)
+    pub func Fputs(str String, stream usize)
     {
         LibcUnsafe:fputs(str.ToByteArray(), stream);
     }
 
-    func GetStdout() usize
+    pub func GetStdout() usize
     {
         LibcUnsafe:GetStdout()
     }

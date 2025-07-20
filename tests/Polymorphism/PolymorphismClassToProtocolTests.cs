@@ -19,7 +19,7 @@ public class PolymorphismClassToProtocolTests
 
             class Duck : Speakable
             {
-                func Speak() i32
+                pub func Speak() i32
                 {
                     42
                 }
@@ -57,7 +57,7 @@ public class PolymorphismClassToProtocolTests
 
             class Duck : Speakable
             {
-                func Speak() i32
+                pub func Speak() i32
                 {
                     42
                 }
@@ -129,7 +129,7 @@ public class PolymorphismClassToProtocolTests
 
             class Duck : Speakable
             {
-                func Speak() i32
+                pub func Speak() i32
                 {
                     42
                 }

@@ -342,8 +342,12 @@ public class Analyser
             if (identifierSymbol is FunctionSymbol functionSymbol)
             {
                 if (!functionSymbol.SyntaxDeclaration.IsStatic)
-                {
                     _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
+
+                if (!functionSymbol.SyntaxDeclaration.IsPublic &&
+                    structureSymbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                {
+                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier.Span);
                 }
 
                 var dataType = new FunctionDataType(functionSymbol);
@@ -361,7 +365,12 @@ public class Analyser
                 if (!fieldSymbol.SyntaxDeclaration.IsStatic)
                     _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
 
-                // TODO: All fields should probaby(?) be private, so this isn't allowed
+                if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
+                    structureSymbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                {
+                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier.Span);
+                }
+
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
 
                 return new SemanticFieldReferenceNode(
@@ -571,6 +580,12 @@ public class Analyser
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(functionSymbol.SyntaxDeclaration.Identifier);
                 }
 
+                if (!functionSymbol.SyntaxDeclaration.IsPublic &&
+                    structureDataType.Symbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                {
+                    _diagnostics.ReportSymbolIsPrivate(left.Span);
+                }
+
                 return new SemanticFunctionReferenceNode(
                     functionSymbol.SyntaxDeclaration.Identifier,
                     functionSymbol,
@@ -585,6 +600,12 @@ public class Analyser
                 if (fieldSymbol.SyntaxDeclaration.IsStatic)
                 {
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(fieldSymbol.SyntaxDeclaration.Identifier);
+                }
+
+                if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
+                    structureDataType.Symbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                {
+                    _diagnostics.ReportSymbolIsPrivate(left.Span);
                 }
 
                 return new SemanticFieldReferenceNode(

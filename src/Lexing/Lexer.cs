@@ -155,6 +155,7 @@ public class Lexer
             "module" => TokenKind.Module,
             "enum" => TokenKind.Enum,
             "inheritable" => TokenKind.Inheritable,
+            "pub" => TokenKind.Pub,
             "static" => TokenKind.Static,
             "override" => TokenKind.Override,
             "new" => TokenKind.New,

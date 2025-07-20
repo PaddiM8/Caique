@@ -6,7 +6,7 @@ class String
     {
     }
 
-    func ToByteArray() [u8]
+    pub func ToByteArray() [u8]
     {
         chars
     }

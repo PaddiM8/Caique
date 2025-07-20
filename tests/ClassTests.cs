@@ -21,8 +21,8 @@ public class ClassTests
 
             class C
             {
-                let a i32;
-                let b i32;
+                pub let a i32;
+                pub let b i32;
             }
             """;
         TestProject
@@ -30,6 +30,31 @@ public class ClassTests
             .AddFile("main", mainFile)
             .Run()
             .AssertSuccessWithExitCode(3);
+    }
+
+    [Test]
+    public void TestClassWithFieldAccess_ToPrivate_Error()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run()
+                {
+                    let c = new C();
+                    c.a = 3;
+                }
+            }
+
+            class C
+            {
+                var a i32;
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorSymbolIsPrivate);
     }
 
     [Test]
@@ -55,7 +80,7 @@ public class ClassTests
                     b = x;
                 }
 
-                func F() i32
+                pub func F() i32
                 {
                     a + b
                 }
@@ -102,7 +127,7 @@ public class ClassTests
 
             class C
             {
-                func F() i32
+                pub func F() i32
                 {
                     3
                 }
@@ -113,6 +138,32 @@ public class ClassTests
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorNonStaticSymbolReferencedAsStatic);
+    }
+
+    public void TestClassWithMethod_AsPrivate_Error()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    new C().F()
+                }
+            }
+
+            class C
+            {
+                func F() i32
+                {
+                    3
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorSymbolIsPrivate);
     }
 
     [Test]
@@ -129,7 +180,7 @@ public class ClassTests
 
             class C
             {
-                static func F() i32
+                pub static func F() i32
                 {
                     3
                 }
@@ -156,7 +207,7 @@ public class ClassTests
 
             class C
             {
-                static func F() i32
+                pub static func F() i32
                 {
                     3
                 }
@@ -183,7 +234,7 @@ public class ClassTests
 
             class C
             {
-                static func F() i32
+                pub static func F() i32
                 {
                     3
                 }
@@ -194,5 +245,32 @@ public class ClassTests
             .AddFile("main", mainFile)
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorExpectedValueGotType);
+    }
+
+    [Test]
+    public void TestClassWithStaticFunction_AsPrivate_Error()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    C:F()
+                }
+            }
+
+            class C
+            {
+                static func F() i32
+                {
+                    3
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Compile()
+            .AssertSingleCompilationError(DiagnosticCode.ErrorSymbolIsPrivate);
     }
 }

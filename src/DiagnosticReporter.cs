@@ -51,6 +51,7 @@ public enum DiagnosticCode
     ErrorAssignmentToImmutable,
     ErrorSetterButNoGetter,
     ErrorSetterOnImmutable,
+    ErrorSymbolIsPrivate,
 }
 
 public class DiagnosticReporter
@@ -479,6 +480,15 @@ public class DiagnosticReporter
             DiagnosticCode.HintChangeToVar,
             "Change from 'let' to 'var' here.",
             keywordSpan
+        );
+    }
+
+    public void ReportSymbolIsPrivate(TextSpan span)
+    {
+        ReportError(
+            DiagnosticCode.ErrorSymbolIsPrivate,
+            "Symbol is private.",
+            span
         );
     }
 

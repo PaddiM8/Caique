@@ -305,6 +305,7 @@ public class SyntaxFunctionDeclarationNode(
     List<SyntaxParameterNode> parameters,
     SyntaxTypeNode? returnType,
     SyntaxBlockNode? body,
+    bool isPublic,
     bool isStatic,
     bool isOverride,
     TextSpan span
@@ -318,6 +319,8 @@ public class SyntaxFunctionDeclarationNode(
     public SyntaxTypeNode? ReturnType { get; } = returnType;
 
     public SyntaxBlockNode? Body { get; } = body;
+
+    public bool IsPublic { get; } = isPublic;
 
     public bool IsStatic { get; } = isStatic;
 
@@ -451,10 +454,11 @@ public class SyntaxEnumMemberNode(Token identifier, SyntaxNode? value, TextSpan 
 }
 
 public class SyntaxFieldDeclarationNode(
-    bool isMutable,
     Token identifier,
     SyntaxTypeNode type,
     SyntaxNode? value,
+    bool isMutable,
+    bool isPublic,
     bool isStatic,
     SyntaxBlockNode? getter,
     SyntaxBlockNode? setter,
@@ -462,13 +466,15 @@ public class SyntaxFieldDeclarationNode(
 )
     : SyntaxNode(span)
 {
-    public bool IsMutable { get; } = isMutable;
-
     public Token Identifier { get; } = identifier;
 
     public SyntaxTypeNode Type { get; } = type;
 
     public SyntaxNode? Value { get; } = value;
+
+    public bool IsMutable { get; } = isMutable;
+
+    public bool IsPublic { get; } = isPublic;
 
     public bool IsStatic { get; } = isStatic;
 

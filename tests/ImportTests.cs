@@ -19,7 +19,7 @@ public class ImportTests
         var subFile = """
             module Sub
             {
-                func A()
+                pub func A()
                 {
                 }
             }
@@ -47,7 +47,7 @@ public class ImportTests
         var subFile = """
             class Sub
             {
-                func A()
+                pub func A()
                 {
                 }
             }
@@ -77,7 +77,7 @@ public class ImportTests
         var subFile = """
             class Sub
             {
-                func A()
+                pub func A()
                 {
                 }
             }

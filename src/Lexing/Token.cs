@@ -20,7 +20,7 @@ public enum TokenKind
 {
     Unknown,
     Let, Var, Func, With, Class, Protocol, Module, Enum,
-    Static, Override, Inheritable,
+    Pub, Static, Override, Inheritable,
     New,
     As,
     Return, Self, Base, Default,
