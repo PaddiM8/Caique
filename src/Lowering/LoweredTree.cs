@@ -207,7 +207,7 @@ public class LoweredFunctionDeclarationNode(
 
     public ILoweredDataType ReturnType { get; } = returnType;
 
-    public LoweredBlockNode? Body { get; } = body;
+    public LoweredBlockNode? Body { get; set; } = body;
 
     public TextSpan Span { get; } = span;
 }

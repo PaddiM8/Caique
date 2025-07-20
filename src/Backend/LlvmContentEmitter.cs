@@ -607,10 +607,13 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(LoweredBlockNode node)
     {
-        var function = _builder.InsertBlock.Parent;
-
         foreach (var expression in node.Expressions)
+        {
             Next(expression);
+
+            if (expression is LoweredReturnNode)
+                break;
+        }
 
         if (node.ReturnValueDeclaration != null)
         {

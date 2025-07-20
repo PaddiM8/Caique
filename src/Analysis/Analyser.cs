@@ -376,6 +376,13 @@ public class Analyser
         }
 
         var identifier = node.IdentifierList.Single();
+        if (identifier.Value == "value")
+        {
+            var keywordNode = TryResolveSetterValueKeywordNode(node);
+            if (keywordNode != null)
+                return keywordNode;
+        }
+
         var variableSymbol = _syntaxTree.GetLocalScope(node)?.FindSymbol(identifier.Value);
         if (variableSymbol != null)
             return new SemanticVariableReferenceNode(identifier, variableSymbol);
@@ -422,6 +429,21 @@ public class Analyser
         }
 
         throw Recover();
+    }
+
+    private SemanticKeywordValueNode? TryResolveSetterValueKeywordNode(SyntaxIdentifierNode node)
+    {
+        var identifier = node.IdentifierList.Single();
+        var setter = _syntaxTree.GetEnclosingSetter(node);
+        if (setter != null)
+        {
+            var field = (SyntaxFieldDeclarationNode)setter.Parent!;
+            var dataType = Next(field.Type).DataType;
+
+            return new SemanticKeywordValueNode(identifier, [], identifier.Span, dataType);
+        }
+
+        return null;
     }
 
     private SemanticEnumReferenceNode ResolveEnum(EnumSymbol symbol, Token memberIdentifier)
@@ -695,32 +717,42 @@ public class Analyser
             : Next(node.Value);
 
         var enclosingFunction = _syntaxTree.GetEnclosingFunction(node);
-        if (enclosingFunction == null)
+        var enclosingGetter = _syntaxTree.GetEnclosingGetter(node);
+        SyntaxTypeNode? returnType;
+        if (enclosingFunction != null)
         {
+            returnType = enclosingFunction?.ReturnType;
+        }
+        else if (enclosingGetter != null)
+        {
+            returnType = ((SyntaxFieldDeclarationNode?)enclosingGetter.Parent)?.Type;
+        }
+        else
+        {
+
             _diagnostics.ReportReturnOutsideFunction(node.Span);
             throw Recover();
         }
 
-        value = TypeCheckReturnType(enclosingFunction, value, node.Span);
+        var functionReturnType = returnType == null
+            ? null
+            : Next(returnType).DataType;
+        value = TypeCheckReturnType(functionReturnType, value, node.Span);
 
         return new SemanticReturnNode(value, node.Span);
     }
 
-    private SemanticNode? TypeCheckReturnType(ISyntaxFunctionDeclaration enclosingFunction, SemanticNode? value, TextSpan span)
+    private SemanticNode? TypeCheckReturnType(IDataType? returnType, SemanticNode? value, TextSpan span)
     {
-        var functionReturnType = enclosingFunction.ReturnType == null
-            ? null
-            : Next(enclosingFunction.ReturnType).DataType;
-
         if (value == null)
         {
-            if (functionReturnType != null)
-                _diagnostics.ReportIncompatibleType(Primitive.Void, functionReturnType, span);
+            if (returnType != null)
+                _diagnostics.ReportIncompatibleType(Primitive.Void, returnType, span);
 
             return null;
         }
 
-        return TypeCheck(value!, functionReturnType ?? PrimitiveDataType.Void);
+        return TypeCheck(value!, returnType ?? PrimitiveDataType.Void);
     }
 
     private SemanticIfNode Visit(SyntaxIfNode node)
@@ -774,11 +806,26 @@ public class Analyser
         {
             dataType = analysedLast.DataType;
 
+            SyntaxTypeNode? returnType = null;
             if (node.Parent is ISyntaxFunctionDeclaration enclosingFunction)
             {
+                returnType = enclosingFunction.ReturnType;
+            }
+            else if (node.Parent is SyntaxFieldDeclarationNode enclosingField)
+            {
+                returnType = node == enclosingField.Getter
+                    ? enclosingField.Type
+                    : null;
+            }
+
+            if (returnType != null)
+            {
                 var analysedLastStatement = (SemanticStatementNode)analysedLast;
+                var functionReturnType = returnType == null
+                    ? null
+                    : Next(returnType).DataType;
                 var typeCheckedValue = TypeCheckReturnType(
-                    enclosingFunction,
+                    functionReturnType,
                     analysedLastStatement.Value,
                     node.Span
                 );
@@ -1152,6 +1199,18 @@ public class Analyser
         if (node.IsStatic && value is not (SemanticLiteralNode or null))
             _diagnostics.ReportNonConstantValueInStaticField(value.Span);
 
+        var getter = node.Getter == null
+            ? null
+            : Visit(node.Getter);
+        var setter = node.Setter == null
+            ? null
+            : Visit(node.Setter);
+        if (setter != null && getter == null)
+            _diagnostics.ReportSetterButNoGetter(setter.Span);
+
+        if (setter != null && !node.IsMutable)
+            _diagnostics.ReportSetterOnImmutable(setter.Span, node.Identifier.Span);
+
         var semanticNode = new SemanticFieldDeclarationNode(
             node.IsMutable,
             node.Identifier,
@@ -1159,6 +1218,8 @@ public class Analyser
             node.IsStatic,
             dataType,
             node.Symbol!,
+            getter,
+            setter,
             node.Span
         )
         {

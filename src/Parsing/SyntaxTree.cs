@@ -50,6 +50,47 @@ public class SyntaxTree(string text, FileScope fileScope)
         return current as ISyntaxStructureDeclaration;
     }
 
+    public SyntaxFieldDeclarationNode? GetEnclosingField(SyntaxNode node)
+    {
+        var current = node;
+        while (current is not (null or SyntaxFieldDeclarationNode))
+            current = current.Parent;
+
+        return current as SyntaxFieldDeclarationNode;
+    }
+
+    public SyntaxBlockNode? GetEnclosingGetter(SyntaxNode node)
+    {
+        var field = GetEnclosingField(node);
+        if (field == null)
+            return null;
+
+        var currentBlock = GetEnclosingBlock(node);
+        while (currentBlock != null && currentBlock != field.Getter)
+            currentBlock = GetEnclosingBlock(currentBlock);
+
+        if (currentBlock == field.Getter)
+            return field.Getter;
+
+        return null;
+    }
+
+    public SyntaxBlockNode? GetEnclosingSetter(SyntaxNode node)
+    {
+        var field = GetEnclosingField(node);
+        if (field == null)
+            return null;
+
+        var currentBlock = GetEnclosingBlock(node);
+        while (currentBlock != null && currentBlock != field.Setter)
+            currentBlock = GetEnclosingBlock(currentBlock);
+
+        if (currentBlock == field.Setter)
+            return field.Setter;
+
+        return null;
+    }
+
     public StructureScope? GetStructureScope(SyntaxNode node)
     {
         return GetEnclosingStructure(node)?.Scope;
@@ -83,12 +124,12 @@ public class SyntaxWithNode(List<Token> identifiers, TextSpan span)
     public List<Token> Identifiers { get; } = identifiers;
 }
 
-public class SyntaxStatementNode(SyntaxNode expression, bool isReturnValue)
+public class SyntaxStatementNode(SyntaxNode expression, bool hasTrailingSemicolon)
     : SyntaxNode(expression.Span)
 {
     public SyntaxNode Expression { get; } = expression;
 
-    public bool HasTrailingSemicolon { get; } = isReturnValue;
+    public bool HasTrailingSemicolon { get; } = hasTrailingSemicolon;
 }
 
 public class SyntaxGroupNode(SyntaxNode value, TextSpan span)
@@ -193,10 +234,12 @@ public class SyntaxIfNode(SyntaxNode condition, SyntaxBlockNode thenBranch, Synt
     public SyntaxBlockNode? ElseBranch { get; } = elseBranch;
 }
 
-public class SyntaxBlockNode(List<SyntaxNode> expressions, TextSpan span)
+public class SyntaxBlockNode(List<SyntaxNode> expressions, bool isArrowBlock, TextSpan span)
     : SyntaxNode(span)
 {
     public List<SyntaxNode> Expressions { get; } = expressions;
+
+    public bool IsArrowBlock { get; } = isArrowBlock;
 
     public IScope? Scope { get; set; }
 }
@@ -413,6 +456,8 @@ public class SyntaxFieldDeclarationNode(
     SyntaxTypeNode type,
     SyntaxNode? value,
     bool isStatic,
+    SyntaxBlockNode? getter,
+    SyntaxBlockNode? setter,
     TextSpan span
 )
     : SyntaxNode(span)
@@ -426,6 +471,10 @@ public class SyntaxFieldDeclarationNode(
     public SyntaxNode? Value { get; } = value;
 
     public bool IsStatic { get; } = isStatic;
+
+    public SyntaxBlockNode? Getter { get; } = getter;
+
+    public SyntaxBlockNode? Setter { get; } = setter;
 
     public FieldSymbol? Symbol { get; set; }
 

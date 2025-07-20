@@ -41,7 +41,12 @@ public class Parser
 
         var start = nodes.FirstOrDefault()?.Span.Start ?? TextPosition.Default(syntaxTree);
         var end = nodes.LastOrDefault()?.Span.End ?? TextPosition.Default(syntaxTree);
-        var root = new SyntaxBlockNode(nodes, new TextSpan(start, end));
+        var root = new SyntaxBlockNode(
+            nodes,
+            isArrowBlock: false,
+            new TextSpan(start, end)
+        );
+
         syntaxTree.Initialise(root);
 
         return syntaxTree;
@@ -69,14 +74,14 @@ public class Parser
         }
     }
 
-    private SyntaxStatementNode ParseStatement(bool isSingleExpressionBlock = false)
+    private SyntaxStatementNode ParseStatement(bool isArrowBlock = false)
     {
         var expressionStatement = ParseExpression();
 
         // The last statement in a block doesn't need to end with a semicolon (except for return statements)
         bool hasTrailingSemicolon = false;
         var isBlockNode = expressionStatement is SyntaxBlockNode or SyntaxIfNode;
-        var isReturnValue = isSingleExpressionBlock || Match(TokenKind.ClosedBrace) || isBlockNode;
+        var isReturnValue = isArrowBlock || Match(TokenKind.ClosedBrace) || isBlockNode;
         if (!isReturnValue || expressionStatement is SyntaxReturnNode)
         {
             EatExpected(TokenKind.Semicolon, insert: true);
@@ -583,13 +588,28 @@ public class Parser
         if (AdvanceIf(TokenKind.Equals))
             value = ParseExpression();
 
-        var end = EatExpected(TokenKind.Semicolon).Span;
+        SyntaxBlockNode? getter = null;
+        SyntaxBlockNode? setter = null;
+        if (Match(TokenKind.OpenBrace, TokenKind.Arrow))
+        {
+            var propertyDefinition = ParsePropertyDefinition();
+            getter = propertyDefinition.getter;
+            setter = propertyDefinition.setter;
+        }
+        else
+        {
+            EatExpected(TokenKind.Semicolon);
+        }
+
+        var end = _previous!.Span;
         var node = new SyntaxFieldDeclarationNode(
             isMutable: keyword.Kind == TokenKind.Var,
             identifier,
             type,
             value,
             isStatic,
+            getter,
+            setter,
             keyword.Span.Combine(end)
         )
         {
@@ -601,6 +621,57 @@ public class Parser
         node.Symbol = symbol;
 
         return node;
+    }
+
+    private (SyntaxBlockNode? getter, SyntaxBlockNode? setter) ParsePropertyDefinition()
+    {
+        if (AdvanceIf(TokenKind.Arrow))
+        {
+            var start = _previous!.Span;
+            var expression = ParseExpression();
+            var statement = new SyntaxStatementNode(expression, hasTrailingSemicolon: false);
+            EatExpected(TokenKind.Semicolon);
+            var singleExpressionGetter = new SyntaxBlockNode(
+                [statement],
+                isArrowBlock: true,
+                start.Combine(expression.Span)
+            );
+
+            return (singleExpressionGetter, null);
+        }
+
+        var braceStart = EatExpected(TokenKind.OpenBrace).Span;
+        SyntaxBlockNode? getterBlock = null;
+        if (_current is { Kind: TokenKind.Identifier, Value: "get" })
+        {
+            Eat();
+            getterBlock = ParseBlockOrArrow();
+
+            if (_previous!.Kind != TokenKind.ClosedBrace)
+                EatExpected(TokenKind.Semicolon);
+        }
+
+        SyntaxBlockNode? setterBlock = null;
+        if (_current is { Kind: TokenKind.Identifier, Value: "set" })
+        {
+            Eat();
+            setterBlock = ParseBlockOrArrow();
+
+            if (_previous!.Kind != TokenKind.ClosedBrace)
+                EatExpected(TokenKind.Semicolon);
+        }
+
+        if (getterBlock == null && setterBlock == null)
+        {
+            var singleExpression = ParseExpression();
+            var statement = new SyntaxStatementNode(singleExpression, hasTrailingSemicolon: false);
+            var span = braceStart.Combine(_current?.Span ?? _previous!.Span);
+            getterBlock = new SyntaxBlockNode([statement], isArrowBlock: false, span);
+        }
+
+        EatExpected(TokenKind.ClosedBrace);
+
+        return (getterBlock, setterBlock);
     }
 
     private List<SyntaxParameterNode> ParseParameters()
@@ -842,7 +913,11 @@ public class Parser
 
         var end = EatExpected(TokenKind.ClosedBrace).Span;
 
-        return new SyntaxBlockNode(expressions, start.Combine(end));
+        return new SyntaxBlockNode(
+            expressions,
+            isArrowBlock: false,
+            start.Combine(end)
+        );
     }
 
     private SyntaxBlockNode ParseBlockOrArrow()
@@ -853,14 +928,18 @@ public class Parser
             SyntaxNode expression;
             try
             {
-                expression = ParseStatement(isSingleExpressionBlock: true);
+                expression = ParseStatement(isArrowBlock: true);
             }
             catch (ParserRecoveryException recovery)
             {
                 expression = recovery.ErrorNode;
             }
 
-            return new SyntaxBlockNode([expression], start.Combine(expression.Span));
+            return new SyntaxBlockNode(
+                [expression],
+                isArrowBlock: true,
+                start.Combine(expression.Span)
+            );
         }
 
         return ParseBlock();
@@ -898,7 +977,11 @@ public class Parser
             }
             else
             {
-                elseBranch = new SyntaxBlockNode([innerStatement], innerStatement.Span);
+                elseBranch = new SyntaxBlockNode(
+                    [innerStatement],
+                    isArrowBlock: false,
+                    innerStatement.Span
+                );
             }
         }
 

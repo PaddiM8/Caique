@@ -127,6 +127,28 @@ public class Lowerer
         return $"{parentType}:init";
     }
 
+    private string BuildGetterName(SemanticFieldDeclarationNode field)
+    {
+        return $"{BuildPropertyBaseName(field)}.get";
+    }
+
+    private string BuildSetterName(SemanticFieldDeclarationNode field)
+    {
+        return $"{BuildPropertyBaseName(field)}.set";
+    }
+
+    private string BuildPropertyBaseName(SemanticFieldDeclarationNode field)
+    {
+        var ffiAttribute = field.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
+        if (ffiAttribute != null)
+            return field.Identifier.Value;
+
+        var parentStructure = _tree.GetEnclosingStructure(field);
+        var parentType = new StructureDataType(parentStructure!.Symbol);
+
+        return $"{parentType}:{field.Identifier.Value}";
+    }
+
     private LoweredNode BuildString(string value)
     {
         var symbol = _stdScope!.ResolveStructure(["prelude", "String"])!;
@@ -191,6 +213,23 @@ public class Lowerer
     private LoweredNode Visit(SemanticFieldReferenceNode node)
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
+        var declaration = node.Symbol.SemanticDeclaration!;
+        if (declaration.Getter != null)
+        {
+            var identifier = BuildGetterName(declaration);
+            var getterDataType = _typeBuilder.BuildGetterType(declaration);
+            var getterReference = new LoweredFunctionReferenceNode(
+                identifier,
+                new LoweredPointerDataType(getterDataType)
+            );
+
+            List<LoweredNode> arguments = [];
+            if (node.ObjectInstance != null)
+                arguments.Add(Next(node.ObjectInstance)!);
+
+            return new LoweredCallNode(getterReference, arguments, dataType);
+        }
+
         if (node.ObjectInstance == null)
         {
             var name = BuildStaticFieldName(node.Symbol.SemanticDeclaration!);
@@ -201,7 +240,6 @@ public class Lowerer
 
         var instance = Next(node.ObjectInstance)!;
         var structure = _tree.GetEnclosingStructure(node.Symbol.SemanticDeclaration!)!;
-        var declaration = node.Symbol.SemanticDeclaration!;
 
         var fieldOffset = 0;
         if (structure is SemanticClassDeclarationNode classNode)
@@ -253,6 +291,24 @@ public class Lowerer
 
     private LoweredNode Visit(SemanticAssignmentNode node)
     {
+        if (node.Left is SemanticFieldReferenceNode { Symbol.SemanticDeclaration.Setter: not null } fieldReference)
+        {
+            var declaration = fieldReference.Symbol.SemanticDeclaration;
+            var identifier = BuildSetterName(declaration);
+            var setterDataType = _typeBuilder.BuildSetterType(declaration);
+            var getterReference = new LoweredFunctionReferenceNode(
+                identifier,
+                new LoweredPointerDataType(setterDataType)
+            );
+
+            var setterValue = Next(node.Right)!;
+            List<LoweredNode> arguments = [setterValue];
+            if (fieldReference.ObjectInstance != null)
+                arguments.Insert(0, Next(fieldReference.ObjectInstance)!);
+
+            return new LoweredCallNode(getterReference, arguments, setterDataType.ReturnType);
+        }
+
         var assignee = Next(node.Left) as LoweredLoadNode;
         var value = Next(node.Right);
         Debug.Assert(assignee != null && value != null);
@@ -468,8 +524,22 @@ public class Lowerer
         return new LoweredReturnNode(value);
     }
 
-    private LoweredKeywordValueNode Visit(SemanticKeywordValueNode node)
+    private LoweredNode Visit(SemanticKeywordValueNode node)
     {
+        var dataType = _typeBuilder.BuildType(node.DataType);
+        if (node.Keyword.Value == "value")
+        {
+            var field = _tree.GetEnclosingField(node);
+            Debug.Assert(field != null);
+
+            var setterIdentifier = BuildSetterName(field);
+            var setter = _functions[setterIdentifier];
+            var valueDeclaration = setter.Parameters.Last();
+            var valueReference = new LoweredVariableReferenceNode(valueDeclaration, dataType);
+
+            return new LoweredLoadNode(valueReference);
+        }
+
         var kind = node.Keyword switch
         {
             { Kind: TokenKind.Self } => KeywordValueKind.Self,
@@ -482,7 +552,6 @@ public class Lowerer
             .Arguments?
             .Select(Next)
             .ToList() ?? [];
-        var dataType = _typeBuilder.BuildType(node.DataType);
 
         return new LoweredKeywordValueNode(kind, arguments!, dataType);
     }
@@ -608,7 +677,9 @@ public class Lowerer
         // While lowering things like if expressions, they may provide a return value declaration when calling this
         // function for the branches, to capture the return value of the block. However, free standing blocks can
         // also have return values. In those cases, we will create the variable declaration in here instead.
-        if (returnValueDeclaration == null && !node.DataType.IsVoid() && node.Parent is not ISemanticFunctionDeclaration)
+        if (returnValueDeclaration == null &&
+            !node.DataType.IsVoid() &&
+            node.Parent is not (ISemanticFunctionDeclaration or SemanticFieldDeclarationNode))
         {
             returnValueDeclaration = new LoweredVariableDeclarationNode("returnValue", null, dataType);
             Add(returnValueDeclaration);
@@ -658,6 +729,18 @@ public class Lowerer
             .Select(Visit)
             .ToList();
         var returnType = _typeBuilder.BuildType(node.ReturnType);
+
+        var dataType = _typeBuilder.BuildFunctionType(node.Symbol);
+        var declaration = new LoweredFunctionDeclarationNode(
+            name,
+            parameters,
+            returnType,
+            body: null,
+            dataType,
+            node.Span
+        );
+        _functions[name] = declaration;
+
         var body = node.Body == null
             ? null
             : (LoweredBlockNode)Next(node.Body)!;
@@ -669,16 +752,7 @@ public class Lowerer
                 body.Expressions.Add(new LoweredReturnNode(null));
         }
 
-        var dataType = _typeBuilder.BuildFunctionType(node.Symbol);
-        var declaration = new LoweredFunctionDeclarationNode(
-            name,
-            parameters,
-            returnType,
-            body,
-            dataType,
-            node.Span
-        );
-        _functions[name] = declaration;
+        declaration.Body = body;
 
         return declaration;
     }
@@ -689,6 +763,8 @@ public class Lowerer
         var fields = node
             .GetAllMemberFields()
             .Select(Visit)
+            .Where(x => x != null)
+            .Cast<LoweredFieldDeclarationNode>()
             .ToList();
         var declaration = new LoweredStructDeclarationNode(name, fields, node.Symbol);
         _structs[name] = declaration;
@@ -703,10 +779,60 @@ public class Lowerer
         return declaration;
     }
 
-    private LoweredFieldDeclarationNode Visit(SemanticFieldDeclarationNode node)
+    private LoweredNode? Visit(SemanticFieldDeclarationNode node)
     {
-        var identifier = node.Identifier.Value;
         var dataType = _typeBuilder.BuildType(node.DataType);
+        if (node.Getter != null)
+        {
+            var getterIdentifier = BuildGetterName(node);
+            var getterDataType = _typeBuilder.BuildGetterType(node);
+            var parameters = getterDataType
+                .ParameterTypes
+                .Select((x, i) => new LoweredParameterNode(i.ToString(), x))
+                .ToList();
+            var getterFunction = new LoweredFunctionDeclarationNode(
+                getterIdentifier,
+                parameters,
+                dataType,
+                body: null,
+                getterDataType,
+                node.Span
+            );
+
+            _functions[getterIdentifier] = getterFunction;
+            getterFunction.Body = Visit(node.Getter);
+        }
+
+        if (node.Setter != null)
+        {
+            Debug.Assert(node.Getter != null);
+
+            var setterIdentifier = BuildSetterName(node);
+            var setterDataType = _typeBuilder.BuildSetterType(node);
+            var parameters = setterDataType
+                .ParameterTypes
+                .Select((x, i) => new LoweredParameterNode(i.ToString(), x))
+                .ToList();
+            var setterFunction = new LoweredFunctionDeclarationNode(
+                setterIdentifier,
+                parameters,
+                setterDataType.ReturnType,
+                body: null,
+                setterDataType,
+                node.Span
+            );
+
+            _functions[setterIdentifier] = setterFunction;
+            setterFunction.Body = Visit(node.Setter);
+
+            if (setterFunction.Body.Expressions.LastOrDefault() is not LoweredReturnNode)
+                setterFunction.Body.Expressions.Add(new LoweredReturnNode(null));
+        }
+
+        if (node.Getter != null)
+            return null;
+
+        var identifier = node.Identifier.Value;
         var value = node.Value == null
             ? BuildDefaultKeyword(dataType)
             : Next(node.Value)!;

@@ -35,6 +35,15 @@ public class SemanticTree(SemanticNode root, FileScope file)
 
         return current as ISemanticStructureDeclaration;
     }
+
+    public SemanticFieldDeclarationNode? GetEnclosingField(SemanticNode node)
+    {
+        var current = node;
+        while (current is not (null or SemanticFieldDeclarationNode))
+            current = current.Parent;
+
+        return current as SemanticFieldDeclarationNode;
+    }
 }
 
 public abstract class SemanticNode(IDataType dataType, TextSpan span)
@@ -672,6 +681,8 @@ public class SemanticFieldDeclarationNode(
     bool isStatic,
     IDataType dataType,
     FieldSymbol symbol,
+    SemanticBlockNode? getter,
+    SemanticBlockNode? setter,
     TextSpan span
 )
     : SemanticNode(dataType, span), ISemanticVariableDeclaration
@@ -685,6 +696,10 @@ public class SemanticFieldDeclarationNode(
     public bool IsStatic { get; } = isStatic;
 
     public FieldSymbol Symbol { get; } = symbol;
+
+    public SemanticBlockNode? Getter { get; } = getter;
+
+    public SemanticBlockNode? Setter { get; } = setter;
 
     public List<SemanticAttributeNode> Attributes { get; init; } = [];
 
@@ -700,6 +715,18 @@ public class SemanticFieldDeclarationNode(
         {
             attribute.Traverse(callback);
             callback(attribute, this);
+        }
+
+        if (Getter != null)
+        {
+            Getter.Traverse(callback);
+            callback(Getter, this);
+        }
+
+        if (Setter != null)
+        {
+            Setter.Traverse(callback);
+            callback(Setter, this);
         }
     }
 }

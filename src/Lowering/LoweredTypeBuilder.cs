@@ -108,6 +108,34 @@ public class LoweredTypeBuilder
         return new LoweredStructDataType(fieldTypes.ToList(), symbol.Name);
     }
 
+    public LoweredFunctionDataType BuildGetterType(SemanticFieldDeclarationNode field)
+    {
+        var fieldType = BuildType(field.DataType);
+        List<ILoweredDataType> parameterTypes = [];
+        if (!field.IsStatic)
+        {
+            var selfType = BuildStructType(((ISemanticStructureDeclaration)field.Parent!).Symbol);
+            parameterTypes.Add(new LoweredPointerDataType(selfType));
+        }
+
+        return new LoweredFunctionDataType(parameterTypes, fieldType);
+    }
+
+    public LoweredFunctionDataType BuildSetterType(SemanticFieldDeclarationNode field)
+    {
+        var fieldType = BuildType(field.DataType);
+        List<ILoweredDataType> parameterTypes = [fieldType];
+        if (!field.IsStatic)
+        {
+            var selfType = BuildStructType(((ISemanticStructureDeclaration)field.Parent!).Symbol);
+            parameterTypes.Insert(0, new LoweredPointerDataType(selfType));
+        }
+
+        var setterReturnType = new LoweredPrimitiveDataType(Primitive.Void);
+
+        return new LoweredFunctionDataType(parameterTypes, setterReturnType);
+    }
+
     public LoweredFunctionDataType BuildFunctionType(FunctionSymbol symbol)
     {
         var parameterTypes = symbol

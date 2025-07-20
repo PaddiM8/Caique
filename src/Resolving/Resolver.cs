@@ -252,6 +252,12 @@ public class Resolver
         ResolveNode(node.Type);
         if (node.Value != null)
             Next(node.Value, node);
+
+        if (node.Getter != null)
+            Next(node.Getter, node);
+
+        if (node.Setter != null)
+            Next(node.Setter, node);
     }
 
     private void Visit(SyntaxInitNode node, StructureScope structureScope)

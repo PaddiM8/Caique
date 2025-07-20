@@ -10,6 +10,7 @@ public enum DiagnosticCode
     HintOtherDuplicate,
     HintUseInheritableKeyword,
     HintAssigneeHere,
+    HintChangeToVar,
 
     // Errors
     ErrorCompilerError,
@@ -48,6 +49,8 @@ public enum DiagnosticCode
     ErrorInvalidEnumType,
     ErrorInvalidEnumMemberValue,
     ErrorAssignmentToImmutable,
+    ErrorSetterButNoGetter,
+    ErrorSetterOnImmutable,
 }
 
 public class DiagnosticReporter
@@ -446,13 +449,36 @@ public class DiagnosticReporter
     {
         ReportError(
             DiagnosticCode.ErrorAssignmentToImmutable,
-            $"Cannot assign to immutable value.",
+            "Cannot assign to immutable value.",
             assignmentSpan
         );
         ReportHint(
             DiagnosticCode.HintAssigneeHere,
-            $"The assignee is defined here.",
+            "The assignee is defined here.",
             declarationSpan
+        );
+    }
+
+    public void ReportSetterButNoGetter(TextSpan span)
+    {
+        ReportError(
+            DiagnosticCode.ErrorSetterButNoGetter,
+            "A field with a setter must also have a getter.",
+            span
+        );
+    }
+
+    public void ReportSetterOnImmutable(TextSpan setterSpan, TextSpan keywordSpan)
+    {
+        ReportError(
+            DiagnosticCode.ErrorSetterOnImmutable,
+            "A field with a setter must be mutable.",
+            setterSpan
+        );
+        ReportHint(
+            DiagnosticCode.HintChangeToVar,
+            "Change from 'let' to 'var' here.",
+            keywordSpan
         );
     }
 
