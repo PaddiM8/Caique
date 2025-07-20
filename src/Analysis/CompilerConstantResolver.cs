@@ -7,6 +7,7 @@ public class CompilerConstantResolver
 {
     private readonly CompilationContext _compilationContext;
     private readonly StructureDataType _stringType;
+    private readonly Dictionary<string, SemanticLiteralNode> _cache = [];
 
     public CompilerConstantResolver(CompilationContext compilationContext)
     {
@@ -18,6 +19,10 @@ public class CompilerConstantResolver
 
     public SemanticLiteralNode? Resolve(string name, TextSpan span)
     {
+        if (_cache.TryGetValue(name, out var existing))
+            return existing;
+
+        SemanticLiteralNode literal;
         if (name == "operating_system")
         {
             var operatingSystem = "unknown";
@@ -34,11 +39,9 @@ public class CompilerConstantResolver
                 operatingSystem = "freebsd";
 
             var token = new Token(TokenKind.StringLiteral, operatingSystem, span);
-
-            return new SemanticLiteralNode(token, _stringType);
+            literal = new SemanticLiteralNode(token, _stringType);
         }
-
-        if (name == "family")
+        else if (name == "family")
         {
             var family = "unknown";
             if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
@@ -48,18 +51,21 @@ public class CompilerConstantResolver
                 family = "windows";
 
             var token = new Token(TokenKind.StringLiteral, family, span);
-
-            return new SemanticLiteralNode(token, _stringType);
+            literal = new SemanticLiteralNode(token, _stringType);
         }
-
-        if (name == "arch")
+        else if (name == "arch")
         {
             var arch = RuntimeInformation.ProcessArchitecture.ToString().ToLower();
             var token = new Token(TokenKind.StringLiteral, arch, span);
-
-            return new SemanticLiteralNode(token, _stringType);
+            literal = new SemanticLiteralNode(token, _stringType);
+        }
+        else
+        {
+            throw new NotImplementedException();
         }
 
-        return null;
+        _cache[name] = literal;
+
+        return literal;
     }
 }

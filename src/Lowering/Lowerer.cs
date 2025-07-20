@@ -171,6 +171,20 @@ public class Lowerer
         return BuildNewNode(new StructureDataType(symbol), [valueReference]);
     }
 
+    private bool FieldHasGetter(SemanticFieldDeclarationNode field)
+    {
+        if (field.Getter != null)
+            return true;
+
+        if (field.Value == null)
+            return false;
+
+        if (field.Value is SemanticLiteralNode && field.DataType is PrimitiveDataType)
+            return false;
+
+        return field.IsStatic;
+    }
+
     private LoweredNode? Visit(SemanticStatementNode node)
     {
         Add(new LoweredStatementStartNode(node.Span));
@@ -214,7 +228,7 @@ public class Lowerer
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
         var declaration = node.Symbol.SemanticDeclaration!;
-        if (declaration.Getter != null)
+        if (FieldHasGetter(declaration))
         {
             var identifier = BuildGetterName(declaration);
             var getterDataType = _typeBuilder.BuildGetterType(declaration);
@@ -782,7 +796,7 @@ public class Lowerer
     private LoweredNode? Visit(SemanticFieldDeclarationNode node)
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
-        if (node.Getter != null)
+        if (FieldHasGetter(node))
         {
             var getterIdentifier = BuildGetterName(node);
             var getterDataType = _typeBuilder.BuildGetterType(node);
@@ -800,7 +814,9 @@ public class Lowerer
             );
 
             _functions[getterIdentifier] = getterFunction;
-            getterFunction.Body = Visit(node.Getter);
+            getterFunction.Body = node.Getter == null
+                ? BuildLazyFieldGetter(node)
+                : Visit(node.Getter);
         }
 
         if (node.Setter != null)
@@ -839,10 +855,95 @@ public class Lowerer
         return new LoweredFieldDeclarationNode(identifier, value, dataType);
     }
 
+    private LoweredBlockNode BuildLazyFieldGetter(SemanticFieldDeclarationNode field)
+    {
+        // TODO: Add lock (or atomic operation?)
+
+        // static let `field.get.initialised` bool = false;
+        var initialisedDeclarationName = BuildGetterName(field) + ".initialised";
+        var boolType = new LoweredPrimitiveDataType(Primitive.Bool);
+        var falseLiteral = new LoweredLiteralNode(
+            string.Empty,
+            TokenKind.False,
+            boolType
+        );
+        var initialisedDeclaration = new LoweredGlobalDeclarationNode(
+            initialisedDeclarationName,
+            falseLiteral,
+            LoweredGlobalScope.Module,
+            boolType
+        );
+        _globals[initialisedDeclarationName] = initialisedDeclaration;
+
+        // static let `field.get.value` T = default;
+        var dataType = _typeBuilder.BuildType(field.DataType);
+        var valueDeclarationName = BuildGetterName(field) + ".value";
+        var valueDeclaration = new LoweredGlobalDeclarationNode(
+            valueDeclarationName,
+            BuildDefaultKeyword(dataType),
+            LoweredGlobalScope.Module,
+            dataType
+        );
+        _globals[valueDeclarationName] = valueDeclaration;
+
+        // Build getter body
+        var voidType = new LoweredPrimitiveDataType(Primitive.Void);
+        var block = new LoweredBlockNode([], returnValueDeclaration: null, voidType);
+
+        // if `field.get.initialised`
+        var condition = new LoweredLoadNode(
+            new LoweredGlobalReferenceNode(initialisedDeclarationName, boolType)
+        );
+
+        // -> return `field.get.value`
+        var thenBranch = new LoweredBlockNode([], returnValueDeclaration: null, voidType);
+        var valueReference = new LoweredLoadNode(
+            new LoweredGlobalReferenceNode(valueDeclarationName, dataType)
+        );
+        thenBranch.Expressions.Add(new LoweredReturnNode(valueReference));
+
+        // else { `field.get.value` = value, `field.get.initialised` = true }
+        var elseBranch = new LoweredBlockNode([], returnValueDeclaration: null, voidType);
+        var valueAssignment = new LoweredAssignmentNode(
+            new LoweredGlobalReferenceNode(valueDeclarationName, dataType),
+            Next(field.Value!)!
+        );
+        elseBranch.Expressions.Add(valueAssignment);
+
+        var trueLiteral = new LoweredLiteralNode(
+            string.Empty,
+            TokenKind.True,
+            boolType
+        );
+        var initialisedAssignment = new LoweredAssignmentNode(
+            new LoweredGlobalReferenceNode(initialisedDeclarationName, boolType),
+            trueLiteral
+        );
+        elseBranch.Expressions.Add(initialisedAssignment);
+        elseBranch.Expressions.Add(new LoweredReturnNode(valueReference));
+
+        var ifNode = new LoweredIfNode(
+            condition,
+            thenBranch,
+            elseBranch,
+            voidType
+        );
+        block.Expressions.Add(ifNode);
+
+        return block;
+    }
+
     private void BuildStaticFields(List<SemanticFieldDeclarationNode> fields)
     {
         foreach (var staticField in fields.Where(x => x.IsStatic))
         {
+            if (FieldHasGetter(staticField))
+            {
+                Visit(staticField);
+
+                continue;
+            }
+
             var ffiAttribute = staticField.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
             var staticFieldName = BuildStaticFieldName(staticField);
             var staticFieldType = _typeBuilder.BuildType(staticField.DataType);

@@ -1247,8 +1247,8 @@ public class Analyser
             ? null
             : Next(node.Value);
 
-        if (node.IsStatic && value is not (SemanticLiteralNode or null))
-            _diagnostics.ReportNonConstantValueInStaticField(value.Span);
+        // if (node.IsStatic && value is not (SemanticLiteralNode or null))
+        //    _diagnostics.ReportNonConstantValueInStaticField(value.Span);
 
         var getter = node.Getter == null
             ? null
