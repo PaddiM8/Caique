@@ -476,7 +476,7 @@ public class Parser
             return ParseFunction(isPublic, isStatic: true, isOverride: false, attributes, scope);
 
         if (Match(TokenKind.Let, TokenKind.Var))
-            return ParseField(isPublic: false, isStatic: true, attributes, scope);
+            return ParseField(isPublic, isStatic: true, attributes, scope);
 
         throw Recover();
     }

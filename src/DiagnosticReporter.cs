@@ -35,7 +35,6 @@ public enum DiagnosticCode
     ErrorStaticSymbolReferencedAsNonStatic,
     ErrorNonStaticFunctionReferenceMustBeCalled,
     ErrorNonStaticMainFunction,
-    ErrorNonConstantValueInStaticField,
     ErrorConstructorAlreadyExists,
     ErrorInitParameterFieldNotFound,
     ErrorReturnOutsideFunction,
@@ -51,6 +50,7 @@ public enum DiagnosticCode
     ErrorAssignmentToImmutable,
     ErrorSetterButNoGetter,
     ErrorSetterOnImmutable,
+    ErrorPublicMutableStaticField,
     ErrorSymbolIsPrivate,
 }
 
@@ -324,15 +324,6 @@ public class DiagnosticReporter
         );
     }
 
-    public void ReportNonConstantValueInStaticField(TextSpan span)
-    {
-        ReportError(
-            DiagnosticCode.ErrorNonConstantValueInStaticField,
-            $"Static fields can only be initialised with constant values.",
-            span
-        );
-    }
-
     public void ReportConstructorAlreadyExists(Token structureIdentifier, TextSpan span)
     {
         ReportError(
@@ -483,12 +474,21 @@ public class DiagnosticReporter
         );
     }
 
-    public void ReportSymbolIsPrivate(TextSpan span)
+    public void ReportPublicMutableStaticField(TextSpan span)
+    {
+        ReportError(
+            DiagnosticCode.ErrorPublicMutableStaticField,
+            "A mutable static field may not be public. Make the field private or immutable.",
+            span
+        );
+    }
+
+    public void ReportSymbolIsPrivate(Token identifier)
     {
         ReportError(
             DiagnosticCode.ErrorSymbolIsPrivate,
-            "Symbol is private.",
-            span
+            $"Symbol is private: '{identifier.Value}'.",
+            identifier.Span
         );
     }
 

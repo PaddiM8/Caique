@@ -377,7 +377,7 @@ public class Analyser
                 if (!functionSymbol.SyntaxDeclaration.IsPublic &&
                     structureSymbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
                 {
-                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier.Span);
+                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
                 }
 
                 var dataType = new FunctionDataType(functionSymbol);
@@ -398,7 +398,7 @@ public class Analyser
                 if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
                     structureSymbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
                 {
-                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier.Span);
+                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
                 }
 
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
@@ -601,19 +601,15 @@ public class Analyser
             {
                 var dataType = new FunctionDataType(functionSymbol);
                 if (node.Parent is not SyntaxCallNode)
-                {
                     _diagnostics.ReportNonStaticFunctionReferenceMustBeCalled(node.Identifier);
-                }
 
                 if (functionSymbol.SyntaxDeclaration.IsStatic)
-                {
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(functionSymbol.SyntaxDeclaration.Identifier);
-                }
 
                 if (!functionSymbol.SyntaxDeclaration.IsPublic &&
                     structureDataType.Symbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
                 {
-                    _diagnostics.ReportSymbolIsPrivate(left.Span);
+                    _diagnostics.ReportSymbolIsPrivate(node.Identifier);
                 }
 
                 return new SemanticFunctionReferenceNode(
@@ -628,14 +624,12 @@ public class Analyser
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
 
                 if (fieldSymbol.SyntaxDeclaration.IsStatic)
-                {
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(fieldSymbol.SyntaxDeclaration.Identifier);
-                }
 
                 if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
                     structureDataType.Symbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
                 {
-                    _diagnostics.ReportSymbolIsPrivate(left.Span);
+                    _diagnostics.ReportSymbolIsPrivate(node.Identifier);
                 }
 
                 return new SemanticFieldReferenceNode(
@@ -1247,9 +1241,6 @@ public class Analyser
             ? null
             : Next(node.Value);
 
-        // if (node.IsStatic && value is not (SemanticLiteralNode or null))
-        //    _diagnostics.ReportNonConstantValueInStaticField(value.Span);
-
         var getter = node.Getter == null
             ? null
             : Visit(node.Getter);
@@ -1262,10 +1253,14 @@ public class Analyser
         if (setter != null && !node.IsMutable)
             _diagnostics.ReportSetterOnImmutable(setter.Span, node.Identifier.Span);
 
+        if (node.IsPublic && node.IsStatic && node.IsMutable)
+            _diagnostics.ReportPublicMutableStaticField(node.Span);
+
         var semanticNode = new SemanticFieldDeclarationNode(
             node.IsMutable,
             node.Identifier,
             value,
+            node.IsPublic,
             node.IsStatic,
             dataType,
             node.Symbol!,

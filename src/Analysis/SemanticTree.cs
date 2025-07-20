@@ -678,6 +678,7 @@ public class SemanticFieldDeclarationNode(
     bool isMutable,
     Token identifier,
     SemanticNode? value,
+    bool isPublic,
     bool isStatic,
     IDataType dataType,
     FieldSymbol symbol,
@@ -692,6 +693,8 @@ public class SemanticFieldDeclarationNode(
     public Token Identifier { get; } = identifier;
 
     public SemanticNode? Value { get; } = value;
+
+    public bool IsPublic { get; } = isPublic;
 
     public bool IsStatic { get; } = isStatic;
 

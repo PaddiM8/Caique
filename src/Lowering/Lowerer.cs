@@ -962,10 +962,13 @@ public class Lowerer
                 staticFieldValue = Next(staticField.Value)!;
             }
 
+            var scope = staticField.IsPublic
+                ? LoweredGlobalScope.Full
+                : LoweredGlobalScope.Module;
             var globalDeclaration = new LoweredGlobalDeclarationNode(
                 staticFieldName,
                 staticFieldValue,
-                LoweredGlobalScope.Module,
+                scope,
                 staticFieldType
             );
             _globals[staticFieldName] = globalDeclaration;

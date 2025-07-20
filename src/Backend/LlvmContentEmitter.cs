@@ -305,7 +305,14 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(LoweredGlobalReferenceNode node)
     {
-        return _module.GetNamedGlobal(node.Identifier);
+        var global = _module.GetNamedGlobal(node.Identifier);
+        if (string.IsNullOrEmpty(global.Name))
+        {
+            var dataType = _typeBuilder.BuildType(node.DataType);
+            global = _module.AddGlobal(dataType, node.Identifier);
+        }
+
+        return global;
     }
 
     private LLVMValueRef Visit(LoweredUnaryNode node)
@@ -314,9 +321,7 @@ public class LlvmContentEmitter
         Debug.Assert(value.HasValue);
 
         if (node.Operator == TokenKind.Exclamation)
-        {
             return _builder.BuildXor(value!.Value, LlvmUtils.CreateConstBool(_context, true), "not");
-        }
 
         if (node.Operator == TokenKind.Minus)
         {

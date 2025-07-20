@@ -1,9 +1,7 @@
 module Libc
 {
-    pub func GetStdout() usize
-    {
-        LibcUnsafe:GetStdout()
-    }
+    pub let Stdout usize ->
+        LibcUnsafe:stdout;
 
     pub func Printf(pattern String, arg String)
     {
