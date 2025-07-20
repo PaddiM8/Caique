@@ -31,4 +31,33 @@ public class ModuleTests
             .Run()
             .AssertSuccessWithExitCode(5);
     }
+
+    [Test]
+    public void TestModuleWithStaticField_AndMutatedNonPrimitiveValue()
+    {
+        var mainFile = """
+            module Main
+            {
+                var a i32 = GetValue();
+
+                func Run() i32
+                {
+                    let x = a;
+                    a = 3;
+
+                    a + x
+                }
+
+                func GetValue() i32
+                {
+                    2
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(5);
+    }
 }

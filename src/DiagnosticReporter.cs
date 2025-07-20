@@ -48,6 +48,7 @@ public enum DiagnosticCode
     ErrorInvalidEnumType,
     ErrorInvalidEnumMemberValue,
     ErrorAssignmentToImmutable,
+    ErrorMutablePropertyWithoutSetter,
     ErrorSetterButNoGetter,
     ErrorSetterOnImmutable,
     ErrorPublicMutableStaticField,
@@ -448,6 +449,15 @@ public class DiagnosticReporter
             DiagnosticCode.HintAssigneeHere,
             "The assignee is defined here.",
             declarationSpan
+        );
+    }
+
+    public void ReportMutablePropertyWithoutSetter(TextSpan span)
+    {
+        ReportError(
+            DiagnosticCode.ErrorMutablePropertyWithoutSetter,
+            "A mutable field with a getter must also have a setter. Add a setter or make it immutable.",
+            span
         );
     }
 

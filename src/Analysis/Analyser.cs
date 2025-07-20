@@ -1247,6 +1247,10 @@ public class Analyser
         var setter = node.Setter == null
             ? null
             : Visit(node.Setter);
+
+        if (getter != null && setter == null && node.IsMutable)
+            _diagnostics.ReportMutablePropertyWithoutSetter(node.Span);
+
         if (setter != null && getter == null)
             _diagnostics.ReportSetterButNoGetter(setter.Span);
 

@@ -185,6 +185,14 @@ public class Lowerer
         return field.IsStatic;
     }
 
+    private bool FieldHasSetter(SemanticFieldDeclarationNode field)
+    {
+        if (field.Setter != null)
+            return true;
+
+        return field.IsMutable && FieldHasGetter(field);
+    }
+
     private LoweredNode? Visit(SemanticStatementNode node)
     {
         Add(new LoweredStatementStartNode(node.Span));
@@ -305,9 +313,9 @@ public class Lowerer
 
     private LoweredNode Visit(SemanticAssignmentNode node)
     {
-        if (node.Left is SemanticFieldReferenceNode { Symbol.SemanticDeclaration.Setter: not null } fieldReference)
+        if (node.Left is SemanticFieldReferenceNode fieldReference && FieldHasSetter(fieldReference.Symbol.SemanticDeclaration!))
         {
-            var declaration = fieldReference.Symbol.SemanticDeclaration;
+            var declaration = fieldReference.Symbol.SemanticDeclaration!;
             var identifier = BuildSetterName(declaration);
             var setterDataType = _typeBuilder.BuildSetterType(declaration);
             var getterReference = new LoweredFunctionReferenceNode(
@@ -546,12 +554,7 @@ public class Lowerer
             var field = _tree.GetEnclosingField(node);
             Debug.Assert(field != null);
 
-            var setterIdentifier = BuildSetterName(field);
-            var setter = _functions[setterIdentifier];
-            var valueDeclaration = setter.Parameters.Last();
-            var valueReference = new LoweredVariableReferenceNode(valueDeclaration, dataType);
-
-            return new LoweredLoadNode(valueReference);
+            return BuildSetterValueKeyword(field);
         }
 
         var kind = node.Keyword switch
@@ -568,6 +571,17 @@ public class Lowerer
             .ToList() ?? [];
 
         return new LoweredKeywordValueNode(kind, arguments!, dataType);
+    }
+
+    private LoweredNode BuildSetterValueKeyword(SemanticFieldDeclarationNode field)
+    {
+        var dataType = _typeBuilder.BuildType(field.DataType);
+        var setterIdentifier = BuildSetterName(field);
+        var setter = _functions[setterIdentifier];
+        var valueDeclaration = setter.Parameters.Last();
+        var valueReference = new LoweredVariableReferenceNode(valueDeclaration, dataType);
+
+        return new LoweredLoadNode(valueReference);
     }
 
     private LoweredIfNode Visit(SemanticIfNode node)
@@ -819,9 +833,9 @@ public class Lowerer
                 : Visit(node.Getter);
         }
 
-        if (node.Setter != null)
+        if (FieldHasSetter(node))
         {
-            Debug.Assert(node.Getter != null);
+            Debug.Assert(FieldHasGetter(node));
 
             var setterIdentifier = BuildSetterName(node);
             var setterDataType = _typeBuilder.BuildSetterType(node);
@@ -839,7 +853,9 @@ public class Lowerer
             );
 
             _functions[setterIdentifier] = setterFunction;
-            setterFunction.Body = Visit(node.Setter);
+            setterFunction.Body = node.Setter == null
+                ? BuildLazyFieldSetter(node)
+                : Visit(node.Setter);
 
             if (setterFunction.Body.Expressions.LastOrDefault() is not LoweredReturnNode)
                 setterFunction.Body.Expressions.Add(new LoweredReturnNode(null));
@@ -929,6 +945,21 @@ public class Lowerer
             voidType
         );
         block.Expressions.Add(ifNode);
+
+        return block;
+    }
+
+    private LoweredBlockNode BuildLazyFieldSetter(SemanticFieldDeclarationNode field)
+    {
+        var voidType = new LoweredPrimitiveDataType(Primitive.Void);
+        var block = new LoweredBlockNode([], returnValueDeclaration: null, voidType);
+
+        var dataType = _typeBuilder.BuildType(field.DataType);
+        var valueDeclarationName = BuildGetterName(field) + ".value";
+        var valueReference = new LoweredGlobalReferenceNode(valueDeclarationName, dataType);
+        var value = BuildSetterValueKeyword(field);
+        var assignment = new LoweredAssignmentNode(valueReference, value);
+        block.Expressions.Add(assignment);
 
         return block;
     }
