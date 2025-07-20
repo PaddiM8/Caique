@@ -1,0 +1,4 @@
+protocol Equatable
+{
+    fn IsEqual(other Self) bool;
+}

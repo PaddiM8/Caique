@@ -7,6 +7,7 @@ namespace Caique.Lowering;
 public class LoweredTypeBuilder
 {
     private readonly Dictionary<IDataType, ILoweredDataType> _generalCache = [];
+    private readonly Dictionary<StructureSymbol, LoweredStructDataType> _structCache = [];
     private readonly Dictionary<(ISemanticStructureDeclaration, ISemanticStructureDeclaration), LoweredStructDataType> _vtableCache = [];
     private readonly Dictionary<SemanticClassDeclarationNode, LoweredStructDataType> _typeTableCache = [];
 
@@ -84,7 +85,13 @@ public class LoweredTypeBuilder
 
     public LoweredStructDataType BuildStructType(StructureSymbol symbol)
     {
+        if (_structCache.TryGetValue(symbol, out var existing))
+            return existing;
+
         var fieldTypes = new List<ILoweredDataType>();
+        var loweredType = new LoweredStructDataType(fieldTypes, symbol.Name);
+        _structCache[symbol] = loweredType;
+
         if (symbol.SemanticDeclaration is SemanticClassDeclarationNode classNode)
         {
             fieldTypes.Add(BuildTypeTableType(classNode));
@@ -103,9 +110,7 @@ public class LoweredTypeBuilder
             fieldTypes.AddRange(memberTypes);
         }
 
-        var name = new StructureDataType(symbol);
-
-        return new LoweredStructDataType(fieldTypes.ToList(), symbol.Name);
+        return loweredType;
     }
 
     public LoweredFunctionDataType BuildGetterType(SemanticFieldDeclarationNode field)

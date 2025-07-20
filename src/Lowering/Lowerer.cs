@@ -301,14 +301,46 @@ public class Lowerer
         return new LoweredUnaryNode(node.Operator, value, dataType);
     }
 
-    private LoweredBinaryNode Visit(SemanticBinaryNode node)
+    private LoweredNode Visit(SemanticBinaryNode node)
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
         var left = Next(node.Left);
         var right = Next(node.Right);
         Debug.Assert(left != null && right != null);
 
+        if (node.Left.DataType is StructureDataType structureDataType)
+        {
+            if (node.Operator is TokenKind.EqualsEquals)
+                return BuildEquatableCall(structureDataType, left, right);
+
+            if (node.Operator is TokenKind.NotEquals)
+            {
+                var isEqual = BuildEquatableCall(structureDataType, left, right);
+
+                return new LoweredUnaryNode(TokenKind.Exclamation, isEqual, isEqual.DataType);
+            }
+        }
+
         return new LoweredBinaryNode(left, node.Operator, right, dataType);
+    }
+
+    private LoweredCallNode BuildEquatableCall(StructureDataType structureDataType, LoweredNode instance, LoweredNode other)
+    {
+        var boolType = new LoweredPrimitiveDataType(Primitive.Bool);
+        // TODO: Optimise
+        var isEqualFunctionDeclaration = structureDataType
+            .Symbol
+            .SemanticDeclaration!
+            .Functions
+            .First(x => x.Identifier.Value == "IsEqual");
+        var isEqualFunctionType = _typeBuilder.BuildFunctionType(isEqualFunctionDeclaration.Symbol);
+        var isEqualFunctionName = BuildFunctionName(isEqualFunctionDeclaration);
+        var isEqualFunctionReference = new LoweredFunctionReferenceNode(
+            isEqualFunctionName,
+            new LoweredPointerDataType(isEqualFunctionType)
+        );
+
+        return new LoweredCallNode(isEqualFunctionReference, [instance, other], boolType);
     }
 
     private LoweredNode Visit(SemanticAssignmentNode node)
@@ -759,6 +791,12 @@ public class Lowerer
         var returnType = _typeBuilder.BuildType(node.ReturnType);
 
         var dataType = _typeBuilder.BuildFunctionType(node.Symbol);
+        if (!node.IsStatic)
+        {
+            var instanceType = dataType.ParameterTypes[0];
+            parameters.Insert(0, new LoweredParameterNode("self", instanceType));
+        }
+
         var declaration = new LoweredFunctionDeclarationNode(
             name,
             parameters,

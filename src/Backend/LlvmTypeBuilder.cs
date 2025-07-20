@@ -75,19 +75,27 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
 
     public LLVMTypeRef Build(LoweredStructDataType dataType)
     {
-        var fieldTypes = dataType
-            .FieldTypes
-            .Select(BuildType)
-            .ToArray();
+        var fieldTypes = new List<LLVMTypeRef>();
+        foreach (var fieldType in dataType.FieldTypes)
+        {
+            if (fieldType is LoweredStructDataType)
+            {
+                fieldTypes.Add(LLVMTypeRef.CreatePointer(_context.VoidType, 0));
+            }
+            else
+            {
+                fieldTypes.Add(BuildType(fieldType));
+            }
+        }
 
         if (dataType.Name == null)
-            return _context.GetStructType(fieldTypes, Packed: false);
+            return _context.GetStructType(fieldTypes.ToArray(), Packed: false);
 
         if (_namedStructs.TryGetValue(dataType.Name, out var existing))
             return existing;
 
         var namedStruct = _context.CreateNamedStruct(dataType.Name);
-        namedStruct.StructSetBody(fieldTypes, Packed: false);
+        namedStruct.StructSetBody(fieldTypes.ToArray(), Packed: false);
         _namedStructs[dataType.Name] = namedStruct;
 
         return namedStruct;

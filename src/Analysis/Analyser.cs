@@ -547,10 +547,20 @@ public class Analyser
             dataType = PrimitiveDataType.Bool;
 
         }
-        else if (node.Operator is TokenKind.EqualsEquals or TokenKind.NotEquals or
-            TokenKind.Greater or TokenKind.GreaterEquals or
-            TokenKind.Less or TokenKind.LessEquals)
+        else if (node.Operator is TokenKind.EqualsEquals or TokenKind.NotEquals)
         {
+            var equatable = new StructureDataType(_stdScope.ResolveStructure(["prelude", "Equatable"])!);
+            if (left.DataType is not (PrimitiveDataType or EnumDataType) && left.DataType.IsEquivalent(equatable) == TypeEquivalence.Incompatible)
+                _diagnostics.ReportIncompatibleType("equatable", left.DataType, left.Span);
+
+            right = TypeCheck(right, left.DataType);
+            dataType = PrimitiveDataType.Bool;
+        }
+        else if (node.Operator is TokenKind.Greater or TokenKind.GreaterEquals or TokenKind.Less or TokenKind.LessEquals)
+        {
+            if (!left.DataType.IsNumber())
+                _diagnostics.ReportIncompatibleType("number", left.DataType, left.Span);
+
             right = TypeCheck(right, left.DataType);
             dataType = PrimitiveDataType.Bool;
         }
@@ -934,6 +944,18 @@ public class Analyser
 
     private IDataType NextSimpleType(SyntaxTypeNode node)
     {
+        if (node.TypeNames.Count == 1 && node.TypeNames.First().Value == "Self")
+        {
+            var parentStructure = _syntaxTree.GetEnclosingStructure(node);
+            if (parentStructure == null)
+            {
+                _diagnostics.ReportMisplacedSelf(node.Span);
+                throw Recover();
+            }
+
+            return new StructureDataType(parentStructure.Symbol!);
+        }
+
         // Primitive
         Debug.Assert(node.TypeNames.Count > 0);
         var first = node.TypeNames.First();
@@ -1103,7 +1125,7 @@ public class Analyser
     {
         var inheritedClasses = node
             .SubTypes
-            .Select(x => x.ResolvedSymbol!.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .Select(x => x.ResolvedSymbol?.SyntaxDeclaration as SyntaxClassDeclarationNode)
             .Where(x => x != null);
 
         if (inheritedClasses.Count() > 1)
