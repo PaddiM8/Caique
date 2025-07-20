@@ -1,5 +1,10 @@
 module LibcUnsafe
 {
+    pub func GetStdout() usize
+    {
+        LibcUnsafe:stdout
+    }
+
     #ffi
     let stdout usize;
 
@@ -11,9 +16,4 @@ module LibcUnsafe
 
     #ffi
     pub func malloc(size usize) usize;
-
-    pub func GetStdout() usize
-    {
-        LibcUnsafe:stdout
-    }
 }

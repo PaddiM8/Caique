@@ -1,5 +1,10 @@
 module Libc
 {
+    pub func GetStdout() usize
+    {
+        LibcUnsafe:GetStdout()
+    }
+
     pub func Printf(pattern String, arg String)
     {
         LibcUnsafe:printf(pattern.ToByteArray(), arg.ToByteArray());
@@ -8,10 +13,5 @@ module Libc
     pub func Fputs(str String, stream usize)
     {
         LibcUnsafe:fputs(str.ToByteArray(), stream);
-    }
-
-    pub func GetStdout() usize
-    {
-        LibcUnsafe:GetStdout()
     }
 }

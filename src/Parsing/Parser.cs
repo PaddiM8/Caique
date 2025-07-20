@@ -860,6 +860,9 @@ public class Parser
         if (Match(TokenKind.Identifier) && _current?.Value == "size_of")
             return ParseKeywordValue(areTypeArguments: true);
 
+        if (Match(TokenKind.Identifier) && _current?.Value == "get_compiler_constant")
+            return ParseKeywordValue(areTypeArguments: false);
+
         if (Match(TokenKind.Self, TokenKind.Base, TokenKind.Default))
             return ParseKeywordValue(areTypeArguments: false);
 

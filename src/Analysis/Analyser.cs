@@ -8,10 +8,11 @@ namespace Caique.Analysis;
 
 public class Analyser
 {
-    private readonly TextSpan _blankSpan;
     private readonly SyntaxTree _syntaxTree;
     private readonly DiagnosticReporter _diagnostics;
     private readonly NamespaceScope _stdScope;
+    private readonly TextSpan _blankSpan;
+    private readonly CompilerConstantResolver _compilerConstantResolver;
 
     private Analyser(SyntaxTree syntaxTree, CompilationContext compilationContext)
     {
@@ -22,6 +23,7 @@ public class Analyser
             new TextPosition(-1, -1, -1, syntaxTree),
             new TextPosition(-1, -1, -1, syntaxTree)
         );
+        _compilerConstantResolver = new CompilerConstantResolver(compilationContext);
     }
 
     public static SemanticTree Analyse(SyntaxTree syntaxTree, CompilationContext compilationContext)
@@ -95,7 +97,7 @@ public class Analyser
         return Next(node.Value);
     }
 
-    private SemanticKeywordValueNode Visit(SyntaxKeywordValueNode node)
+    private SemanticNode Visit(SyntaxKeywordValueNode node)
     {
         var arguments = node
             .Arguments?
@@ -108,6 +110,7 @@ public class Analyser
             { Kind: TokenKind.Base } => NextBaseKeyword(node, arguments),
             { Kind: TokenKind.Default } => NextDefaultKeyword(node, arguments),
             { Value: "size_of" } => NextSizeOfKeyword(node, arguments),
+            { Value: "get_compiler_constant" } => NextGetCompilerConstantKeyword(node, arguments),
             _ => throw new UnreachableException(),
         };
     }
@@ -218,6 +221,33 @@ public class Analyser
         }
 
         return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span, new PrimitiveDataType(Primitive.Int64));
+    }
+
+    private SemanticLiteralNode NextGetCompilerConstantKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
+    {
+        if (_syntaxTree.GetEnclosingStructure(node)?.Scope.Namespace.ToString().StartsWith("std:") is not true)
+        {
+            _diagnostics.ReportNotFound(node.Keyword);
+            throw Recover();
+        }
+
+        if (arguments?.Count != 1)
+        {
+            arguments = [];
+            _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
+        }
+
+        if (arguments.First() is not SemanticLiteralNode { Value.Kind: TokenKind.StringLiteral } stringLiteral)
+            throw new InvalidOperationException("Expected string literal as argument to get_compiler_constant.");
+
+        var constant = _compilerConstantResolver.Resolve(stringLiteral.Value.Value, stringLiteral.Value.Span);
+        if (constant == null)
+        {
+            _diagnostics.ReportNotFound(stringLiteral.Value);
+            throw Recover();
+        }
+
+        return constant;
     }
 
     private SemanticNode Visit(SyntaxDotKeywordNode node)
