@@ -81,4 +81,35 @@ public class FunctionTests
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorSymbolIsPrivate);
     }
+
+    [Test]
+    public void TestFunctionCall_WithRecursion()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    Recurse(3, 0)
+                }
+
+                func Recurse(x i32, sum i32) i32
+                {
+                    if x == 0
+                    {
+                        sum
+                    }
+                    else
+                    {
+                        Recurse(x - 1, sum + x)
+                    }
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(6);
+    }
 }
