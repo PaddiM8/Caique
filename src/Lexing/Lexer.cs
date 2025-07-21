@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Caique.Parsing;
+using LLVMSharp;
 
 namespace Caique.Lexing;
 
@@ -73,12 +75,8 @@ public class Lexer
             '|' => Peek() == '|'
                 ? (TokenKind.PipePipe, Eat(2))
                 : (TokenKind.Pipe, Eat()),
-            '!' => Peek() == '='
-                ? (TokenKind.NotEquals, Eat(2))
-                : (TokenKind.Exclamation, Eat()),
-            '=' => Peek() == '='
-                ? (TokenKind.EqualsEquals, Eat(2))
-                : (TokenKind.Equals, Eat()),
+            '!' => NextExclamation(),
+            '=' => NextEquals(),
             '>' => Peek() == '='
                 ? (TokenKind.GreaterEquals, Eat(2))
                 : (TokenKind.Greater, Eat()),
@@ -109,6 +107,44 @@ public class Lexer
         var end = GetTextPosition();
 
         return new Token(kind, content, new TextSpan(start, end));
+    }
+
+    private (TokenKind, string) NextEquals()
+    {
+        Eat();
+        if (Current == '=')
+        {
+            Eat();
+            if (Current == '=')
+            {
+                Eat();
+
+                return (TokenKind.EqualsEqualsEquals, "===");
+            }
+
+            return (TokenKind.EqualsEquals, "==");
+        }
+
+        return (TokenKind.Equals, "=");
+    }
+
+    private (TokenKind, string) NextExclamation()
+    {
+        Eat();
+        if (Current == '=')
+        {
+            Eat();
+            if (Current == '=')
+            {
+                Eat();
+
+                return (TokenKind.NotEqualsEquals, "!==");
+            }
+
+            return (TokenKind.NotEquals, "!=");
+        }
+
+        return (TokenKind.Exclamation, "!");
     }
 
     private Token NextComplex(TextPosition start)

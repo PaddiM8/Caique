@@ -742,7 +742,9 @@ public class Parser
                 TokenKind.Greater,
                 TokenKind.GreaterEquals,
                 TokenKind.Less,
-                TokenKind.LessEquals
+                TokenKind.LessEquals,
+                TokenKind.EqualsEqualsEquals,
+                TokenKind.NotEqualsEquals
             )
         )
         {

@@ -32,7 +32,7 @@ public enum TokenKind
     Plus, Minus, Star, Slash,
     Pipe, Ampersand,
     PipePipe, AmpersandAmpersand,
-    Exclamation, EqualsEquals, NotEquals, Greater, Less, GreaterEquals, LessEquals,
+    Exclamation, EqualsEquals, NotEquals, EqualsEqualsEquals, NotEqualsEquals, Greater, Less, GreaterEquals, LessEquals,
     NumberLiteral, StringLiteral, True, False,
     Comment,
     Void, Bool, I8, I16, I32, I64, I128, ISize, U8, U16, U32, U64, U128, USize, F8, F16, F32, F64, F128,

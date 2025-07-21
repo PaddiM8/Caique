@@ -363,6 +363,10 @@ public interface ISyntaxInstantiableStructureDeclaration : ISyntaxStructureDecla
     SyntaxInitNode? Init { get; }
 }
 
+public interface ISyntaxReferenceTypeDeclaration : ISyntaxStructureDeclaration
+{
+}
+
 public class SyntaxClassDeclarationNode(
     Token identifier,
     List<SyntaxTypeNode> subTypes,
@@ -372,7 +376,7 @@ public class SyntaxClassDeclarationNode(
     StructureScope scope,
     TextSpan span
 )
-    : SyntaxNode(span), ISyntaxStructureDeclaration, ISyntaxInstantiableStructureDeclaration
+    : SyntaxNode(span), ISyntaxStructureDeclaration, ISyntaxInstantiableStructureDeclaration, ISyntaxReferenceTypeDeclaration
 {
     public Token Identifier { get; } = identifier;
 

@@ -556,6 +556,14 @@ public class Analyser
             right = TypeCheck(right, left.DataType);
             dataType = PrimitiveDataType.Bool;
         }
+        else if (node.Operator is TokenKind.EqualsEqualsEquals or TokenKind.NotEqualsEquals)
+        {
+            if (left.DataType is not StructureDataType { Symbol.SyntaxDeclaration: ISyntaxReferenceTypeDeclaration })
+                _diagnostics.ReportIncompatibleType("reference type", left.DataType, left.Span);
+
+            right = TypeCheck(right, left.DataType);
+            dataType = PrimitiveDataType.Bool;
+        }
         else if (node.Operator is TokenKind.Greater or TokenKind.GreaterEquals or TokenKind.Less or TokenKind.LessEquals)
         {
             if (!left.DataType.IsNumber())

@@ -350,6 +350,12 @@ public class LlvmContentEmitter
         var right = Next(node.Right);
         Debug.Assert(right.HasValue);
 
+        if (node.Operator is TokenKind.EqualsEqualsEquals)
+            return _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, left.Value, right.Value, "cmp");
+
+        if (node.Operator is TokenKind.NotEqualsEquals)
+            return _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, left.Value, right.Value, "cmp");
+
         var primitive = (node.Left.DataType as LoweredPrimitiveDataType)?.Primitive;
         if (node.Operator is
             TokenKind.EqualsEquals or
