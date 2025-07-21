@@ -170,7 +170,7 @@ public class LlvmContentEmitter
             var stringGlobal = _module.AddGlobal(stringType, node.Identifier);
             var stringConstant = _context.GetConstString(literalNode.Value, DontNullTerminate: true);
             stringGlobal.Initializer = stringConstant;
-            stringGlobal.IsGlobalConstant = node.Scope == LoweredGlobalScope.Full;
+            stringGlobal.Linkage = LLVMLinkage.LLVMInternalLinkage;
 
             _globals[node.Identifier] = stringGlobal;
 

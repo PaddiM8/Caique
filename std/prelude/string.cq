@@ -1,13 +1,15 @@
 class String
 {
-    var chars [u8];
+    pub let Size usize;
 
-    init(chars)
+    let _chars [u8];
+
+    init(_chars, Size)
     {
     }
 
     pub func ToByteArray() [u8]
     {
-        chars
+        _chars
     }
 }

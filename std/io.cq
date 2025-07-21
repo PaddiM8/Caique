@@ -1,0 +1,15 @@
+with libc;
+
+module Io
+{
+    pub func Print(input String)
+    {
+        Libc:Write(1, input.ToByteArray(), input.Size);
+    }
+
+    pub func Println(input String)
+    {
+        Libc:Write(1, input.ToByteArray(), input.Size);
+        Libc:Write(1, "\n".ToByteArray(), 1);
+    }
+}

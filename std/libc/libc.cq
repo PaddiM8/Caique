@@ -12,4 +12,9 @@ module Libc
     {
         LibcUnsafe:fputs(str.ToByteArray(), stream);
     }
+
+    pub func Write(file_descriptor i32, str [u8], length usize)
+    {
+        LibcUnsafe:write(file_descriptor, str, length);
+    }
 }

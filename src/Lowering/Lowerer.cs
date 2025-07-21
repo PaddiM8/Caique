@@ -167,8 +167,10 @@ public class Lowerer
 
         var dataType = _typeBuilder.BuildType(new StructureDataType(symbol));
         var valueReference = new LoweredGlobalReferenceNode(name, dataType);
+        var lengthType = new LoweredPrimitiveDataType(Primitive.USize);
+        var lengthLiteral = new LoweredLiteralNode(value.Length.ToString(), TokenKind.NumberLiteral, lengthType);
 
-        return BuildNewNode(new StructureDataType(symbol), [valueReference]);
+        return BuildNewNode(new StructureDataType(symbol), [valueReference, lengthLiteral]);
     }
 
     private bool FieldHasGetter(SemanticFieldDeclarationNode field)

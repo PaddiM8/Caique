@@ -10,5 +10,8 @@ module LibcUnsafe
     pub func fputs(str [u8], stream usize);
 
     #ffi
+    pub func write(fd i32, str [u8], length usize);
+
+    #ffi
     pub func malloc(size usize) usize;
 }
