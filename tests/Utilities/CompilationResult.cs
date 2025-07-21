@@ -7,10 +7,14 @@ public record CompilationResult(IReadOnlyList<Diagnostic> Diagnostics)
 
     public CompilationResult AssertSingleCompilationError(DiagnosticCode code)
     {
-        Assert.Multiple(() =>
-        {
-            Assert.That(ErrorDiagnostics, Has.Exactly(1).Matches<Diagnostic>(x => x.Code == code));
-        });
+        Assert.That(ErrorDiagnostics, Has.Exactly(1).Matches<Diagnostic>(x => x.Code == code));
+
+        return this;
+    }
+
+    public CompilationResult AssertSuccess()
+    {
+        Assert.That(ErrorDiagnostics, Is.Empty);
 
         return this;
     }

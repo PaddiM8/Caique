@@ -35,7 +35,8 @@ public class Lexer
         while (!lexer.ReachedEnd)
         {
             var token = lexer.Next();
-            yield return token;
+            if (token.Kind != TokenKind.Comment)
+                yield return token;
 
             if (token.Kind == TokenKind.EndOfFile)
                 yield break;
@@ -68,7 +69,9 @@ public class Lexer
                 ? (TokenKind.Arrow, Eat(2))
                 : (TokenKind.Minus, Eat()),
             '*' => (TokenKind.Star, Eat()),
-            '/' => (TokenKind.Slash, Eat()),
+            '/' => Peek() is '/' or '*'
+                ? NextComment()
+                : (TokenKind.Slash, Eat()),
             '&' => Peek() == '&'
                 ? (TokenKind.AmpersandAmpersand, Eat(2))
                 : (TokenKind.Ampersand, Eat()),
@@ -107,6 +110,34 @@ public class Lexer
         var end = GetTextPosition();
 
         return new Token(kind, content, new TextSpan(start, end));
+    }
+
+    private (TokenKind, string) NextComment()
+    {
+        var builder = new StringBuilder();
+        builder.Append(Eat()); // /
+
+        if (Current == '/')
+        {
+            while (!ReachedEnd && Current is not ('\r' or '\n'))
+                builder.Append(Eat());
+
+            return (TokenKind.Comment, builder.ToString());
+        }
+
+        builder.Append(Eat()); // *
+        while (!ReachedEnd && Current != '*' && Peek() != '/')
+            builder.Append(Eat());
+
+        // *
+        if (!ReachedEnd)
+            builder.Append(Eat());
+
+        // /
+        if (!ReachedEnd)
+            builder.Append(Eat());
+
+        return (TokenKind.Comment, builder.ToString());
     }
 
     private (TokenKind, string) NextEquals()
