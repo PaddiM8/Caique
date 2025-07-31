@@ -13,7 +13,7 @@ public record EmitResult(string ObjectFilePath, bool Success);
 
 public class LlvmContentEmitter
 {
-    private readonly LoweredTree _tree;
+    private readonly LoweredTree _loweredTree;
     private readonly LLVMContextRef _context;
     private readonly LLVMBuilderRef _builder;
     private readonly LLVMModuleRef _module;
@@ -29,7 +29,7 @@ public class LlvmContentEmitter
 
     private LlvmContentEmitter(LoweredTree tree, LlvmEmitterContext emitterContext)
     {
-        _tree = tree;
+        _loweredTree = tree;
         _context = emitterContext.LlvmContext;
         _builder = emitterContext.LlvmBuilder;
         _module = emitterContext.LlvmModule;

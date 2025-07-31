@@ -41,7 +41,7 @@ class NameMangler(SemanticTree tree, TypeArgumentResolver typeArgumentResolver)
     public string BuildStaticFieldName(SemanticFieldDeclarationNode field)
     {
         var ffiAttribute = field.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
-        var parentStructure = _tree.GetEnclosingStructure(field);
+        var parentStructure = SemanticTree.GetEnclosingStructure(field);
         var structureName = BuildStructName(parentStructure!, typeArguments: []);
 
         return ffiAttribute == null
@@ -55,7 +55,7 @@ class NameMangler(SemanticTree tree, TypeArgumentResolver typeArgumentResolver)
         if (ffiAttribute != null)
             return function.Identifier.Value;
 
-        var parentStructure = _tree.GetEnclosingStructure(function);
+        var parentStructure = SemanticTree.GetEnclosingStructure(function);
         var structureName = BuildStructName(parentStructure!, structureTypeArguments);
 
         return $"{structureName}:{function.Identifier.Value}";
@@ -95,7 +95,7 @@ class NameMangler(SemanticTree tree, TypeArgumentResolver typeArgumentResolver)
         if (ffiAttribute != null)
             return field.Identifier.Value;
 
-        var parentStructure = _tree.GetEnclosingStructure(field);
+        var parentStructure = SemanticTree.GetEnclosingStructure(field);
         var structureName = BuildStructName(parentStructure!, structureTypeArguments);
 
         return $"{structureName}:{field.Identifier.Value}";

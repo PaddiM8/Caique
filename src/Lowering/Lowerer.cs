@@ -213,7 +213,7 @@ public class Lowerer
         }
 
         var instance = Next(node.ObjectInstance)!;
-        var structure = _semanticTree.GetEnclosingStructure(node.Symbol.SemanticDeclaration!)!;
+        var structure = SemanticTree.GetEnclosingStructure(node.Symbol.SemanticDeclaration!)!;
 
         var fieldOffset = 0;
         if (structure is SemanticClassDeclarationNode classNode)
@@ -558,7 +558,7 @@ public class Lowerer
         var dataType = _typeBuilder.BuildType(node.DataType);
         if (node.Keyword.Value == "value")
         {
-            var field = _semanticTree.GetEnclosingField(node);
+            var field = SemanticTree.GetEnclosingField(node);
             Debug.Assert(field != null);
 
             return BuildSetterValueKeyword(field);

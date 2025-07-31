@@ -9,7 +9,7 @@ public class SemanticTree(SemanticNode root, FileScope file)
 
     public FileScope File { get; } = file;
 
-    public SemanticBlockNode? GetEnclosingBlock(SemanticNode node)
+    public static SemanticBlockNode? GetEnclosingBlock(SemanticNode node)
     {
         var current = node.Parent;
         while (current is not (null or SemanticBlockNode))
@@ -18,7 +18,7 @@ public class SemanticTree(SemanticNode root, FileScope file)
         return current as SemanticBlockNode;
     }
 
-    public SemanticFunctionDeclarationNode? GetEnclosingFunction(SemanticNode node)
+    public static SemanticFunctionDeclarationNode? GetEnclosingFunction(SemanticNode node)
     {
         var current = node;
         while (current is not (null or SemanticFunctionDeclarationNode))
@@ -27,7 +27,7 @@ public class SemanticTree(SemanticNode root, FileScope file)
         return current as SemanticFunctionDeclarationNode;
     }
 
-    public ISemanticStructureDeclaration? GetEnclosingStructure(SemanticNode node)
+    public static ISemanticStructureDeclaration? GetEnclosingStructure(SemanticNode node)
     {
         var current = node;
         while (current is not (null or ISemanticStructureDeclaration))
@@ -36,7 +36,7 @@ public class SemanticTree(SemanticNode root, FileScope file)
         return current as ISemanticStructureDeclaration;
     }
 
-    public SemanticFieldDeclarationNode? GetEnclosingField(SemanticNode node)
+    public static SemanticFieldDeclarationNode? GetEnclosingField(SemanticNode node)
     {
         var current = node;
         while (current is not (null or SemanticFieldDeclarationNode))
