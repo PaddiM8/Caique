@@ -4,12 +4,14 @@ using Caique.Scope;
 
 namespace Caique.Lowering;
 
-public class LoweredTypeBuilder
+class LoweredTypeBuilder(TypeArgumentResolver typeArgumentResolver, NameMangler mangler)
 {
     private readonly Dictionary<IDataType, ILoweredDataType> _generalCache = [];
     private readonly Dictionary<StructureSymbol, LoweredStructDataType> _structCache = [];
-    private readonly Dictionary<(ISemanticStructureDeclaration, ISemanticStructureDeclaration), LoweredStructDataType> _vtableCache = [];
-    private readonly Dictionary<SemanticClassDeclarationNode, LoweredStructDataType> _typeTableCache = [];
+    private readonly Dictionary<(StructureDataType, StructureDataType), LoweredStructDataType> _vtableCache = [];
+    private readonly Dictionary<StructureDataType, LoweredStructDataType> _typeTableCache = [];
+    private readonly TypeArgumentResolver _typeArgumentResolver = typeArgumentResolver;
+    private readonly NameMangler _mangler = mangler;
 
     public ILoweredDataType BuildType(IDataType dataType)
     {
@@ -23,6 +25,7 @@ public class LoweredTypeBuilder
             StructureDataType structureDataType => Build(structureDataType),
             FunctionDataType functionDataType => Build(functionDataType),
             EnumDataType enumDataType => Build(enumDataType),
+            TypeParameterDataType typeParameterDataType => Build(typeParameterDataType),
             _ => throw new NotImplementedException(),
         };
         _generalCache[dataType] = lowered;
@@ -30,60 +33,63 @@ public class LoweredTypeBuilder
         return lowered;
     }
 
-    public LoweredFunctionDataType BuildInitType(ISemanticInstantiableStructureDeclaration structure)
+    public LoweredFunctionDataType BuildInitType(ISemanticInstantiableStructureDeclaration structure, List<IDataType> structureTypeArguments)
     {
+        _typeArgumentResolver.PushTypeArguments(structureTypeArguments, structure);
         var parameterTypes = structure
             .Init
             .Parameters
             .Select(x => x.DataType)
             .Select(BuildType)
-            .Prepend(BuildType(new StructureDataType(structure.Symbol)))
+            .Prepend(BuildType(new StructureDataType(structure.Symbol, structureTypeArguments)))
             .ToList();
+
+        _typeArgumentResolver.PopTypeArguments();
         var voidType = new LoweredPrimitiveDataType(Primitive.Void);
 
         return new LoweredFunctionDataType(parameterTypes, voidType);
     }
 
-    public LoweredStructDataType BuildVtableType(ISemanticStructureDeclaration classNode)
+    public LoweredStructDataType BuildVtableType(StructureDataType structureDataType)
     {
-        return BuildVtableType(classNode, classNode);
+        return BuildVtableType(structureDataType, structureDataType);
     }
 
-    public LoweredStructDataType BuildVtableType(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
+    public LoweredStructDataType BuildVtableType(StructureDataType implementorDataType, StructureDataType implementedDataType)
     {
-        if (_vtableCache.TryGetValue((implementor, implemented), out var existing))
+        if (_vtableCache.TryGetValue((implementorDataType, implementedDataType), out var existing))
             return existing;
 
+        var implementor = implementorDataType.Symbol.SemanticDeclaration!;
+        var implemented = implementedDataType.Symbol.SemanticDeclaration!;
         var functionTypes = implementor
             .Functions
             .Where(x => !x.IsStatic)
             .Select(x => BuildType(new FunctionDataType(x.Symbol)))
             .ToList();
-        var implementedName = new StructureDataType(implemented.Symbol);
-        var implementorName = new StructureDataType(implementor.Symbol);
-        var name = $"{implementedName}.vtable.{implementorName}";
+        var name = _mangler.BuildVtableName(implementorDataType, implementedDataType);
 
         var structValue = new LoweredStructDataType(functionTypes, name);
-        _vtableCache[(implementor, implemented)] = structValue;
+        _vtableCache[(implementorDataType, implementedDataType)] = structValue;
 
         return structValue;
     }
 
-    public LoweredStructDataType BuildTypeTableType(SemanticClassDeclarationNode node)
+    public LoweredStructDataType BuildTypeTableType(StructureDataType structureDataType)
     {
-        if (_typeTableCache.TryGetValue(node, out var existing))
+        if (_typeTableCache.TryGetValue(structureDataType, out var existing))
             return existing;
 
-        var vtableType = new LoweredPointerDataType(BuildVtableType(node));
-        var name = $"typetable.{new StructureDataType(node.Symbol)}";
+        var vtableType = new LoweredPointerDataType(BuildVtableType(structureDataType));
+        var name = _mangler.BuildTypeTableName(structureDataType);
         var structValue = new LoweredStructDataType([vtableType], name);
 
-        _typeTableCache[node] = structValue;
+        _typeTableCache[structureDataType] = structValue;
 
         return structValue;
     }
 
-    public LoweredStructDataType BuildStructType(StructureSymbol symbol)
+    public LoweredStructDataType BuildStructType(StructureSymbol symbol, List<IDataType> typeArguments)
     {
         if (_structCache.TryGetValue(symbol, out var existing))
             return existing;
@@ -94,12 +100,15 @@ public class LoweredTypeBuilder
 
         if (symbol.SemanticDeclaration is SemanticClassDeclarationNode classNode)
         {
-            fieldTypes.Add(BuildTypeTableType(classNode));
+            fieldTypes.Add(BuildTypeTableType(new StructureDataType(symbol, typeArguments)));
 
+            _typeArgumentResolver.PushTypeArguments(typeArguments, classNode);
             var memberTypes = classNode
                 .GetAllMemberFields()
                 .Select(x => BuildType(x.DataType));
+
             fieldTypes.AddRange(memberTypes);
+            _typeArgumentResolver.PopTypeArguments();
         }
         else
         {
@@ -113,26 +122,32 @@ public class LoweredTypeBuilder
         return loweredType;
     }
 
-    public LoweredFunctionDataType BuildGetterType(SemanticFieldDeclarationNode field)
+    public LoweredFunctionDataType BuildGetterType(SemanticFieldDeclarationNode field, List<IDataType> structureTypeArguments)
     {
         var fieldType = BuildType(field.DataType);
         List<ILoweredDataType> parameterTypes = [];
         if (!field.IsStatic)
         {
-            var selfType = BuildStructType(((ISemanticStructureDeclaration)field.Parent!).Symbol);
+            var selfType = BuildStructType(
+                ((ISemanticStructureDeclaration)field.Parent!).Symbol,
+                structureTypeArguments
+            );
             parameterTypes.Add(new LoweredPointerDataType(selfType));
         }
 
         return new LoweredFunctionDataType(parameterTypes, fieldType);
     }
 
-    public LoweredFunctionDataType BuildSetterType(SemanticFieldDeclarationNode field)
+    public LoweredFunctionDataType BuildSetterType(SemanticFieldDeclarationNode field, List<IDataType> structureTypeArguments)
     {
         var fieldType = BuildType(field.DataType);
         List<ILoweredDataType> parameterTypes = [fieldType];
         if (!field.IsStatic)
         {
-            var selfType = BuildStructType(((ISemanticStructureDeclaration)field.Parent!).Symbol);
+            var selfType = BuildStructType(
+                ((ISemanticStructureDeclaration)field.Parent!).Symbol,
+                structureTypeArguments
+            );
             parameterTypes.Insert(0, new LoweredPointerDataType(selfType));
         }
 
@@ -175,14 +190,14 @@ public class LoweredTypeBuilder
     {
         if (dataType.Symbol.SemanticDeclaration is SemanticClassDeclarationNode)
         {
-            return new LoweredPointerDataType(BuildStructType(dataType.Symbol));
+            return new LoweredPointerDataType(BuildStructType(dataType.Symbol, dataType.TypeArguments));
         }
         else if (dataType.Symbol.SemanticDeclaration is SemanticProtocolDeclarationNode)
         {
             var internalFatPointerTypes = new List<ILoweredDataType>
             {
-                new LoweredPointerDataType(BuildStructType(dataType.Symbol)),
-                new LoweredPointerDataType(BuildVtableType(dataType.Symbol.SemanticDeclaration)),
+                new LoweredPointerDataType(BuildStructType(dataType.Symbol, dataType.TypeArguments)),
+                new LoweredPointerDataType(BuildVtableType(dataType)),
             };
 
             return new LoweredStructDataType(internalFatPointerTypes, name: null);
@@ -199,5 +214,10 @@ public class LoweredTypeBuilder
     private ILoweredDataType Build(EnumDataType dataType)
     {
         return BuildType(dataType.Symbol.SemanticDeclaration!.MemberDataType);
+    }
+
+    private ILoweredDataType Build(TypeParameterDataType dataType)
+    {
+        return BuildType(_typeArgumentResolver.Resolve(dataType.Symbol));
     }
 }

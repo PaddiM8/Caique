@@ -81,8 +81,9 @@ public class Analyser
     private SemanticKeywordValueNode BuildSelfNode(StructureSymbol structureSymbol)
     {
         var token = new Token(TokenKind.Self, string.Empty, _blankSpan);
+        var dataType = BuildGenericStructureDataType(structureSymbol);
 
-        return new SemanticKeywordValueNode(token, [], _blankSpan, new StructureDataType(structureSymbol));
+        return new SemanticKeywordValueNode(token, [], _blankSpan, dataType);
     }
 
     private SemanticStatementNode Visit(SyntaxStatementNode node)
@@ -120,7 +121,7 @@ public class Analyser
         if (arguments?.Count > 0)
             _diagnostics.ReportWrongNumberOfArguments(0, arguments.Count, node.Span);
 
-        var function = _syntaxTree.GetEnclosingFunction(node);
+        var function = SyntaxTree.GetEnclosingFunction(node);
         var isWithinMethod = function?.IsStatic is false;
         if (!isWithinMethod)
         {
@@ -128,40 +129,31 @@ public class Analyser
             throw Recover();
         }
 
-        var structure = _syntaxTree.GetEnclosingStructure(node);
+        var structure = SyntaxTree.GetEnclosingStructure(node);
+        var dataType = BuildGenericStructureDataType(structure!.Symbol!);
 
-        return new SemanticKeywordValueNode(
-            node.Keyword,
-            null,
-            node.Span,
-            new StructureDataType(structure!.Symbol!)
-        );
+        return new SemanticKeywordValueNode(node.Keyword, null, node.Span, dataType);
     }
 
     private SemanticKeywordValueNode NextBaseKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
     {
-        var structure = _syntaxTree.GetEnclosingStructure(node);
+        var structure = SyntaxTree.GetEnclosingStructure(node);
+        var firstInherited = structure?
+            .SubTypes
+            .FirstOrDefault(x => x.ResolvedSymbol is StructureSymbol { SyntaxDeclaration: SyntaxClassDeclarationNode });
+        var structureDataType = BuildGenericStructureDataType((StructureSymbol)firstInherited!.ResolvedSymbol!);
         if (arguments == null)
         {
-            var function = _syntaxTree.GetEnclosingFunction(node);
+            var function = SyntaxTree.GetEnclosingFunction(node);
             var isWithinMethod = function?.IsStatic is false;
-            var isWithinInheritingStructure = structure?
-                .SubTypes
-                .Any(x => x.ResolvedSymbol?.SyntaxDeclaration is SyntaxClassDeclarationNode)
-                is true;
-
+            var isWithinInheritingStructure = firstInherited != null;
             if (!isWithinMethod || !isWithinInheritingStructure)
             {
                 _diagnostics.ReportMisplacedBase(node.Span);
                 throw Recover();
             }
 
-            return new SemanticKeywordValueNode(
-                node.Keyword,
-                null,
-                node.Span,
-                new StructureDataType(structure!.Symbol!)
-            );
+            return new SemanticKeywordValueNode(node.Keyword, null, node.Span, structureDataType);
         }
 
         if (node.Parent?.Parent?.Parent is not SyntaxInitNode)
@@ -169,9 +161,10 @@ public class Analyser
 
         var baseClassNode = (structure as SyntaxClassDeclarationNode)?
             .SubTypes
-            .FirstOrDefault(x => x.ResolvedSymbol?.SyntaxDeclaration is SyntaxClassDeclarationNode)?
-            .ResolvedSymbol?
-            .SyntaxDeclaration as SyntaxClassDeclarationNode;
+            .Select<SyntaxTypeNode, SyntaxClassDeclarationNode?>(x =>
+                (x.ResolvedSymbol as StructureSymbol)?.SyntaxDeclaration as SyntaxClassDeclarationNode
+            )
+            .FirstOrDefault(x => x != null);
 
         if (baseClassNode == null)
         {
@@ -187,13 +180,13 @@ public class Analyser
             .Select(Next)
             .Select(x => x.DataType)
             .ToList();
-        var typeCheckedArguments = TypeCheckArguments(parameterTypes ?? [], arguments, node.Span);
+        var typeCheckedArguments = TypeCheckArguments(structureDataType, parameterTypes ?? [], arguments, node.Span);
 
         return new SemanticKeywordValueNode(
             node.Keyword,
             typeCheckedArguments,
             node.Span,
-            new StructureDataType(structure.Symbol)
+            new StructureDataType(structure.Symbol, [])
         );
     }
 
@@ -225,7 +218,7 @@ public class Analyser
 
     private SemanticLiteralNode NextGetCompilerConstantKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
     {
-        if (_syntaxTree.GetEnclosingStructure(node)?.Scope.Namespace.ToString().StartsWith("std:") is not true)
+        if (SyntaxTree.GetEnclosingStructure(node)?.Scope.Namespace.ToString().StartsWith("std:") is not true)
         {
             _diagnostics.ReportNotFound(node.Keyword);
             throw Recover();
@@ -328,7 +321,7 @@ public class Analyser
         if (node.Value.Kind == TokenKind.StringLiteral)
         {
             var symbol = _stdScope.ResolveStructure(["prelude", "String"])!;
-            var dataType = new StructureDataType(symbol);
+            var dataType = new StructureDataType(symbol, []);
 
             return new SemanticLiteralNode(node.Value, dataType);
         }
@@ -375,7 +368,7 @@ public class Analyser
                     _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
 
                 if (!functionSymbol.SyntaxDeclaration.IsPublic &&
-                    structureSymbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                    structureSymbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
                 {
                     _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
                 }
@@ -396,7 +389,7 @@ public class Analyser
                     _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
 
                 if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
-                    structureSymbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                    structureSymbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
                 {
                     _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
                 }
@@ -422,11 +415,11 @@ public class Analyser
                 return keywordNode;
         }
 
-        var variableSymbol = _syntaxTree.GetLocalScope(node)?.FindSymbol(identifier.Value);
+        var variableSymbol = SyntaxTree.GetLocalScope(node)?.FindSymbol(identifier.Value);
         if (variableSymbol != null)
             return new SemanticVariableReferenceNode(identifier, variableSymbol);
 
-        var structure = _syntaxTree.GetEnclosingStructure(node);
+        var structure = SyntaxTree.GetEnclosingStructure(node);
         Debug.Assert(structure?.Symbol != null);
 
         var symbolFromStructure = structure?.Scope.FindSymbol(identifier.Value);
@@ -454,7 +447,7 @@ public class Analyser
             return new SemanticFieldReferenceNode(identifier, fieldSymbol2, instance, dataType);
         }
 
-        var block = _syntaxTree.GetEnclosingBlock(node);
+        var block = SyntaxTree.GetEnclosingBlock(node);
         if (block?.Scope?.Namespace.ResolveSymbol([identifier.Value]) != null)
         {
             _diagnostics.ReportExpectedValueGotType(identifier);
@@ -473,7 +466,7 @@ public class Analyser
     private SemanticKeywordValueNode? TryResolveSetterValueKeywordNode(SyntaxIdentifierNode node)
     {
         var identifier = node.IdentifierList.Single();
-        var setter = _syntaxTree.GetEnclosingSetter(node);
+        var setter = SyntaxTree.GetEnclosingSetter(node);
         if (setter != null)
         {
             var field = (SyntaxFieldDeclarationNode)setter.Parent!;
@@ -549,7 +542,7 @@ public class Analyser
         }
         else if (node.Operator is TokenKind.EqualsEquals or TokenKind.NotEquals)
         {
-            var equatable = new StructureDataType(_stdScope.ResolveStructure(["prelude", "Equatable"])!);
+            var equatable = new StructureDataType(_stdScope.ResolveStructure(["prelude", "Equatable"])!, []);
             if (left.DataType is not (PrimitiveDataType or EnumDataType) && left.DataType.IsEquivalent(equatable) == TypeEquivalence.Incompatible)
                 _diagnostics.ReportIncompatibleType("equatable", left.DataType, left.Span);
 
@@ -625,13 +618,13 @@ public class Analyser
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(functionSymbol.SyntaxDeclaration.Identifier);
 
                 if (!functionSymbol.SyntaxDeclaration.IsPublic &&
-                    structureDataType.Symbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                    structureDataType.Symbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
                 {
                     _diagnostics.ReportSymbolIsPrivate(node.Identifier);
                 }
 
                 return new SemanticFunctionReferenceNode(
-                    functionSymbol.SyntaxDeclaration.Identifier,
+                    node.Identifier,
                     functionSymbol,
                     objectInstance: left,
                     dataType
@@ -640,18 +633,19 @@ public class Analyser
             else if (symbol is FieldSymbol fieldSymbol)
             {
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
+                dataType = ResolvePotentialTypeParametersForStructure(dataType, structureDataType);
 
                 if (fieldSymbol.SyntaxDeclaration.IsStatic)
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(fieldSymbol.SyntaxDeclaration.Identifier);
 
                 if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
-                    structureDataType.Symbol.SyntaxDeclaration != _syntaxTree.GetEnclosingStructure(node))
+                    structureDataType.Symbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
                 {
                     _diagnostics.ReportSymbolIsPrivate(node.Identifier);
                 }
 
                 return new SemanticFieldReferenceNode(
-                    fieldSymbol.SyntaxDeclaration.Identifier,
+                    node.Identifier,
                     fieldSymbol,
                     objectInstance: left,
                     dataType
@@ -667,6 +661,35 @@ public class Analyser
         throw Recover();
     }
 
+    private IDataType ResolvePotentialTypeParametersForStructure(IDataType dataType, StructureDataType parentStructureDataType)
+    {
+        if (dataType is TypeParameterDataType typeParameterDataType)
+        {
+            foreach (var (i, typeParameter) in parentStructureDataType.Symbol.SyntaxDeclaration.TypeParameters.Index())
+            {
+                if (typeParameter.Symbol == typeParameterDataType.Symbol)
+                {
+                    return parentStructureDataType.TypeArguments.ElementAtOrDefault(i)
+                        ?? typeParameterDataType;
+                }
+            }
+
+            return typeParameterDataType;
+        }
+
+        if (dataType is StructureDataType structureDataType)
+        {
+            var typeArguments = structureDataType
+                .TypeArguments
+                .Select(x => ResolvePotentialTypeParametersForStructure(x, parentStructureDataType))
+                .ToList();
+
+            return new StructureDataType(structureDataType.Symbol, typeArguments);
+        }
+
+        return dataType;
+    }
+
     private SemanticCallNode Visit(SyntaxCallNode node)
     {
         var left = Next(node.Left);
@@ -678,18 +701,35 @@ public class Analyser
             throw Recover();
         }
 
+        StructureDataType? structureDataType = null;
+        bool isStatic = functionDataType.Symbol.SyntaxDeclaration.IsStatic;
+        if (!isStatic && left is SemanticFunctionReferenceNode functionReferenceNode)
+        {
+            if (functionReferenceNode.ObjectInstance == null)
+            {
+                var parentStructure = SyntaxTree.GetEnclosingStructure(node);
+                structureDataType = BuildGenericStructureDataType(parentStructure!.Symbol!);
+            }
+            else
+            {
+                structureDataType = (StructureDataType)functionReferenceNode.ObjectInstance.DataType;
+            }
+        }
+
         var parameterTypes = functionDataType
             .Symbol
             .SyntaxDeclaration
             .Parameters
             .Select(x => Next(x.Type).DataType)
             .ToList();
-        var typeCheckedArguments = TypeCheckArguments(parameterTypes, arguments, node.Span);
+        var typeCheckedArguments = TypeCheckArguments(structureDataType, parameterTypes, arguments, node.Span);
 
         var declarationReturnType = functionDataType.Symbol.SyntaxDeclaration.ReturnType;
         var dataType = declarationReturnType == null
             ? PrimitiveDataType.Void
             : Next(declarationReturnType).DataType;
+        if (structureDataType != null)
+            dataType = ResolvePotentialTypeParametersForStructure(dataType, structureDataType);
 
         return new SemanticCallNode(left, typeCheckedArguments, dataType, node.Span);
     }
@@ -728,20 +768,32 @@ public class Analyser
 
         // Will be null if it isn't an instantiable structure (which is an error, so don't try to type check)
         if (instantiable != null)
-            arguments = TypeCheckArguments(parameterTypes, arguments, node.Span);
+            arguments = TypeCheckArguments(structureDataType, parameterTypes, arguments, node.Span);
 
         return new SemanticNewNode(arguments, dataType, node.Span);
     }
 
-    private List<SemanticNode> TypeCheckArguments(List<IDataType> parameterTypes, List<SemanticNode> arguments, TextSpan span)
+    private List<SemanticNode> TypeCheckArguments(
+        StructureDataType? structureDataType,
+        List<IDataType> parameterTypes,
+        List<SemanticNode> arguments,
+        TextSpan span
+    )
     {
         if (parameterTypes.Count != arguments.Count)
             _diagnostics.ReportWrongNumberOfArguments(parameterTypes.Count, arguments.Count, span);
 
-        return arguments
-            .Zip(parameterTypes)
-            .Select(x => TypeCheck(x.First, x.Second))
-            .ToList();
+        var typeCheckedArguments = new List<SemanticNode>();
+        foreach (var (argument, parameterType) in arguments.Zip(parameterTypes))
+        {
+            var resolvedParameterType = structureDataType != null
+                ? ResolvePotentialTypeParametersForStructure(parameterType, structureDataType)
+                : parameterType;
+            var typeCheckedArgument = TypeCheck(argument, resolvedParameterType);
+            typeCheckedArguments.Add(typeCheckedArgument);
+        }
+
+        return typeCheckedArguments;
     }
 
     private SemanticNode TypeCheck(SemanticNode value, IDataType targetDataType)
@@ -779,8 +831,8 @@ public class Analyser
             ? null
             : Next(node.Value);
 
-        var enclosingFunction = _syntaxTree.GetEnclosingFunction(node);
-        var enclosingGetter = _syntaxTree.GetEnclosingGetter(node);
+        var enclosingFunction = SyntaxTree.GetEnclosingFunction(node);
+        var enclosingGetter = SyntaxTree.GetEnclosingGetter(node);
         SyntaxTypeNode? returnType;
         if (enclosingFunction != null)
         {
@@ -954,14 +1006,14 @@ public class Analyser
     {
         if (node.TypeNames.Count == 1 && node.TypeNames.First().Value == "Self")
         {
-            var parentStructure = _syntaxTree.GetEnclosingStructure(node);
+            var parentStructure = SyntaxTree.GetEnclosingStructure(node);
             if (parentStructure == null)
             {
                 _diagnostics.ReportMisplacedSelf(node.Span);
                 throw Recover();
             }
 
-            return new StructureDataType(parentStructure.Symbol!);
+            return BuildGenericStructureDataType(parentStructure.Symbol!);
         }
 
         // Primitive
@@ -994,7 +1046,24 @@ public class Analyser
             return new PrimitiveDataType(primitiveKind);
         }
 
-        // Symbol
+        // Type parameter
+        if (node.ResolvedSymbol == null && node.TypeNames.Count == 1)
+        {
+            var typeScope = SyntaxTree.GetTypeScope(node);
+            var typeSymbol = typeScope?.FindSymbol(node.TypeNames.First().Value);
+            if (typeSymbol != null)
+            {
+                node.ResolvedSymbol = typeSymbol;
+
+                return new TypeParameterDataType(typeSymbol);
+            }
+        }
+        else if (node.ResolvedSymbol is TypeSymbol typeSymbol)
+        {
+            return new TypeParameterDataType(typeSymbol);
+        }
+
+        // Structure
         var symbol = node.ResolvedSymbol;
         if (node.ResolvedSymbol == null)
         {
@@ -1002,13 +1071,32 @@ public class Analyser
             symbol = _syntaxTree.File.ResolveStructure(typeNames);
         }
 
-        if (symbol == null)
+        if (symbol is not StructureSymbol structureSymbol)
         {
             _diagnostics.ReportTypeNotFound(node.TypeNames);
             throw Recover();
         }
 
-        return new StructureDataType(symbol);
+        var typeArguments = node
+            .TypeArguments
+            .Select(x => Visit(x).DataType)
+            .ToList();
+        if (typeArguments.Count > 0)
+            structureSymbol.AddTypeArgumentOccurrence(typeArguments);
+
+        return new StructureDataType(structureSymbol, typeArguments);
+    }
+
+    private StructureDataType BuildGenericStructureDataType(StructureSymbol symbol)
+    {
+        var typeArguments = symbol
+            .SyntaxDeclaration
+            .TypeParameters
+            .Select(x => new TypeParameterDataType(x.Symbol))
+            .Cast<IDataType>()
+            .ToList();
+
+        return new StructureDataType(symbol, typeArguments);
     }
 
     private SemanticNode Visit(SyntaxVariableDeclarationNode node)
@@ -1031,7 +1119,7 @@ public class Analyser
 
         // Variable symbols are created in the analyser, since they can only be referenced
         // after they have been declared
-        var scope = _syntaxTree.GetLocalScope(node);
+        var scope = SyntaxTree.GetLocalScope(node);
         Debug.Assert(scope != null);
         scope.AddSymbol(new VariableSymbol(semanticNode));
 
@@ -1041,7 +1129,7 @@ public class Analyser
     private SemanticNode Visit(SyntaxFunctionDeclarationNode node)
     {
         var isMain = node.Identifier.Value == "Run" &&
-            _syntaxTree.GetEnclosingStructure(node)?.Identifier.Value == "Main";
+            SyntaxTree.GetEnclosingStructure(node)?.Identifier.Value == "Main";
         if (isMain && !node.IsStatic)
             _diagnostics.ReportNonStaticMainFunction(node.Span);
 
@@ -1071,7 +1159,7 @@ public class Analyser
             returnType = PrimitiveDataType.Void;
         }
 
-        var structure = _syntaxTree.GetEnclosingStructure(node);
+        var structure = SyntaxTree.GetEnclosingStructure(node);
         if (node.Identifier.Value == structure?.Identifier.Value)
             _diagnostics.ReportFunctionNameSameAsParentStructure(node.Identifier);
 
@@ -1083,9 +1171,8 @@ public class Analyser
 
         var parentClass = structure?
             .SubTypes
-            .Select(x => x.ResolvedSymbol?.SyntaxDeclaration as SyntaxClassDeclarationNode)
-            .Where(x => x != null)
-            .FirstOrDefault();
+            .Select(x => (x.ResolvedSymbol as StructureSymbol)?.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .FirstOrDefault(x => x != null);
         if (parentClass != null && node.IsOverride)
         {
             if (!parentClass.IsInheritable)
@@ -1133,7 +1220,7 @@ public class Analyser
     {
         var inheritedClasses = node
             .SubTypes
-            .Select(x => x.ResolvedSymbol?.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .Select(x => (x.ResolvedSymbol as StructureSymbol)?.SyntaxDeclaration as SyntaxClassDeclarationNode)
             .Where(x => x != null);
 
         if (inheritedClasses.Count() > 1)
@@ -1244,8 +1331,8 @@ public class Analyser
     private static int CalculateFieldStartIndex(SyntaxClassDeclarationNode classDeclarationNode)
     {
         var inheritedClassSyntax = classDeclarationNode.SubTypes
-            .Select(x => x.ResolvedSymbol?.SyntaxDeclaration as SyntaxClassDeclarationNode)
-            .FirstOrDefault();
+            .Select(x => (x.ResolvedSymbol as StructureSymbol)?.SyntaxDeclaration as SyntaxClassDeclarationNode)
+            .FirstOrDefault(x => x != null);
 
         if (inheritedClassSyntax == null)
             return 0;
@@ -1328,7 +1415,7 @@ public class Analyser
                 continue;
 
             // References a field, so we need to insert assignment nodes
-            var structure = _syntaxTree.GetEnclosingStructure(node);
+            var structure = SyntaxTree.GetEnclosingStructure(node);
             Debug.Assert(structure?.Symbol != null);
             var linkedSymbol = (FieldSymbol)structure.Scope.FindSymbol(parameter.Identifier.Value)!;
             var left = new SemanticFieldReferenceNode(
@@ -1512,7 +1599,7 @@ public class Analyser
         else if (node.Value == null && targetDataType.IsString())
         {
             var stringToken = new Token(TokenKind.StringLiteral, node.Identifier.Value, _blankSpan);
-            var stringDataType = new StructureDataType(_stdScope.ResolveStructure(["prelude", "String"]!)!);
+            var stringDataType = new StructureDataType(_stdScope.ResolveStructure(["prelude", "String"]!)!, []);
             value = new SemanticLiteralNode(stringToken, stringDataType);
         }
         else if (node.Value == null)

@@ -42,8 +42,14 @@ public class Compilation
 
         if (!context.DiagnosticReporter.Errors.Any())
         {
-            var loweredTrees = Lower(semanticTrees, context);
-            var (objectFilePaths, success) = Emit(loweredTrees, project.ProjectFilePath, options);
+            var globalLoweringContext = new GlobalLoweringContext();
+            var loweredTrees = Lower(semanticTrees, context, globalLoweringContext);
+            var (objectFilePaths, success) = Emit(
+                loweredTrees,
+                project.ProjectFilePath,
+                options,
+                globalLoweringContext
+            );
             if (success)
             {
                 Link(objectFilePaths, project, GetTargetDirectory(project.ProjectFilePath));
@@ -114,13 +120,16 @@ public class Compilation
         return semanticTrees;
     }
 
-    private static List<LoweredTree> Lower(List<SemanticTree> semanticTrees, CompilationContext compilationContext
+    private static List<LoweredTree> Lower(
+        List<SemanticTree> semanticTrees,
+        CompilationContext compilationContext,
+        GlobalLoweringContext globalLoweringContext
     )
     {
         var loweredTrees = new List<LoweredTree>();
         foreach (var semanticTree in semanticTrees)
         {
-            var tree = Lowerer.Lower(semanticTree, compilationContext.StdScope);
+            var tree = Lowerer.Lower(semanticTree, compilationContext.StdScope, globalLoweringContext);
             loweredTrees.Add(tree);
         }
 
@@ -130,13 +139,18 @@ public class Compilation
     private static (List<string> objectFilePaths, bool success) Emit(
         List<LoweredTree> loweredTrees,
         string projectFilePath,
-        CompilationOptions options
+        CompilationOptions options,
+        GlobalLoweringContext globalLoweringContext
     )
     {
         using var llvmContext = LLVMContextRef.Create();
         var objectFilePaths = new List<string>();
         foreach (var loweredTree in loweredTrees)
         {
+            var lazilyGeneratedStructs = globalLoweringContext.GetLazilyGeneratedStructsForFile(loweredTree.FileScope);
+            foreach (var lazilyGeneratedStruct in lazilyGeneratedStructs)
+                loweredTree.Structs[lazilyGeneratedStruct.Identifier] = lazilyGeneratedStruct;
+
             var emitterContext = new LlvmEmitterContext(loweredTree.ModuleName, llvmContext);
             var targetPath = GetTargetDirectory(projectFilePath);
             var result = LlvmContentEmitter.Emit(

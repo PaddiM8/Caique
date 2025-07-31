@@ -1,3 +1,4 @@
+using System.Text;
 using Caique.Parsing;
 using Caique.Scope;
 
@@ -113,6 +114,24 @@ public interface IDataType
         => false;
 }
 
+public class TypeParameterDataType(TypeSymbol symbol) : IDataType
+{
+    public TypeSymbol Symbol { get; } = symbol;
+
+    public override string ToString()
+        => Symbol.Name;
+
+    public override int GetHashCode()
+        => Symbol.GetHashCode();
+
+    public TypeEquivalence IsEquivalent(IDataType other)
+    {
+        return Symbol == (other as TypeParameterDataType)?.Symbol
+            ? TypeEquivalence.Identical
+            : TypeEquivalence.Incompatible;
+    }
+}
+
 public class PrimitiveDataType(Primitive kind) : IDataType
 {
     public static PrimitiveDataType Bool { get; } = new PrimitiveDataType(Primitive.Bool);
@@ -200,12 +219,28 @@ public class SliceDataType(IDataType subType) : IDataType
     }
 }
 
-public class StructureDataType(StructureSymbol symbol) : IDataType
+public class StructureDataType(StructureSymbol symbol, List<IDataType> typeArguments) : IDataType
 {
     public StructureSymbol Symbol { get; } = symbol;
 
+    public List<IDataType> TypeArguments { get; } = typeArguments;
+
+    public string QualifiedName
+        => Symbol.Namespace.ToString() + ":" + Symbol.Name;
+
     public override string ToString()
-        => $"{Symbol.Namespace}:{Symbol.Name}";
+    {
+        var builder = new StringBuilder();
+        builder.Append(QualifiedName);
+        if (TypeArguments.Count > 0)
+        {
+            builder.Append('[');
+            builder.Append(string.Join(", ", TypeArguments));
+            builder.Append(']');
+        }
+
+        return builder.ToString();
+    }
 
     public override int GetHashCode()
         => Symbol.SyntaxDeclaration.GetHashCode();
@@ -214,6 +249,9 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
     {
         if (other is StructureDataType otherStructure)
         {
+            if (!TypeArgumentsAreIdentical(otherStructure.TypeArguments))
+                return TypeEquivalence.Incompatible;
+
             if (otherStructure.Symbol == Symbol)
                 return TypeEquivalence.Identical;
 
@@ -222,6 +260,13 @@ public class StructureDataType(StructureSymbol symbol) : IDataType
         }
 
         return TypeEquivalence.Incompatible;
+    }
+
+    private bool TypeArgumentsAreIdentical(List<IDataType> otherArguments)
+    {
+        return TypeArguments
+            .Zip(otherArguments)
+            .All(x => x.First.IsEquivalent(x.Second) == TypeEquivalence.Identical);
     }
 
     public bool IsString()

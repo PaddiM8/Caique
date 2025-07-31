@@ -23,7 +23,7 @@ public class SyntaxTree(string text, FileScope fileScope)
         Root = root;
     }
 
-    public SyntaxBlockNode? GetEnclosingBlock(SyntaxNode node)
+    public static SyntaxBlockNode? GetEnclosingBlock(SyntaxNode node)
     {
         var current = node.Parent;
         while (current is not (null or SyntaxBlockNode))
@@ -32,7 +32,7 @@ public class SyntaxTree(string text, FileScope fileScope)
         return current as SyntaxBlockNode;
     }
 
-    public SyntaxFunctionDeclarationNode? GetEnclosingFunction(SyntaxNode node)
+    public static SyntaxFunctionDeclarationNode? GetEnclosingFunction(SyntaxNode node)
     {
         var current = node.Parent;
         while (current is not (null or SyntaxFunctionDeclarationNode))
@@ -41,7 +41,7 @@ public class SyntaxTree(string text, FileScope fileScope)
         return current as SyntaxFunctionDeclarationNode;
     }
 
-    public ISyntaxStructureDeclaration? GetEnclosingStructure(SyntaxNode node)
+    public static ISyntaxStructureDeclaration? GetEnclosingStructure(SyntaxNode node)
     {
         var current = node;
         while (current is not (null or ISyntaxStructureDeclaration))
@@ -50,7 +50,7 @@ public class SyntaxTree(string text, FileScope fileScope)
         return current as ISyntaxStructureDeclaration;
     }
 
-    public SyntaxFieldDeclarationNode? GetEnclosingField(SyntaxNode node)
+    public static SyntaxFieldDeclarationNode? GetEnclosingField(SyntaxNode node)
     {
         var current = node;
         while (current is not (null or SyntaxFieldDeclarationNode))
@@ -59,7 +59,7 @@ public class SyntaxTree(string text, FileScope fileScope)
         return current as SyntaxFieldDeclarationNode;
     }
 
-    public SyntaxBlockNode? GetEnclosingGetter(SyntaxNode node)
+    public static SyntaxBlockNode? GetEnclosingGetter(SyntaxNode node)
     {
         var field = GetEnclosingField(node);
         if (field == null)
@@ -75,7 +75,7 @@ public class SyntaxTree(string text, FileScope fileScope)
         return null;
     }
 
-    public SyntaxBlockNode? GetEnclosingSetter(SyntaxNode node)
+    public static SyntaxBlockNode? GetEnclosingSetter(SyntaxNode node)
     {
         var field = GetEnclosingField(node);
         if (field == null)
@@ -91,18 +91,29 @@ public class SyntaxTree(string text, FileScope fileScope)
         return null;
     }
 
-    public StructureScope? GetStructureScope(SyntaxNode node)
+    public static FileScope? GetFileScope(SyntaxNode node)
+    {
+        return node.Span.Start.SyntaxTree.File;
+    }
+
+    public static StructureScope? GetStructureScope(SyntaxNode node)
     {
         return GetEnclosingStructure(node)?.Scope;
     }
 
-    public LocalScope? GetLocalScope(SyntaxNode node)
+    public static LocalScope? GetLocalScope(SyntaxNode node)
     {
         var current = node;
         while (current is not (null or SyntaxBlockNode))
             current = current.Parent;
 
         return (current as SyntaxBlockNode)?.Scope as LocalScope;
+    }
+
+    public static TypeScope? GetTypeScope(SyntaxNode node)
+    {
+        return GetEnclosingFunction(node)?.TypeScope
+            ?? GetEnclosingStructure(node)?.TypeScope;
     }
 }
 
@@ -266,7 +277,7 @@ public class SyntaxTypeNode(
 
     public List<SyntaxTypeNode> TypeArguments { get; } = typeArguments;
 
-    public StructureSymbol? ResolvedSymbol { get; set; }
+    public ISymbol? ResolvedSymbol { get; set; }
 }
 
 public class SyntaxAttributeNode(Token identifier, List<SyntaxNode> arguments, TextSpan span)
@@ -308,6 +319,7 @@ public class SyntaxFunctionDeclarationNode(
     bool isPublic,
     bool isStatic,
     bool isOverride,
+    TypeScope typeScope,
     TextSpan span
 )
     : SyntaxNode(span), ISyntaxFunctionDeclaration
@@ -328,6 +340,8 @@ public class SyntaxFunctionDeclarationNode(
 
     public FunctionSymbol? Symbol { get; set; }
 
+    public TypeScope TypeScope { get; } = typeScope;
+
     public List<SyntaxAttributeNode> Attributes { get; init; } = [];
 }
 
@@ -337,9 +351,13 @@ public interface ISyntaxStructureDeclaration
 
     StructureScope Scope { get; }
 
+    TypeScope TypeScope { get; }
+
     StructureSymbol? Symbol { get; }
 
     List<SyntaxTypeNode> SubTypes { get; }
+
+    List<SyntaxTypeParameterNode> TypeParameters { get; }
 
     ISymbol? ResolveSymbol(string name)
     {
@@ -349,7 +367,10 @@ public interface ISyntaxStructureDeclaration
 
         foreach (var subType in SubTypes)
         {
-            var resolved = subType.ResolvedSymbol?.SyntaxDeclaration.ResolveSymbol(name);
+            if (subType.ResolvedSymbol is not StructureSymbol structureSymbol)
+                continue;
+
+            var resolved = structureSymbol.SyntaxDeclaration.ResolveSymbol(name);
             if (resolved != null)
                 return resolved;
         }
@@ -367,13 +388,23 @@ public interface ISyntaxReferenceTypeDeclaration : ISyntaxStructureDeclaration
 {
 }
 
+public class SyntaxTypeParameterNode(Token identifier, TypeSymbol symbol)
+    : SyntaxNode(identifier.Span)
+{
+    public Token Identifier { get; } = identifier;
+
+    public TypeSymbol Symbol { get; } = symbol;
+}
+
 public class SyntaxClassDeclarationNode(
     Token identifier,
     List<SyntaxTypeNode> subTypes,
+    List<SyntaxTypeParameterNode> typeParameters,
     SyntaxInitNode? constructor,
     List<SyntaxNode> declarations,
     bool isInheritable,
     StructureScope scope,
+    TypeScope typeScope,
     TextSpan span
 )
     : SyntaxNode(span), ISyntaxStructureDeclaration, ISyntaxInstantiableStructureDeclaration, ISyntaxReferenceTypeDeclaration
@@ -382,6 +413,8 @@ public class SyntaxClassDeclarationNode(
 
     public List<SyntaxTypeNode> SubTypes { get; } = subTypes;
 
+    public List<SyntaxTypeParameterNode> TypeParameters { get; } = typeParameters;
+
     public SyntaxInitNode? Init { get; } = constructor;
 
     public List<SyntaxNode> Declarations { get; } = declarations;
@@ -389,6 +422,8 @@ public class SyntaxClassDeclarationNode(
     public bool IsInheritable { get; } = isInheritable;
 
     public StructureScope Scope { get; } = scope;
+
+    public TypeScope TypeScope { get; } = typeScope;
 
     public StructureSymbol? Symbol { get; set; }
 }
@@ -406,9 +441,13 @@ public class SyntaxProtocolDeclarationNode(
 
     public List<SyntaxTypeNode> SubTypes { get; } = subTypes;
 
+    public List<SyntaxTypeParameterNode> TypeParameters { get; } = [];
+
     public List<SyntaxNode> Declarations { get; } = declarations;
 
     public StructureScope Scope { get; } = scope;
+
+    public TypeScope TypeScope { get; } = new(parent: null);
 
     public StructureSymbol? Symbol { get; set; }
 }
@@ -425,9 +464,13 @@ public class SyntaxModuleDeclarationNode(
 
     public List<SyntaxTypeNode> SubTypes { get; } = [];
 
+    public List<SyntaxTypeParameterNode> TypeParameters { get; } = [];
+
     public List<SyntaxNode> Declarations { get; } = declarations;
 
     public StructureScope Scope { get; } = scope;
+
+    public TypeScope TypeScope { get; } = new(parent: null);
 
     public StructureSymbol? Symbol { get; set; }
 }

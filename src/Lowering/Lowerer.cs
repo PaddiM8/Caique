@@ -1,9 +1,8 @@
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using Caique.Analysis;
 using Caique.Backend;
 using Caique.Lexing;
+using Caique.Parsing;
 using Caique.Scope;
 
 namespace Caique.Lowering;
@@ -14,37 +13,44 @@ public class Lowerer
     private readonly Dictionary<string, LoweredStructDeclarationNode> _structs = [];
     private readonly Dictionary<string, LoweredGlobalDeclarationNode> _globals = [];
     private readonly Dictionary<ISemanticVariableDeclaration, ILoweredVariableDeclaration> _variableDeclarationCache = [];
-    private readonly LoweredTypeBuilder _typeBuilder = new();
-    private readonly SemanticTree _tree;
+    private readonly TypeArgumentResolver _typeArgumentResolver;
+    private readonly NameMangler _mangler;
+    private readonly LoweredTypeBuilder _typeBuilder;
+    private readonly SemanticTree _semanticTree;
     private readonly NamespaceScope? _stdScope;
+    private readonly GlobalLoweringContext _globalLoweringContext;
     private LoweredBlockNode? _currentBlock;
     private int _nextGlobalStringIndex = 0;
 
-    private Lowerer(SemanticTree tree, NamespaceScope? stdScope)
+    private Lowerer(SemanticTree tree, NamespaceScope? stdScope, GlobalLoweringContext globalLoweringContext)
     {
-        _tree = tree;
+        _typeArgumentResolver = new TypeArgumentResolver();
+        _mangler = new NameMangler(tree, _typeArgumentResolver);
+        _typeBuilder = new LoweredTypeBuilder(_typeArgumentResolver, _mangler);
+        _semanticTree = tree;
         _stdScope = stdScope;
+        _globalLoweringContext = globalLoweringContext;
     }
 
-    public static LoweredTree Lower(SemanticTree tree, NamespaceScope? stdScope)
+    public static LoweredTree Lower(SemanticTree tree, NamespaceScope? stdScope, GlobalLoweringContext globalLoweringContext)
     {
-        var lowerer = new Lowerer(tree, stdScope);
+        var lowerer = new Lowerer(tree, stdScope, globalLoweringContext);
         lowerer.Next(tree.Root);
 
         var moduleName = tree.File.Namespace.ToString() + "_" + Path.GetFileNameWithoutExtension(tree.File.FilePath);
 
         return new LoweredTree(
             moduleName,
+            tree.Root.Span.Start.SyntaxTree.File,
             lowerer._functions,
             lowerer._structs,
-            lowerer._globals,
-            tree.Root.Span.Start.SyntaxTree.File.FilePath
+            lowerer._globals
         );
     }
 
     private LoweredNode? Next(SemanticNode node)
     {
-        Debug.Assert(node.Parent != null || node == _tree.Root);
+        Debug.Assert(node.Parent != null || node == _semanticTree.Root);
 
         return node switch
         {
@@ -68,7 +74,6 @@ public class Lowerer
             SemanticVariableDeclarationNode variableDeclarationNode => Visit(variableDeclarationNode),
             SemanticFunctionDeclarationNode functionDeclarationNode => Visit(functionDeclarationNode),
             SemanticClassDeclarationNode classDeclarationNode => Visit(classDeclarationNode),
-            SemanticFieldDeclarationNode fieldDeclarationNode => Visit(fieldDeclarationNode),
             SemanticProtocolDeclarationNode protocolDeclarationNode => Visit(protocolDeclarationNode),
             SemanticModuleDeclarationNode moduleDeclarationNode => Visit(moduleDeclarationNode),
             SemanticEnumDeclarationNode => null,
@@ -84,69 +89,6 @@ public class Lowerer
     private LoweredKeywordValueNode BuildDefaultKeyword(ILoweredDataType dataType)
     {
         return new LoweredKeywordValueNode(KeywordValueKind.Default, [], dataType);
-    }
-
-    private string BuildStaticFieldName(SemanticFieldDeclarationNode field)
-    {
-        var ffiAttribute = field.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
-        var parentStructure = _tree.GetEnclosingStructure(field);
-        var parentType = new StructureDataType(parentStructure!.Symbol);
-
-        return ffiAttribute == null
-            ? $"{parentType}:{field.Identifier.Value}"
-            : field.Identifier.Value;
-    }
-
-    private string BuildFunctionName(SemanticFunctionDeclarationNode function)
-    {
-        var ffiAttribute = function.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
-        if (ffiAttribute != null)
-            return function.Identifier.Value;
-
-        var parentStructure = _tree.GetEnclosingStructure(function);
-        var parentType = new StructureDataType(parentStructure!.Symbol);
-
-        return $"{parentType}:{function.Identifier.Value}";
-    }
-
-    private string BuildStructName(ISemanticStructureDeclaration structure)
-    {
-        var ffiAttribute = structure.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
-        if (ffiAttribute != null)
-            return structure.Identifier.Value;
-
-        var dataType = new StructureDataType(structure.Symbol);
-
-        return dataType.ToString();
-    }
-
-    private string BuildConstructorName(ISemanticStructureDeclaration structure)
-    {
-        var parentType = new StructureDataType(structure.Symbol);
-
-        return $"{parentType}:init";
-    }
-
-    private string BuildGetterName(SemanticFieldDeclarationNode field)
-    {
-        return $"{BuildPropertyBaseName(field)}.get";
-    }
-
-    private string BuildSetterName(SemanticFieldDeclarationNode field)
-    {
-        return $"{BuildPropertyBaseName(field)}.set";
-    }
-
-    private string BuildPropertyBaseName(SemanticFieldDeclarationNode field)
-    {
-        var ffiAttribute = field.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
-        if (ffiAttribute != null)
-            return field.Identifier.Value;
-
-        var parentStructure = _tree.GetEnclosingStructure(field);
-        var parentType = new StructureDataType(parentStructure!.Symbol);
-
-        return $"{parentType}:{field.Identifier.Value}";
     }
 
     private LoweredNode BuildString(string value)
@@ -165,12 +107,13 @@ public class Lowerer
         );
         _globals[name] = valueDeclaration;
 
-        var dataType = _typeBuilder.BuildType(new StructureDataType(symbol));
+        var semanticDataType = new StructureDataType(symbol, []);
+        var dataType = _typeBuilder.BuildType(semanticDataType);
         var valueReference = new LoweredGlobalReferenceNode(name, dataType);
         var lengthType = new LoweredPrimitiveDataType(Primitive.USize);
         var lengthLiteral = new LoweredLiteralNode(value.Length.ToString(), TokenKind.NumberLiteral, lengthType);
 
-        return BuildNewNode(new StructureDataType(symbol), [valueReference, lengthLiteral]);
+        return BuildNewNode(semanticDataType, [valueReference, lengthLiteral]);
     }
 
     private bool FieldHasGetter(SemanticFieldDeclarationNode field)
@@ -229,7 +172,11 @@ public class Lowerer
     private LoweredFunctionReferenceNode Visit(SemanticFunctionReferenceNode node)
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
-        var name = BuildFunctionName(node.Symbol.SemanticDeclaration!);
+        var structureTypeArguments = node.ObjectInstance?.DataType is StructureDataType structureInstance
+            ? structureInstance.TypeArguments
+            : [];
+
+        var name = _mangler.BuildFunctionName(node.Symbol.SemanticDeclaration!, structureTypeArguments);
 
         return new LoweredFunctionReferenceNode(name, dataType);
     }
@@ -240,8 +187,11 @@ public class Lowerer
         var declaration = node.Symbol.SemanticDeclaration!;
         if (FieldHasGetter(declaration))
         {
-            var identifier = BuildGetterName(declaration);
-            var getterDataType = _typeBuilder.BuildGetterType(declaration);
+            var structureTypeArguments = node.ObjectInstance?.DataType is StructureDataType structureInstance
+                ? structureInstance.TypeArguments
+                : [];
+            var identifier = _mangler.BuildGetterName(declaration, structureTypeArguments);
+            var getterDataType = _typeBuilder.BuildGetterType(declaration, structureTypeArguments);
             var getterReference = new LoweredFunctionReferenceNode(
                 identifier,
                 new LoweredPointerDataType(getterDataType)
@@ -256,14 +206,14 @@ public class Lowerer
 
         if (node.ObjectInstance == null)
         {
-            var name = BuildStaticFieldName(node.Symbol.SemanticDeclaration!);
+            var name = _mangler.BuildStaticFieldName(node.Symbol.SemanticDeclaration!);
             var global = new LoweredGlobalReferenceNode(name, dataType);
 
             return new LoweredLoadNode(global);
         }
 
         var instance = Next(node.ObjectInstance)!;
-        var structure = _tree.GetEnclosingStructure(node.Symbol.SemanticDeclaration!)!;
+        var structure = _semanticTree.GetEnclosingStructure(node.Symbol.SemanticDeclaration!)!;
 
         var fieldOffset = 0;
         if (structure is SemanticClassDeclarationNode classNode)
@@ -336,7 +286,7 @@ public class Lowerer
             .Functions
             .First(x => x.Identifier.Value == "IsEqual");
         var isEqualFunctionType = _typeBuilder.BuildFunctionType(isEqualFunctionDeclaration.Symbol);
-        var isEqualFunctionName = BuildFunctionName(isEqualFunctionDeclaration);
+            var isEqualFunctionName = _mangler.BuildFunctionName(isEqualFunctionDeclaration, structureDataType.TypeArguments);
         var isEqualFunctionReference = new LoweredFunctionReferenceNode(
             isEqualFunctionName,
             new LoweredPointerDataType(isEqualFunctionType)
@@ -349,9 +299,12 @@ public class Lowerer
     {
         if (node.Left is SemanticFieldReferenceNode fieldReference && FieldHasSetter(fieldReference.Symbol.SemanticDeclaration!))
         {
+            var structureTypeArguments = fieldReference.ObjectInstance?.DataType is StructureDataType instanceDataType
+                ? instanceDataType.TypeArguments
+                : [];
             var declaration = fieldReference.Symbol.SemanticDeclaration!;
-            var identifier = BuildSetterName(declaration);
-            var setterDataType = _typeBuilder.BuildSetterType(declaration);
+            var identifier = _mangler.BuildSetterName(declaration, structureTypeArguments);
+            var setterDataType = _typeBuilder.BuildSetterType(declaration, structureTypeArguments);
             var getterReference = new LoweredFunctionReferenceNode(
                 identifier,
                 new LoweredPointerDataType(setterDataType)
@@ -408,7 +361,7 @@ public class Lowerer
         List<LoweredNode> arguments
     )
     {
-        var loweredInstanceType = _typeBuilder.BuildType(new StructureDataType(objectInstanceDataType.Symbol));
+        var loweredInstanceType = _typeBuilder.BuildType(objectInstanceDataType);
         var instancePointerDeclaration = new LoweredVariableDeclarationNode(
             "instancePointer",
             objectInstance,
@@ -425,7 +378,7 @@ public class Lowerer
             arguments.Insert(0, objectInstance);
 
             // Get the type table
-            var typeTableType = _typeBuilder.BuildTypeTableType(classNode);
+            var typeTableType = _typeBuilder.BuildTypeTableType(objectInstanceDataType);
             var typeTableReference = new LoweredFieldReferenceNode(
                 instancePointerReference,
                 0,
@@ -433,7 +386,7 @@ public class Lowerer
             );
 
             // Get the vtable from the type table
-            vtableType = new LoweredPointerDataType(_typeBuilder.BuildVtableType(classNode));
+            vtableType = new LoweredPointerDataType(_typeBuilder.BuildVtableType(objectInstanceDataType));
             vtableReference = new LoweredFieldReferenceNode(
                 typeTableReference,
                 0,
@@ -501,17 +454,35 @@ public class Lowerer
             .Arguments
             .Select(Next)
             .ToList();
+        var structureDataType = (StructureDataType)node.DataType;
+        var loweredNode = BuildNewNode(structureDataType, arguments!);
+        var structureFileScope = SyntaxTree.GetFileScope((SyntaxNode)structureDataType.Symbol.SyntaxDeclaration)!;
 
-        return BuildNewNode(node.DataType, arguments!);
+        _globalLoweringContext.AddGenericStructLazily(
+            (LoweredStructDataType)loweredNode.DataType.Dereference(),
+            structureFileScope,
+            () =>
+            {
+                var declaration = structureDataType.Symbol.SemanticDeclaration!;
+                _typeArgumentResolver.PushTypeArguments(structureDataType.TypeArguments, declaration);
+
+                var loweredDeclaration = BuildStructureDeclaration(declaration, structureDataType.TypeArguments);
+                _typeArgumentResolver.PopTypeArguments();
+
+                return loweredDeclaration;
+            }
+        );
+
+        return loweredNode;
     }
 
-    private LoweredNode BuildNewNode(IDataType dataType, List<LoweredNode> arguments)
+    private LoweredNode BuildNewNode(StructureDataType dataType, List<LoweredNode> arguments)
     {
         // TODO: Make some function for this, or maybe cache it somewhere
         var libcUnsafeSymbol = (StructureSymbol)_stdScope!.ResolveSymbol(["libc", "LibcUnsafe"])!;
         var mallocSymbol = (FunctionSymbol)libcUnsafeSymbol.SyntaxDeclaration.Scope.FindSymbol("malloc")!;
 
-        var mallocFunctionName = BuildFunctionName(mallocSymbol.SemanticDeclaration!);
+        var mallocFunctionName = _mangler.BuildFunctionName(mallocSymbol.SemanticDeclaration!, dataType.TypeArguments);
         var mallocType = _typeBuilder.BuildType(new FunctionDataType(mallocSymbol));
         var mallocReference = new LoweredFunctionReferenceNode(mallocFunctionName, mallocType);
 
@@ -544,6 +515,7 @@ public class Lowerer
         var call = BuildConstructorCall(
             mallocInstanceReference,
             (ISemanticInstantiableStructureDeclaration)declaration,
+            dataType.TypeArguments,
             arguments
         );
         Add(call);
@@ -554,11 +526,12 @@ public class Lowerer
     private LoweredNode BuildConstructorCall(
         LoweredNode instance,
         ISemanticInstantiableStructureDeclaration structure,
+        List<IDataType> structureTypeArguments,
         IEnumerable<LoweredNode> arguments
     )
     {
-        var name = BuildConstructorName(structure);
-        var functionType = _typeBuilder.BuildInitType(structure);
+        var functionType = _typeBuilder.BuildInitType(structure, structureTypeArguments);
+        var name = _mangler.BuildConstructorName(structure, structureTypeArguments);
         var functionReference = new LoweredFunctionReferenceNode(
             name,
             new LoweredPointerDataType(functionType)
@@ -585,7 +558,7 @@ public class Lowerer
         var dataType = _typeBuilder.BuildType(node.DataType);
         if (node.Keyword.Value == "value")
         {
-            var field = _tree.GetEnclosingField(node);
+            var field = _semanticTree.GetEnclosingField(node);
             Debug.Assert(field != null);
 
             return BuildSetterValueKeyword(field);
@@ -610,7 +583,7 @@ public class Lowerer
     private LoweredNode BuildSetterValueKeyword(SemanticFieldDeclarationNode field)
     {
         var dataType = _typeBuilder.BuildType(field.DataType);
-        var setterIdentifier = BuildSetterName(field);
+        var setterIdentifier = _mangler.BuildSetterName(field, _typeArgumentResolver.GetCurrentStructureTypeArguments());
         var setter = _functions[setterIdentifier];
         var valueDeclaration = setter.Parameters.Last();
         var valueReference = new LoweredVariableReferenceNode(valueDeclaration, dataType);
@@ -698,7 +671,11 @@ public class Lowerer
         throw new NotImplementedException();
     }
 
-    private LoweredNode BuildFatPointer(LoweredNode instance, StructureDataType implementorDataType, StructureDataType implementedDataType)
+    private LoweredNode BuildFatPointer(
+        LoweredNode instance,
+        StructureDataType implementorDataType,
+        StructureDataType implementedDataType
+    )
     {
         var implementor = implementorDataType.Symbol.SemanticDeclaration!;
         var implemented = implementedDataType.Symbol.SemanticDeclaration!;
@@ -726,7 +703,7 @@ public class Lowerer
             vtableIndex,
             fatPointerType.FieldTypes[vtableIndex]
         );
-        Add(new LoweredAssignmentNode(vtableReference, BuildVtable(implementor, implemented)));
+        Add(new LoweredAssignmentNode(vtableReference, BuildVtable(implementorDataType, implementedDataType)));
 
         return new LoweredLoadNode(reference);
     }
@@ -783,9 +760,12 @@ public class Lowerer
         return declaration;
     }
 
-    private LoweredFunctionDeclarationNode Visit(SemanticFunctionDeclarationNode node)
-    {
-        var name = BuildFunctionName(node);
+    private LoweredFunctionDeclarationNode Visit(
+        SemanticFunctionDeclarationNode node,
+        List<IDataType>? structureTypeArguments = null
+    )
+{
+        var name = _mangler.BuildFunctionName(node, structureTypeArguments ?? []);
         var parameters = node
             .Parameters
             .Select(Visit)
@@ -825,35 +805,58 @@ public class Lowerer
         return declaration;
     }
 
-    private LoweredStructDeclarationNode Visit(SemanticClassDeclarationNode node)
+    private LoweredNode? Visit(SemanticClassDeclarationNode node)
     {
-        var name = BuildStructName(node);
+        // Classes with type parameters are lazily generated when the types are encountered
+        if (node.Symbol.SyntaxDeclaration.TypeParameters.Count == 0)
+        {
+            var (name, loweredDeclaration) = BuildClassDeclaration(node, []);
+            _structs[name] = loweredDeclaration;
+        }
+
+        return null;
+    }
+
+    private LoweredStructDeclarationNode BuildStructureDeclaration(ISemanticStructureDeclaration node, List<IDataType> typeArguments)
+    {
+        return node switch
+        {
+            SemanticClassDeclarationNode classNode => BuildClassDeclaration(classNode, typeArguments).declaration,
+            _ => throw new InvalidOperationException(),
+        };
+    }
+
+    private (string name, LoweredStructDeclarationNode declaration) BuildClassDeclaration(
+        SemanticClassDeclarationNode node,
+        List<IDataType> typeArguments
+    )
+    {
+        var name = _mangler.BuildStructName(node, typeArguments);
         var fields = node
             .GetAllMemberFields()
-            .Select(Visit)
+            .Select(x => Visit(x, typeArguments))
             .Where(x => x != null)
             .Cast<LoweredFieldDeclarationNode>()
             .ToList();
         var declaration = new LoweredStructDeclarationNode(name, fields, node.Symbol);
-        _structs[name] = declaration;
 
         BuildStaticFields(node.Fields);
 
         foreach (var function in node.Functions)
-            Next(function);
+            Visit(function, typeArguments);
 
-        Visit(node.Init, node);
+        Visit(node.Init, node, typeArguments);
 
-        return declaration;
+        return (name, declaration);
     }
 
-    private LoweredNode? Visit(SemanticFieldDeclarationNode node)
+    private LoweredNode? Visit(SemanticFieldDeclarationNode node, List<IDataType> structureTypeArguments)
     {
         var dataType = _typeBuilder.BuildType(node.DataType);
         if (FieldHasGetter(node))
         {
-            var getterIdentifier = BuildGetterName(node);
-            var getterDataType = _typeBuilder.BuildGetterType(node);
+            var getterIdentifier = _mangler.BuildGetterName(node, structureTypeArguments);
+            var getterDataType = _typeBuilder.BuildGetterType(node, structureTypeArguments);
             var parameters = getterDataType
                 .ParameterTypes
                 .Select((x, i) => new LoweredParameterNode(i.ToString(), x))
@@ -869,7 +872,7 @@ public class Lowerer
 
             _functions[getterIdentifier] = getterFunction;
             getterFunction.Body = node.Getter == null
-                ? BuildLazyFieldGetter(node)
+            ? BuildLazyFieldGetter(node, structureTypeArguments)
                 : Visit(node.Getter);
         }
 
@@ -877,8 +880,8 @@ public class Lowerer
         {
             Debug.Assert(FieldHasGetter(node));
 
-            var setterIdentifier = BuildSetterName(node);
-            var setterDataType = _typeBuilder.BuildSetterType(node);
+            var setterIdentifier = _mangler.BuildSetterName(node, structureTypeArguments);
+            var setterDataType = _typeBuilder.BuildSetterType(node, structureTypeArguments);
             var parameters = setterDataType
                 .ParameterTypes
                 .Select((x, i) => new LoweredParameterNode(i.ToString(), x))
@@ -894,7 +897,7 @@ public class Lowerer
 
             _functions[setterIdentifier] = setterFunction;
             setterFunction.Body = node.Setter == null
-                ? BuildLazyFieldSetter(node)
+                ? BuildLazyFieldSetter(node, structureTypeArguments)
                 : Visit(node.Setter);
 
             if (setterFunction.Body.Expressions.LastOrDefault() is not LoweredReturnNode)
@@ -911,12 +914,12 @@ public class Lowerer
         return new LoweredFieldDeclarationNode(identifier, value, dataType);
     }
 
-    private LoweredBlockNode BuildLazyFieldGetter(SemanticFieldDeclarationNode field)
+    private LoweredBlockNode BuildLazyFieldGetter(SemanticFieldDeclarationNode field, List<IDataType> structureTypeArguments)
     {
         // TODO: Add lock (or atomic operation?)
 
         // static let `field.get.initialised` bool = false;
-        var initialisedDeclarationName = BuildGetterName(field) + ".initialised";
+        var initialisedDeclarationName = _mangler.BuildGetterName(field, structureTypeArguments) + ".initialised";
         var boolType = new LoweredPrimitiveDataType(Primitive.Bool);
         var falseLiteral = new LoweredLiteralNode(
             string.Empty,
@@ -933,7 +936,7 @@ public class Lowerer
 
         // static let `field.get.value` T = default;
         var dataType = _typeBuilder.BuildType(field.DataType);
-        var valueDeclarationName = BuildGetterName(field) + ".value";
+        var valueDeclarationName = _mangler.BuildGetterName(field, structureTypeArguments) + ".value";
         var valueDeclaration = new LoweredGlobalDeclarationNode(
             valueDeclarationName,
             BuildDefaultKeyword(dataType),
@@ -989,13 +992,13 @@ public class Lowerer
         return block;
     }
 
-    private LoweredBlockNode BuildLazyFieldSetter(SemanticFieldDeclarationNode field)
+    private LoweredBlockNode BuildLazyFieldSetter(SemanticFieldDeclarationNode field, List<IDataType> structureTypeArguments)
     {
         var voidType = new LoweredPrimitiveDataType(Primitive.Void);
         var block = new LoweredBlockNode([], returnValueDeclaration: null, voidType);
 
         var dataType = _typeBuilder.BuildType(field.DataType);
-        var valueDeclarationName = BuildGetterName(field) + ".value";
+        var valueDeclarationName = _mangler.BuildGetterName(field, structureTypeArguments) + ".value";
         var valueReference = new LoweredGlobalReferenceNode(valueDeclarationName, dataType);
         var value = BuildSetterValueKeyword(field);
         var assignment = new LoweredAssignmentNode(valueReference, value);
@@ -1010,13 +1013,13 @@ public class Lowerer
         {
             if (FieldHasGetter(staticField))
             {
-                Visit(staticField);
+                Visit(staticField, structureTypeArguments: []);
 
                 continue;
             }
 
             var ffiAttribute = staticField.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
-            var staticFieldName = BuildStaticFieldName(staticField);
+            var staticFieldName = _mangler.BuildStaticFieldName(staticField);
             var staticFieldType = _typeBuilder.BuildType(staticField.DataType);
 
             LoweredNode? staticFieldValue;
@@ -1046,14 +1049,25 @@ public class Lowerer
         }
     }
 
-    private LoweredFunctionDeclarationNode Visit(SemanticInitNode node, ISemanticStructureDeclaration parentStructure)
+    private LoweredFunctionDeclarationNode Visit(
+        SemanticInitNode node,
+        ISemanticStructureDeclaration parentStructure,
+        List<IDataType> structureTypeArguments
+    )
     {
         var block = new LoweredBlockNode([], null, new LoweredPrimitiveDataType(Primitive.Void));
         var previousBlock = _currentBlock;
         _currentBlock = block;
 
         // Insert default values
-        var structureType = _typeBuilder.BuildType(new StructureDataType(parentStructure.Symbol));
+        var structureTypeParameters = parentStructure
+            .Symbol
+            .SyntaxDeclaration
+            .TypeParameters
+            .Select(x => new TypeParameterDataType(x.Symbol))
+            .Cast<IDataType>()
+            .ToList();
+        var structureType = _typeBuilder.BuildType(new StructureDataType(parentStructure.Symbol, structureTypeParameters));
         var instance = new LoweredKeywordValueNode(KeywordValueKind.Self, [], structureType);
 
         int fieldOffset = parentStructure is SemanticClassDeclarationNode
@@ -1088,6 +1102,7 @@ public class Lowerer
             BuildConstructorCall(
                 instance,
                 (SemanticClassDeclarationNode)classNode2.InheritedClass!.SemanticDeclaration!,
+                structureTypeArguments,
                 baseCallArguments
             );
         }
@@ -1095,8 +1110,9 @@ public class Lowerer
         if (parentStructure is SemanticClassDeclarationNode parentClass)
         {
             // Insert type table
-            var typeTable = BuildTypeTable(parentClass);
-            var typeTableType = _typeBuilder.BuildTypeTableType(parentClass);
+            var structureDataType = new StructureDataType(parentClass.Symbol, structureTypeArguments);
+            var typeTable = BuildTypeTable(structureDataType);
+            var typeTableType = _typeBuilder.BuildTypeTableType(structureDataType);
             var fieldReference = new LoweredFieldReferenceNode(instance, 0, typeTableType);
             var typeTableAssignment = new LoweredAssignmentNode(fieldReference, typeTable);
             Add(typeTableAssignment);
@@ -1106,7 +1122,10 @@ public class Lowerer
         }
 
         // Parameters need to be evaluated before evaluating the body
-        var functionType = _typeBuilder.BuildInitType((ISemanticInstantiableStructureDeclaration)parentStructure);
+        var functionType = _typeBuilder.BuildInitType(
+            (ISemanticInstantiableStructureDeclaration)parentStructure,
+            structureTypeArguments
+        );
         var instanceParameter = new LoweredParameterNode("instance", functionType.ParameterTypes.First());
         var parameters = node
             .Parameters
@@ -1126,7 +1145,7 @@ public class Lowerer
             Add(returnNode);
         }
 
-        var name = BuildConstructorName(parentStructure);
+        var name = _mangler.BuildConstructorName(parentStructure, structureTypeArguments);
         _currentBlock = previousBlock;
 
         var function = new LoweredFunctionDeclarationNode(
@@ -1142,18 +1161,21 @@ public class Lowerer
         return function;
     }
 
-    private LoweredNode BuildVtable(ISemanticStructureDeclaration implementor, ISemanticStructureDeclaration implemented)
+    private LoweredNode BuildVtable(StructureDataType implementorDataType, StructureDataType implementedDataType)
     {
+        var implementor = implementorDataType.Symbol.SemanticDeclaration!;
+        var implemented = implementedDataType.Symbol.SemanticDeclaration!;
+
         var functionReferences = new List<LoweredNode>();
         foreach (var function in implementor.Functions.Where(x => !x.IsStatic))
         {
-            var functionName = BuildFunctionName(function);
+            var functionName = _mangler.BuildFunctionName(function, implementorDataType.TypeArguments);
             var functionType = _typeBuilder.BuildType(new FunctionDataType(function.Symbol));
             var reference = new LoweredFunctionReferenceNode(functionName, functionType);
             functionReferences.Add(reference);
         }
 
-        var vtableType = _typeBuilder.BuildVtableType(implemented);
+        var vtableType = _typeBuilder.BuildVtableType(implementedDataType);
         var structValue = new LoweredConstStructNode(functionReferences, vtableType);
         var global = new LoweredGlobalDeclarationNode(
             vtableType.Name!,
@@ -1166,13 +1188,13 @@ public class Lowerer
         return new LoweredGlobalReferenceNode(vtableType.Name!, vtableType);
     }
 
-    private LoweredNode BuildTypeTable(SemanticClassDeclarationNode classNode)
+    private LoweredNode BuildTypeTable(StructureDataType classDataType)
     {
         // Prepare the vtable
-        var vtableReference = BuildVtable(classNode, classNode);
+        var vtableReference = BuildVtable(classDataType, classDataType);
 
         // Build the type table
-        var typeTableType = _typeBuilder.BuildTypeTableType(classNode);
+        var typeTableType = _typeBuilder.BuildTypeTableType(classDataType);
         var fields = new List<LoweredNode>()
         {
             vtableReference,

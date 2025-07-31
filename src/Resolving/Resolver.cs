@@ -96,6 +96,9 @@ public class Resolver
                 Next(parameterNode.Type, node);
                 ResolveNode(parameterNode.Type);
                 break;
+            case SyntaxTypeNode typeNode:
+                Visit(typeNode);
+                break;
             case SyntaxClassDeclarationNode classDeclarationNode:
                 Visit(classDeclarationNode);
                 break;
@@ -124,6 +127,18 @@ public class Resolver
         // Primitives don't need to be resolved
         if (typeNode.TypeNames.SingleOrDefault()?.Kind != TokenKind.Identifier)
             return;
+
+        if (typeNode.TypeNames.Count == 1)
+        {
+            var typeScope = SyntaxTree.GetTypeScope(typeNode);
+            var typeSymbol = typeScope?.FindSymbol(typeNode.TypeNames.First().Value);
+            if (typeSymbol != null)
+            {
+                typeNode.ResolvedSymbol = typeSymbol;
+
+                return;
+            }
+        }
 
         var typeNames = typeNode.TypeNames.Select(x => x.Value).ToList();
         var resolvedType = _syntaxTree.File.ResolveStructure(typeNames);
@@ -184,7 +199,7 @@ public class Resolver
 
     private void Visit(SyntaxBlockNode node)
     {
-        var parentScope = _syntaxTree.GetEnclosingBlock(node)?.Scope;
+        var parentScope = SyntaxTree.GetEnclosingBlock(node)?.Scope;
         if (node.Parent != null)
             Debug.Assert(parentScope != null);
 
@@ -223,8 +238,26 @@ public class Resolver
             Next(node.Body, node);
     }
 
+    private void Visit(SyntaxTypeNode node)
+    {
+        foreach (var typeArgument in node.TypeArguments)
+        {
+            Next(typeArgument, node);
+            ResolveNode(typeArgument);
+        }
+    }
+
+    private void Visit(SyntaxTypeParameterNode node, SyntaxNode parent, ISymbol symbol)
+    {
+        node.Parent = parent;
+        node.Symbol.DeclarationSymbol = symbol;
+    }
+
     private void Visit(SyntaxClassDeclarationNode node)
     {
+        foreach (var typeParameter in node.TypeParameters)
+            Visit(typeParameter, node, node.Symbol!);
+
         foreach (var subType in node.SubTypes)
         {
             Next(subType, node);

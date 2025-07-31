@@ -35,7 +35,7 @@ public class LlvmContentEmitter
         _module = emitterContext.LlvmModule;
         _typeBuilder = emitterContext.LlvmTypeBuilder;
         _specialValueBuilder = new LlvmSpecialValueBuilder(emitterContext, _typeBuilder);
-        var (diBuilder, compileUnit, diFile) = SetUpDiBuilder(_context, _module, tree.FilePath);
+        var (diBuilder, compileUnit, diFile) = SetUpDiBuilder(_context, _module, tree.FileScope.FilePath);
         _diBuilder = diBuilder;
         _compileUnit = compileUnit;
         _diFile = diFile;

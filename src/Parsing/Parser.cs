@@ -198,29 +198,29 @@ public class Parser
             while (AdvanceIf(TokenKind.Comma));
         }
 
-        var typeParameters = new List<Token>();
+        var typeScope = new TypeScope(parent: null);
+        var typeParameters = new List<SyntaxTypeParameterNode>();
         if (Match(TokenKind.OpenBracket))
-            typeParameters = ParseTypeParameters();
+            typeParameters = ParseTypeParameters(typeScope);
 
         EatExpected(TokenKind.OpenBrace);
 
-        var (declarations, constructor, scope) = ParseStructureBody(identifier);
+        var (declarations, constructor, scope) = ParseStructureBody(identifier, typeScope);
         var end = EatExpected(TokenKind.ClosedBrace).Span;
 
         var node = new SyntaxClassDeclarationNode(
             identifier,
             subTypes,
+            typeParameters,
             constructor,
             declarations,
             isInheritable,
             scope,
+            typeScope,
             start.Combine(end)
         );
         if (_fileScope.Namespace.FindSymbol(node.Identifier.Value) != null)
             _diagnostics.ReportSymbolAlreadyExists(node.Identifier);
-
-        foreach (var typeParameter in typeParameters)
-            scope.AddTypeParameter(new TypeSymbol(typeParameter.Value));
 
         var symbol = new StructureSymbol(identifier.Value, node, _fileScope.Namespace);
         node.Symbol = symbol;
@@ -229,14 +229,19 @@ public class Parser
         return node;
     }
 
-    private List<Token> ParseTypeParameters()
+    private List<SyntaxTypeParameterNode> ParseTypeParameters(TypeScope typeScope)
     {
+
         EatExpected(TokenKind.OpenBracket);
 
-        var typeParameters = new List<Token>();
+        var typeParameters = new List<SyntaxTypeParameterNode>();
         do
         {
-            typeParameters.Add(EatExpected(TokenKind.Identifier));
+            var identifier = EatExpected(TokenKind.Identifier);
+            var symbol = new TypeSymbol(identifier.Value, declarationSymbol: null);
+            var typeParameter = new SyntaxTypeParameterNode(identifier, symbol);
+            typeScope.AddSymbol(symbol);
+            typeParameters.Add(typeParameter);
         }
         while (AdvanceIf(TokenKind.Comma));
 
@@ -245,7 +250,10 @@ public class Parser
         return typeParameters;
     }
 
-    private (List<SyntaxNode>, SyntaxInitNode? constructor, StructureScope scope) ParseStructureBody(Token identifier)
+    private (List<SyntaxNode>, SyntaxInitNode? constructor, StructureScope scope) ParseStructureBody(
+        Token identifier,
+        TypeScope typeScope
+    )
     {
         var declarations = new List<SyntaxNode>();
         var scope = new StructureScope(_fileScope.Namespace);
@@ -254,7 +262,7 @@ public class Parser
         {
             try
             {
-                var declaration = ParseStructureDeclaration(scope);
+                var declaration = ParseStructureDeclaration(scope, typeScope);
                 if (declaration is SyntaxInitNode initNode)
                 {
                     if (constructor != null)
@@ -276,7 +284,7 @@ public class Parser
         return (declarations, constructor, scope);
     }
 
-    private SyntaxNode ParseStructureDeclaration(StructureScope scope)
+    private SyntaxNode ParseStructureDeclaration(StructureScope scope, TypeScope typeScope)
     {
         var attributes = new List<SyntaxAttributeNode>();
         while (Match(TokenKind.Hash))
@@ -286,7 +294,7 @@ public class Parser
         bool isStatic = AdvanceIf(TokenKind.Static);
         bool isOverride = AdvanceIf(TokenKind.Override);
         if (Match(TokenKind.Func))
-            return ParseFunction(isPublic, isStatic, isOverride, attributes, scope);
+            return ParseFunction(isPublic, isStatic, isOverride, attributes, scope, typeScope);
 
         if (_current is { Kind: TokenKind.Identifier, Value: "init" })
             return ParseInit();
@@ -498,7 +506,8 @@ public class Parser
         bool isStatic,
         bool isOverride,
         List<SyntaxAttributeNode> attributes,
-        StructureScope? scope = null
+        StructureScope? scope = null,
+        TypeScope? parentTypeScope = null
     )
     {
         var start = EatExpected(TokenKind.Func).Span;
@@ -511,6 +520,7 @@ public class Parser
             ? null
             : ParseBlock();
 
+        var typeScope = new TypeScope(parentTypeScope);
         var node = new SyntaxFunctionDeclarationNode(
             identifier,
             parameters,
@@ -519,6 +529,7 @@ public class Parser
             isPublic,
             isStatic,
             isOverride,
+            typeScope,
             start.Combine(_previous!.Span)
         )
         {

@@ -6,21 +6,21 @@ namespace Caique.Lowering;
 
 public class LoweredTree(
     string moduleName,
+    FileScope fileScope,
     Dictionary<string, LoweredFunctionDeclarationNode> functions,
     Dictionary<string, LoweredStructDeclarationNode> structs,
-    Dictionary<string, LoweredGlobalDeclarationNode> globals,
-    string filePath
+    Dictionary<string, LoweredGlobalDeclarationNode> globals
 )
 {
     public string ModuleName { get; } = moduleName;
+
+    public FileScope FileScope { get; } = fileScope;
 
     public Dictionary<string, LoweredFunctionDeclarationNode> Functions { get; } = functions;
 
     public Dictionary<string, LoweredStructDeclarationNode> Structs { get; } = structs;
 
     public Dictionary<string, LoweredGlobalDeclarationNode> Globals { get; } = globals;
-
-    public string FilePath { get; } = filePath;
 }
 
 public abstract class LoweredNode(ILoweredDataType dataType)

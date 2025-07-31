@@ -14,7 +14,7 @@ public class CompilerConstantResolver
         _compilationContext = compilationContext;
 
         var stringSymbol = compilationContext.StdScope.ResolveStructure(["std", "prelude", "String"])!.SyntaxDeclaration.Symbol!;
-        _stringType = new StructureDataType(stringSymbol);
+        _stringType = new StructureDataType(stringSymbol, []);
     }
 
     public SemanticLiteralNode? Resolve(string name, TextSpan span)
