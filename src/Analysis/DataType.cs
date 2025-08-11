@@ -243,7 +243,15 @@ public class StructureDataType(StructureSymbol symbol, List<IDataType> typeArgum
     }
 
     public override int GetHashCode()
-        => Symbol.SyntaxDeclaration.GetHashCode();
+    {
+        var hashCode = new HashCode();
+        hashCode.Add(Symbol.SyntaxDeclaration);
+
+        foreach (var typeArgument in TypeArguments)
+            hashCode.Add(typeArgument);
+
+        return hashCode.ToHashCode();
+    }
 
     public TypeEquivalence IsEquivalent(IDataType other)
     {
@@ -279,9 +287,17 @@ public class StructureDataType(StructureSymbol symbol, List<IDataType> typeArgum
         => Symbol is StructureSymbol { SyntaxDeclaration: SyntaxProtocolDeclarationNode };
 }
 
-public class FunctionDataType(FunctionSymbol symbol) : IDataType
+public class FunctionDataType(
+    FunctionSymbol symbol,
+    StructureDataType? instanceDataType,
+    List<IDataType> typeArguments
+) : IDataType
 {
     public FunctionSymbol Symbol { get; } = symbol;
+
+    public StructureDataType? InstanceDataType { get; } = instanceDataType;
+
+    public List<IDataType> TypeArguments { get; } = typeArguments;
 
     public override string ToString()
     {
@@ -301,7 +317,15 @@ public class FunctionDataType(FunctionSymbol symbol) : IDataType
     }
 
     public override int GetHashCode()
-        => Symbol.SyntaxDeclaration.GetHashCode();
+    {
+        var hashCode = new HashCode();
+        hashCode.Add(Symbol.SyntaxDeclaration);
+
+        foreach (var typeArgument in TypeArguments)
+            hashCode.Add(typeArgument);
+
+        return hashCode.ToHashCode();
+    }
 
     public TypeEquivalence IsEquivalent(IDataType other)
     {

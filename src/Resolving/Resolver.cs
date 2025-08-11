@@ -44,6 +44,9 @@ public class Resolver
             case SyntaxGroupNode groupNode:
                 Next(groupNode.Value, node);
                 break;
+            case SyntaxIdentifierNode identifierNode:
+                Visit(identifierNode);
+                break;
             case SyntaxUnaryNode unaryNode:
                 Next(unaryNode.Value, node);
                 break;
@@ -57,6 +60,7 @@ public class Resolver
                 break;
             case SyntaxMemberAccessNode memberAccessNode:
                 Next(memberAccessNode.Left, node);
+                Next(memberAccessNode.IdentifierNode, node);
                 break;
             case SyntaxCallNode callNode:
                 Visit(callNode);
@@ -154,6 +158,12 @@ public class Resolver
             _diagnostics.ReportInvalidNamespace(node.Identifiers);
     }
 
+    private void Visit(SyntaxIdentifierNode node)
+    {
+        foreach (var typeArgument in node.TypeArguments)
+            Next(typeArgument, node);
+    }
+
     private void Visit(SyntaxCallNode node)
     {
         Next(node.Left, node);
@@ -222,6 +232,9 @@ public class Resolver
 
     private void Visit(SyntaxFunctionDeclarationNode node)
     {
+        foreach (var typeParameter in node.TypeParameters)
+            Visit(typeParameter, node, node.Symbol!);
+
         foreach (var attribute in node.Attributes)
             Next(attribute, node);
 

@@ -155,10 +155,16 @@ public class SyntaxLiteralNode(Token value)
     public Token Value { get; } = value;
 }
 
-public class SyntaxIdentifierNode(List<Token> identifierList)
-    : SyntaxNode(identifierList.First().Span.Combine(identifierList.Last().Span))
+public class SyntaxIdentifierNode(
+    List<Token> identifierList,
+    List<SyntaxTypeNode> typeArguments,
+    TextSpan span
+)
+    : SyntaxNode(span)
 {
     public List<Token> IdentifierList { get; } = identifierList;
+
+    public List<SyntaxTypeNode> TypeArguments { get; } = typeArguments;
 }
 
 public class SyntaxUnaryNode(TokenKind op, SyntaxNode value, TextSpan span)
@@ -187,15 +193,19 @@ public class SyntaxAssignmentNode(SyntaxNode left, SyntaxNode right)
     public SyntaxNode Right { get; } = right;
 }
 
-public class SyntaxMemberAccessNode(SyntaxNode left, Token identifier)
-    : SyntaxNode(left.Span.Combine(identifier.Span))
+public class SyntaxMemberAccessNode(SyntaxNode left, SyntaxIdentifierNode identifierNode)
+    : SyntaxNode(left.Span.Combine(identifierNode.Span))
 {
     public SyntaxNode Left { get; } = left;
 
-    public Token Identifier { get; } = identifier;
+    public SyntaxIdentifierNode IdentifierNode { get; } = identifierNode;
 }
 
-public class SyntaxCallNode(SyntaxNode left, List<SyntaxNode> arguments, TextSpan span)
+public class SyntaxCallNode(
+    SyntaxNode left,
+    List<SyntaxNode> arguments,
+    TextSpan span
+    )
     : SyntaxNode(span)
 {
     public SyntaxNode Left { get; } = left;
@@ -313,6 +323,7 @@ public interface ISyntaxFunctionDeclaration
 
 public class SyntaxFunctionDeclarationNode(
     Token identifier,
+    List<SyntaxTypeParameterNode> typeParameters,
     List<SyntaxParameterNode> parameters,
     SyntaxTypeNode? returnType,
     SyntaxBlockNode? body,
@@ -325,6 +336,8 @@ public class SyntaxFunctionDeclarationNode(
     : SyntaxNode(span), ISyntaxFunctionDeclaration
 {
     public Token Identifier { get; } = identifier;
+
+    public List<SyntaxTypeParameterNode> TypeParameters { get; } = typeParameters;
 
     public List<SyntaxParameterNode> Parameters { get; } = parameters;
 

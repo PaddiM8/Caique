@@ -180,7 +180,13 @@ public class Analyser
             .Select(Next)
             .Select(x => x.DataType)
             .ToList();
-        var typeCheckedArguments = TypeCheckArguments(structureDataType, parameterTypes ?? [], arguments, node.Span);
+        var typeCheckedArguments = TypeCheckArguments(
+            functionDataType: null,
+            structureDataType,
+            parameterTypes ?? [],
+            arguments,
+            node.Span
+        );
 
         return new SemanticKeywordValueNode(
             node.Keyword,
@@ -213,7 +219,12 @@ public class Analyser
             _diagnostics.ReportWrongNumberOfArguments(1, arguments.Count, node.Span);
         }
 
-        return new SemanticKeywordValueNode(node.Keyword, arguments, node.Span, new PrimitiveDataType(Primitive.Int64));
+        return new SemanticKeywordValueNode(
+            node.Keyword,
+            arguments,
+            node.Span,
+            new PrimitiveDataType(Primitive.USize)
+        );
     }
 
     private SemanticLiteralNode NextGetCompilerConstantKeyword(SyntaxKeywordValueNode node, List<SemanticNode>? arguments)
@@ -332,80 +343,7 @@ public class Analyser
     private SemanticNode Visit(SyntaxIdentifierNode node)
     {
         if (node.IdentifierList.Count > 1)
-        {
-            var namespaceNames = node.IdentifierList
-                .Take(node.IdentifierList.Count - 1)
-                .Select(x => x.Value)
-                .ToList();
-            var lastIdentifier = node.IdentifierList.Last();
-
-            var foundSymbol = _syntaxTree.File.ResolveSymbol(namespaceNames);
-            if (foundSymbol == null)
-            {
-                _diagnostics.ReportNotFound(node.IdentifierList);
-                throw Recover();
-            }
-
-            if (foundSymbol is not StructureSymbol structureSymbol)
-            {
-                if (foundSymbol is EnumSymbol enumSymbol)
-                    return ResolveEnum(enumSymbol, lastIdentifier);
-
-                _diagnostics.ReportNotFound(node.IdentifierList);
-                throw Recover();
-            }
-
-            var identifierSymbol = structureSymbol.SyntaxDeclaration.Scope.FindSymbol(lastIdentifier.Value);
-            if (identifierSymbol == null)
-            {
-                _diagnostics.ReportNotFound(node.IdentifierList);
-                throw Recover();
-            }
-
-            if (identifierSymbol is FunctionSymbol functionSymbol)
-            {
-                if (!functionSymbol.SyntaxDeclaration.IsStatic)
-                    _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
-
-                if (!functionSymbol.SyntaxDeclaration.IsPublic &&
-                    structureSymbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
-                {
-                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
-                }
-
-                var dataType = new FunctionDataType(functionSymbol);
-
-                return new SemanticFunctionReferenceNode(
-                    lastIdentifier,
-                    functionSymbol,
-                    objectInstance: null,
-                    dataType
-                );
-            }
-
-            if (identifierSymbol is FieldSymbol fieldSymbol)
-            {
-                if (!fieldSymbol.SyntaxDeclaration.IsStatic)
-                    _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
-
-                if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
-                    structureSymbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
-                {
-                    _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
-                }
-
-                var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
-
-                return new SemanticFieldReferenceNode(
-                    lastIdentifier,
-                    fieldSymbol,
-                    objectInstance: null,
-                    dataType
-                );
-            }
-
-            throw new NotImplementedException();
-        }
+            return AnalyseNamespacedIdentifier(node);
 
         var identifier = node.IdentifierList.Single();
         if (identifier.Value == "value")
@@ -417,21 +355,37 @@ public class Analyser
 
         var variableSymbol = SyntaxTree.GetLocalScope(node)?.FindSymbol(identifier.Value);
         if (variableSymbol != null)
+        {
+            if (node.TypeArguments.Count > 0)
+                _diagnostics.ReportMisplacedTypeArguments(node.Span);
+
             return new SemanticVariableReferenceNode(identifier, variableSymbol);
+        }
 
         var structure = SyntaxTree.GetEnclosingStructure(node);
         Debug.Assert(structure?.Symbol != null);
 
         var symbolFromStructure = structure?.Scope.FindSymbol(identifier.Value);
-        if (symbolFromStructure is FunctionSymbol functionSymbol2)
+        if (symbolFromStructure is FunctionSymbol functionSymbol)
         {
-            var dataType = new FunctionDataType(functionSymbol2);
-            var instance = functionSymbol2.SyntaxDeclaration.IsStatic
+            var typeArguments = node
+                .TypeArguments
+                .Select(x => Visit(x).DataType)
+                .ToList();
+            var instance = functionSymbol.SyntaxDeclaration.IsStatic
                 ? null
                 : BuildSelfNode(structure!.Symbol);
+            var dataType = new FunctionDataType(
+                functionSymbol,
+                instance?.DataType as StructureDataType,
+                typeArguments
+            );
 
-            return new SemanticFunctionReferenceNode(identifier, functionSymbol2, instance, dataType);
+            return new SemanticFunctionReferenceNode(identifier, functionSymbol, instance, dataType);
         }
+
+        if (node.TypeArguments.Count > 0)
+            _diagnostics.ReportMisplacedTypeArguments(node.Span);
 
         if (symbolFromStructure is FieldSymbol fieldSymbol2)
         {
@@ -453,7 +407,7 @@ public class Analyser
             _diagnostics.ReportExpectedValueGotType(identifier);
 
             if (node.Parent is SyntaxMemberAccessNode memberAccess)
-                _diagnostics.HintColonInsteadOfDot(memberAccess.Identifier.Span);
+                _diagnostics.HintColonInsteadOfDot(memberAccess.IdentifierNode.IdentifierList[0].Span);
         }
         else
         {
@@ -461,6 +415,86 @@ public class Analyser
         }
 
         throw Recover();
+    }
+
+    private SemanticNode AnalyseNamespacedIdentifier(SyntaxIdentifierNode node)
+    {
+        var namespaceNames = node.IdentifierList
+            .Take(node.IdentifierList.Count - 1)
+            .Select(x => x.Value)
+            .ToList();
+        var lastIdentifier = node.IdentifierList.Last();
+
+        var foundSymbol = _syntaxTree.File.ResolveSymbol(namespaceNames);
+        if (foundSymbol == null)
+        {
+            _diagnostics.ReportNotFound(node.IdentifierList);
+            throw Recover();
+        }
+
+        if (foundSymbol is not StructureSymbol structureSymbol)
+        {
+            if (foundSymbol is EnumSymbol enumSymbol)
+                return ResolveEnum(enumSymbol, lastIdentifier);
+
+            _diagnostics.ReportNotFound(node.IdentifierList);
+            throw Recover();
+        }
+
+        var identifierSymbol = structureSymbol.SyntaxDeclaration.Scope.FindSymbol(lastIdentifier.Value);
+        if (identifierSymbol == null)
+        {
+            _diagnostics.ReportNotFound(node.IdentifierList);
+            throw Recover();
+        }
+
+        if (identifierSymbol is FunctionSymbol functionSymbol)
+        {
+            if (!functionSymbol.SyntaxDeclaration.IsStatic)
+                _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
+
+            if (!functionSymbol.SyntaxDeclaration.IsPublic &&
+                structureSymbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
+            {
+                _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
+            }
+
+            var typeArguments = node
+                .TypeArguments
+                .Select(x => Visit(x).DataType)
+                .ToList();
+            var dataType = new FunctionDataType(functionSymbol, instanceDataType: null, typeArguments);
+
+            return new SemanticFunctionReferenceNode(
+                lastIdentifier,
+                functionSymbol,
+                objectInstance: null,
+                dataType
+            );
+        }
+
+        if (identifierSymbol is FieldSymbol fieldSymbol)
+        {
+            if (!fieldSymbol.SyntaxDeclaration.IsStatic)
+                _diagnostics.ReportNonStaticSymbolReferencedAsStatic(lastIdentifier);
+
+            if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
+                structureSymbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
+            {
+                _diagnostics.ReportSymbolIsPrivate(lastIdentifier);
+            }
+
+            var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
+
+            return new SemanticFieldReferenceNode(
+                lastIdentifier,
+                fieldSymbol,
+                objectInstance: null,
+                dataType
+            );
+        }
+
+        throw new NotImplementedException();
     }
 
     private SemanticKeywordValueNode? TryResolveSetterValueKeywordNode(SyntaxIdentifierNode node)
@@ -599,20 +633,29 @@ public class Analyser
     private SemanticNode Visit(SyntaxMemberAccessNode node)
     {
         var left = Next(node.Left);
+        var identifier = node.IdentifierNode.IdentifierList[0];
         if (left.DataType is StructureDataType structureDataType)
         {
-            var symbol = structureDataType.Symbol.SyntaxDeclaration.ResolveSymbol(node.Identifier.Value);
+            var symbol = structureDataType
+                .Symbol
+                .SyntaxDeclaration
+                .ResolveSymbol(identifier.Value);
             if (symbol == null)
             {
-                _diagnostics.ReportMemberNotFound(node.Identifier, left.DataType);
+                _diagnostics.ReportMemberNotFound(identifier, left.DataType);
                 throw Recover();
             }
 
             if (symbol is FunctionSymbol functionSymbol)
             {
-                var dataType = new FunctionDataType(functionSymbol);
+                var typeArguments = node
+                    .IdentifierNode
+                    .TypeArguments
+                    .Select(x => Visit(x).DataType)
+                    .ToList();
+                var dataType = new FunctionDataType(functionSymbol, structureDataType, typeArguments);
                 if (node.Parent is not SyntaxCallNode)
-                    _diagnostics.ReportNonStaticFunctionReferenceMustBeCalled(node.Identifier);
+                    _diagnostics.ReportNonStaticFunctionReferenceMustBeCalled(identifier);
 
                 if (functionSymbol.SyntaxDeclaration.IsStatic)
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(functionSymbol.SyntaxDeclaration.Identifier);
@@ -620,11 +663,11 @@ public class Analyser
                 if (!functionSymbol.SyntaxDeclaration.IsPublic &&
                     structureDataType.Symbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
                 {
-                    _diagnostics.ReportSymbolIsPrivate(node.Identifier);
+                    _diagnostics.ReportSymbolIsPrivate(identifier);
                 }
 
                 return new SemanticFunctionReferenceNode(
-                    node.Identifier,
+                    identifier,
                     functionSymbol,
                     objectInstance: left,
                     dataType
@@ -632,8 +675,11 @@ public class Analyser
             }
             else if (symbol is FieldSymbol fieldSymbol)
             {
+                if (node.IdentifierNode.TypeArguments.Count > 0)
+                    _diagnostics.ReportMisplacedTypeArguments(node.IdentifierNode.Span);
+
                 var dataType = Next(fieldSymbol.SyntaxDeclaration.Type).DataType;
-                dataType = ResolvePotentialTypeParametersForStructure(dataType, structureDataType);
+                dataType = ResolvePotentialTypeParametersFromStructure(dataType, structureDataType);
 
                 if (fieldSymbol.SyntaxDeclaration.IsStatic)
                     _diagnostics.ReportStaticSymbolReferencedAsNonStatic(fieldSymbol.SyntaxDeclaration.Identifier);
@@ -641,11 +687,11 @@ public class Analyser
                 if (!fieldSymbol.SyntaxDeclaration.IsPublic &&
                     structureDataType.Symbol.SyntaxDeclaration != SyntaxTree.GetEnclosingStructure(node))
                 {
-                    _diagnostics.ReportSymbolIsPrivate(node.Identifier);
+                    _diagnostics.ReportSymbolIsPrivate(identifier);
                 }
 
                 return new SemanticFieldReferenceNode(
-                    node.Identifier,
+                    identifier,
                     fieldSymbol,
                     objectInstance: left,
                     dataType
@@ -657,11 +703,64 @@ public class Analyser
             }
         }
 
-        _diagnostics.ReportMemberNotFound(node.Identifier, left.DataType);
+        _diagnostics.ReportMemberNotFound(identifier, left.DataType);
         throw Recover();
     }
 
-    private IDataType ResolvePotentialTypeParametersForStructure(IDataType dataType, StructureDataType parentStructureDataType)
+    private IDataType ResolvePotentialTypeParametersFromFunction(IDataType dataType, FunctionDataType functionDataType)
+    {
+        if (dataType is TypeParameterDataType typeParameterDataType)
+        {
+            foreach (var (i, typeParameter) in functionDataType.Symbol.SyntaxDeclaration.TypeParameters.Index())
+            {
+                if (typeParameter.Symbol == typeParameterDataType.Symbol)
+                {
+                    return functionDataType.TypeArguments.ElementAtOrDefault(i)
+                        ?? typeParameterDataType;
+                }
+            }
+
+            return typeParameterDataType;
+        }
+
+        // Since function data types can contain type parameters, we may need to resolve those.
+        if (dataType is FunctionDataType otherFunctionDataType)
+        {
+            var typeArguments = otherFunctionDataType
+                .TypeArguments
+                .Select(x => ResolvePotentialTypeParametersFromFunction(x, functionDataType))
+                .ToList();
+
+            return new FunctionDataType(
+                otherFunctionDataType.Symbol,
+                otherFunctionDataType.InstanceDataType,
+                typeArguments
+            );
+        }
+
+        // Since structure data types can contain type parameters, we may need to resolve those.
+        if (dataType is StructureDataType structureDataType)
+        {
+            var typeArguments = structureDataType
+                .TypeArguments
+                .Select(x => ResolvePotentialTypeParametersFromFunction(x, functionDataType))
+                .ToList();
+
+            return new StructureDataType(structureDataType.Symbol, typeArguments);
+        }
+
+        return dataType;
+    }
+
+    /// <summary>
+    /// During analysis, type parameters are not resolved inside the declarations that declare them.
+    /// However, when the type parameters end up outside their declarations, they need to be resolved.
+    /// An example of this is when a function returns a type parameter originating from its parent
+    /// class declaration.
+    ///
+    /// This function takes any data type and ensures that any type parameters like that are resolved.
+    /// </summary>
+    private IDataType ResolvePotentialTypeParametersFromStructure(IDataType dataType, StructureDataType parentStructureDataType)
     {
         if (dataType is TypeParameterDataType typeParameterDataType)
         {
@@ -677,11 +776,27 @@ public class Analyser
             return typeParameterDataType;
         }
 
+        // Since function data types can contain type parameters, we may need to resolve those.
+        if (dataType is FunctionDataType functionDataType)
+        {
+            var typeArguments = functionDataType
+                .TypeArguments
+                .Select(x => ResolvePotentialTypeParametersFromStructure(x, parentStructureDataType))
+                .ToList();
+
+            return new FunctionDataType(
+                functionDataType.Symbol,
+                functionDataType.InstanceDataType,
+                typeArguments
+            );
+        }
+
+        // Since structure data types can contain type parameters, we may need to resolve those.
         if (dataType is StructureDataType structureDataType)
         {
             var typeArguments = structureDataType
                 .TypeArguments
-                .Select(x => ResolvePotentialTypeParametersForStructure(x, parentStructureDataType))
+                .Select(x => ResolvePotentialTypeParametersFromStructure(x, parentStructureDataType))
                 .ToList();
 
             return new StructureDataType(structureDataType.Symbol, typeArguments);
@@ -722,14 +837,23 @@ public class Analyser
             .Parameters
             .Select(x => Next(x.Type).DataType)
             .ToList();
-        var typeCheckedArguments = TypeCheckArguments(structureDataType, parameterTypes, arguments, node.Span);
+        var typeCheckedArguments = TypeCheckArguments(
+            functionDataType,
+            structureDataType,
+            parameterTypes,
+            arguments,
+            node.Span
+        );
 
         var declarationReturnType = functionDataType.Symbol.SyntaxDeclaration.ReturnType;
         var dataType = declarationReturnType == null
             ? PrimitiveDataType.Void
             : Next(declarationReturnType).DataType;
+
+        dataType = ResolvePotentialTypeParametersFromFunction(dataType, functionDataType);
+
         if (structureDataType != null)
-            dataType = ResolvePotentialTypeParametersForStructure(dataType, structureDataType);
+            dataType = ResolvePotentialTypeParametersFromStructure(dataType, structureDataType);
 
         return new SemanticCallNode(left, typeCheckedArguments, dataType, node.Span);
     }
@@ -768,12 +892,21 @@ public class Analyser
 
         // Will be null if it isn't an instantiable structure (which is an error, so don't try to type check)
         if (instantiable != null)
-            arguments = TypeCheckArguments(structureDataType, parameterTypes, arguments, node.Span);
+        {
+            arguments = TypeCheckArguments(
+                functionDataType: null,
+                structureDataType,
+                parameterTypes,
+                arguments,
+                node.Span
+            );
+        }
 
         return new SemanticNewNode(arguments, dataType, node.Span);
     }
 
     private List<SemanticNode> TypeCheckArguments(
+        FunctionDataType? functionDataType,
         StructureDataType? structureDataType,
         List<IDataType> parameterTypes,
         List<SemanticNode> arguments,
@@ -786,9 +919,15 @@ public class Analyser
         var typeCheckedArguments = new List<SemanticNode>();
         foreach (var (argument, parameterType) in arguments.Zip(parameterTypes))
         {
-            var resolvedParameterType = structureDataType != null
-                ? ResolvePotentialTypeParametersForStructure(parameterType, structureDataType)
-                : parameterType;
+            var resolvedParameterType = parameterType;
+
+            // functionDataType will be null in the case of constructors
+            if (functionDataType != null)
+                resolvedParameterType = ResolvePotentialTypeParametersFromFunction(parameterType, functionDataType);
+
+            if (structureDataType != null)
+                resolvedParameterType = ResolvePotentialTypeParametersFromStructure(resolvedParameterType, structureDataType);
+
             var typeCheckedArgument = TypeCheck(argument, resolvedParameterType);
             typeCheckedArguments.Add(typeCheckedArgument);
         }
@@ -1081,8 +1220,6 @@ public class Analyser
             .TypeArguments
             .Select(x => Visit(x).DataType)
             .ToList();
-        if (typeArguments.Count > 0)
-            structureSymbol.AddTypeArgumentOccurrence(typeArguments);
 
         return new StructureDataType(structureSymbol, typeArguments);
     }
@@ -1236,6 +1373,8 @@ public class Analyser
             var subTypeDataType = Next(subTypeNode).DataType;
             if (subTypeDataType is StructureDataType structureDataType)
             {
+                structureDataType.Symbol.Implementors.Add(node.Symbol!);
+
                 if (structureDataType.IsClass())
                 {
                     inheritedClass = structureDataType.Symbol;

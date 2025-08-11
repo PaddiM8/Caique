@@ -4,53 +4,331 @@ using Caique.Scope;
 
 namespace Caique.Lowering;
 
+record OnDemandGeneratedFunctionEntry(
+    FunctionSymbol Symbol,
+    string UnqualifiedName,
+    LoweredFunctionDeclarationNode Declaration
+);
+
+record OnDemandGeneratedVirtualFunctionEntry(
+    FunctionSymbol Symbol,
+    FunctionDataType VirtualFunctionDataType,
+    List<IDataType> StructureTypeArguments,
+    StructureSymbol InstanceSymbol,
+    TypeArgumentResolver TypeArgumentResolver,
+    Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode, string)> GenerateDeclaration
+);
+
 public class GlobalLoweringContext
 {
+    private readonly ConcurrentDictionary<string, bool> _alreadyGeneratedVtables = [];
+
+    // Generics
     private readonly HashSet<string> _keysForAlreadyGeneratedStructs = [];
-    private readonly Dictionary<FileScope, List<LoweredStructDeclarationNode>> _lazilyGeneratedStructsByFileScope = [];
-    private readonly Lock _lazyStructGenerationLock = new();
+    private readonly HashSet<string> _keysForAlreadyGeneratedFunctions = [];
+    private readonly Dictionary<FileScope, List<LoweredStructDeclarationNode>> _onDemandGeneratedStructsByFileScope = [];
+    private readonly Dictionary<FileScope, List<OnDemandGeneratedFunctionEntry>> _onDemandGeneratedFunctionsByFileScope = [];
+    private readonly Dictionary<FileScope, List<OnDemandGeneratedVirtualFunctionEntry>> _onDemandGeneratedVirtualFunctionsByFileScope = [];
+    private readonly Lock _onDemandStructGenerationLock = new();
+    private readonly Lock _onDemandFunctionGenerationLock = new();
+    private readonly Lock _onDemandVirtualFunctionGenerationLock = new();
+
+    private readonly Dictionary<StructureSymbol, List<LoweredStructDeclarationNode>> _generatedStructureDeclarationsBySymbol = [];
+
+    // Would've been a ConcurrentSet if that was a thing
+    private readonly ConcurrentDictionary<(FunctionSymbol, List<LoweredNode>), bool> _incompleteFunctionReferenceLists = [];
+    private readonly ConcurrentDictionary<(FunctionSymbol, List<LoweredStructDataTypeField>), bool> _incompleteFunctionTypeLists = [];
+
+    public void RegisterVtable(string name)
+    {
+        _alreadyGeneratedVtables[name] = true;
+    }
+
+    public bool VtableHasBeenRegistered(string name)
+    {
+        return _alreadyGeneratedVtables.ContainsKey(name);
+    }
 
     /// <summary>
-    /// Generic structs are generated on-demand since the concrete types are not yet known
+    /// Generic structures are generated on-demand since the concrete types are not yet known
     /// before the lowering stage. When, for example, a generic SemanticNewNode is encountered,
     /// a struct for the declaration is generated with the specific type arguments. Since the
     /// SemanticNewNode could be in a different SemanticTree, the struct is added to the global
     /// lowering context, and then added to the correct tree right before the emitting phase.
     ///
     /// If a struct has already been generated with the given type arguments, the
-    /// <ref>generateDeclaraation</ref> function is not called.
+    /// <ref>generateDeclaration</ref> function is not called.
     /// </summary>
-    public void AddGenericStructLazily(
-        LoweredStructDataType structDataType,
+    public void AddOnDemandGenericStructure(
+        StructureSymbol symbol,
+        string name,
         FileScope fileScope,
         Func<LoweredStructDeclarationNode> generateDeclaration
     )
     {
-        lock (_lazyStructGenerationLock)
+        lock (_onDemandStructGenerationLock)
         {
-            if (_keysForAlreadyGeneratedStructs.Contains(structDataType.Name!))
+            if (_keysForAlreadyGeneratedStructs.Contains(name))
                 return;
 
-            _keysForAlreadyGeneratedStructs.Add(structDataType.Name!);
+            _keysForAlreadyGeneratedStructs.Add(name);
 
-            if (_lazilyGeneratedStructsByFileScope.TryGetValue(fileScope, out var entries))
+            var declaration = generateDeclaration();
+            if (_onDemandGeneratedStructsByFileScope.TryGetValue(fileScope, out var entries))
             {
-                entries.Add(generateDeclaration());
+                entries.Add(declaration);
             }
             else
             {
-                _lazilyGeneratedStructsByFileScope[fileScope] = [generateDeclaration()];
+                _onDemandGeneratedStructsByFileScope[fileScope] = [declaration];
+            }
+
+            if (_generatedStructureDeclarationsBySymbol.TryGetValue(symbol, out var entriesForSymbol))
+            {
+                entriesForSymbol.Add(declaration);
+            }
+            else
+            {
+                _generatedStructureDeclarationsBySymbol[symbol] = [declaration];
             }
         }
     }
 
-    public List<LoweredStructDeclarationNode> GetLazilyGeneratedStructsForFile(FileScope fileScope)
+    public void AddPregeneratedStructure(StructureSymbol symbol, LoweredStructDeclarationNode declaration)
     {
-        lock (_lazyStructGenerationLock)
+        lock (_onDemandStructGenerationLock)
         {
-            _lazilyGeneratedStructsByFileScope.TryGetValue(fileScope, out var structs);
+            if (_generatedStructureDeclarationsBySymbol.TryGetValue(symbol, out var entriesForSymbol))
+            {
+                entriesForSymbol.Add(declaration);
+            }
+            else
+            {
+                _generatedStructureDeclarationsBySymbol[symbol] = [declaration];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Generic functions are generated on-demand since the concrete types are not yet known
+    /// before the lowering stage. When, for example, a generic call node is encountered, a
+    /// function for the declaration is generated with the specific type arguments. Since the
+    /// call node could be in a different SemanticTree, the function is added to the global
+    /// lowering context, and then added to the correct tree right before the emitting phase.
+    ///
+    /// If a function has already been generated with the given type arguments, the
+    /// <ref>generateDeclaration</ref> function is not called.
+    /// </summary>
+    public void AddOnDemandGenericFunction(
+        FunctionSymbol symbol,
+        string qualifiedName,
+        string unqualifiedName,
+        FileScope fileScope,
+        Func<LoweredFunctionDeclarationNode> generateDeclaration
+    )
+    {
+        lock (_onDemandFunctionGenerationLock)
+        {
+            if (_keysForAlreadyGeneratedFunctions.Contains(qualifiedName))
+                return;
+
+            _keysForAlreadyGeneratedFunctions.Add(qualifiedName);
+
+            var declaration = generateDeclaration.Invoke();
+            var entry = new OnDemandGeneratedFunctionEntry(symbol, unqualifiedName, declaration);
+            if (_onDemandGeneratedFunctionsByFileScope.TryGetValue(fileScope, out var entries))
+            {
+                entries.Add(entry);
+            }
+            else
+            {
+                _onDemandGeneratedFunctionsByFileScope[fileScope] = [entry];
+            }
+        }
+    }
+
+    public void AddOnDemandGenericFunctionForAllSpecialisationsOfStructure(
+        FunctionSymbol symbol,
+        FileScope fileScope,
+        FunctionDataType virtualFunctionDataType,
+        StructureSymbol structureSymbol,
+        List<IDataType> structureTypeArguments,
+        TypeArgumentResolver typeArgumentResolver,
+        Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode, string)> generateDeclaration
+    )
+    {
+        lock (_onDemandVirtualFunctionGenerationLock)
+        {
+            // Caching is handled in the lowerer
+            var entry = new OnDemandGeneratedVirtualFunctionEntry(
+                symbol,
+                virtualFunctionDataType,
+                structureTypeArguments,
+                structureSymbol,
+                (TypeArgumentResolver)typeArgumentResolver.Clone(),
+                generateDeclaration
+            );
+            if (_onDemandGeneratedVirtualFunctionsByFileScope.TryGetValue(fileScope, out var entries))
+            {
+                entries.Add(entry);
+            }
+            else
+            {
+                _onDemandGeneratedVirtualFunctionsByFileScope[fileScope] = [entry];
+            }
+        }
+    }
+
+    /// <summary>
+    /// When (for example) building vtables, it is necessary to fully resolve any generic functions.
+    /// However, since these functions are generated on-demand, they will not be fully resolved until
+    /// after the lowering phase is completely done. This means that things like vtables will need to
+    /// be finished off after the lowering phase, since there is not enough information during it.
+    /// To make this possible, we save a reference to the vtable's function reference list together
+    /// with the function's symbol, so that we later can gather all the concrete lowered function
+    /// declarations and complete the vtable, right before starting the code generation phase.
+    /// </summary>
+    public void AddIncompleteFunctionReferenceList(FunctionSymbol functionSymbol, List<LoweredNode> functionReferences)
+    {
+        _incompleteFunctionReferenceLists.TryAdd((functionSymbol, functionReferences), true);
+    }
+
+    /// <summary>
+    /// When (for example) building vtable data types, it is necessary to fully resolve any generic functions.
+    /// However, since these functions are generated on-demand, they will not be fully resolved until
+    /// after the lowering phase is completely done. This means that things like vtables will need to
+    /// be finished off after the lowering phase, since there is not enough information during it.
+    /// To make this possible, we save a LoweredFunctionDataType to the vtable type's field type list
+    /// together with the function's symbol, so that we later can gather all the concrete lowered function
+    /// declarations and complete the vtable, right before starting the code generation phase.
+    /// </summary>
+    public void AddIncompleteFunctionTypeList(FunctionSymbol functionSymbol, List<LoweredStructDataTypeField> functionTypes)
+    {
+        _incompleteFunctionTypeLists.TryAdd((functionSymbol, functionTypes), true);
+    }
+
+    public IEnumerable<LoweredStructDeclarationNode> GetOnDemandGeneratedStructsForFile(FileScope fileScope)
+    {
+        lock (_onDemandStructGenerationLock)
+        {
+            _onDemandGeneratedStructsByFileScope.TryGetValue(fileScope, out var structs);
 
             return structs ?? [];
+        }
+    }
+
+    public IEnumerable<LoweredFunctionDeclarationNode> GetOnDemandGeneratedFunctionsForFile(FileScope fileScope)
+    {
+        List<OnDemandGeneratedFunctionEntry>? functionEntries;
+        lock (_onDemandFunctionGenerationLock)
+        {
+            _onDemandGeneratedFunctionsByFileScope.TryGetValue(fileScope, out functionEntries);
+        }
+
+        functionEntries ??= [];
+
+        List<OnDemandGeneratedFunctionEntry> virtualFunctionEntries = [];
+        lock (_onDemandVirtualFunctionGenerationLock)
+        {
+            _onDemandGeneratedVirtualFunctionsByFileScope.TryGetValue(fileScope, out var ungeneratedVirtualFunctions);
+            foreach (var ungeneratedVirtualFunction in ungeneratedVirtualFunctions ?? [])
+            {
+                if (!_generatedStructureDeclarationsBySymbol.TryGetValue(ungeneratedVirtualFunction.InstanceSymbol, out var generatedStructDeclarations))
+                    continue;
+
+                foreach (var structDeclaration in generatedStructDeclarations)
+                {
+                    ungeneratedVirtualFunction.TypeArgumentResolver.PushTypeArguments(
+                        ungeneratedVirtualFunction.StructureTypeArguments,
+                        ungeneratedVirtualFunction.InstanceSymbol.SemanticDeclaration!
+                    );
+                    ungeneratedVirtualFunction.TypeArgumentResolver.PushTypeArguments(
+                        ungeneratedVirtualFunction.VirtualFunctionDataType.TypeArguments,
+                        ungeneratedVirtualFunction.Symbol.SemanticDeclaration!
+                    );
+
+                    var (generatedDeclaration, unqualifiedName) = ungeneratedVirtualFunction.GenerateDeclaration(
+                        ungeneratedVirtualFunction.TypeArgumentResolver,
+                        structDeclaration
+                    );
+                    var entry = new OnDemandGeneratedFunctionEntry(
+                        ungeneratedVirtualFunction.Symbol,
+                        unqualifiedName,
+                        generatedDeclaration
+                    );
+                    virtualFunctionEntries.Add(entry);
+
+                    var virtualEntry = new OnDemandGeneratedFunctionEntry(
+                        ungeneratedVirtualFunction.VirtualFunctionDataType.Symbol,
+                        unqualifiedName,
+                        generatedDeclaration
+                    );
+                    virtualFunctionEntries.Add(virtualEntry);
+
+                    ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
+                    ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
+                }
+            }
+        }
+
+        var allEntries = functionEntries.Concat(virtualFunctionEntries);
+        ResolveIncompleteLists(allEntries);
+
+        return allEntries.Select(x => x.Declaration);
+    }
+
+    private void ResolveIncompleteLists(IEnumerable<OnDemandGeneratedFunctionEntry> onDemandGeneratedFunctions)
+    {
+        var referenceListsBySymbol = new Dictionary<FunctionSymbol, List<List<LoweredNode>>>();
+        foreach (var (functionSymbol, functionReferenceList) in _incompleteFunctionReferenceLists.Keys)
+        {
+            if (referenceListsBySymbol.TryGetValue(functionSymbol, out var lists))
+            {
+                lists.Add(functionReferenceList);
+            }
+            else
+            {
+                referenceListsBySymbol[functionSymbol] = [functionReferenceList];
+            }
+        }
+
+        var typeListsBySymbol = new Dictionary<FunctionSymbol, List<List<LoweredStructDataTypeField>>>();
+        foreach (var (functionSymbol, functionTypeList) in _incompleteFunctionTypeLists.Keys)
+        {
+            if (typeListsBySymbol.TryGetValue(functionSymbol, out var lists))
+            {
+                lists.Add(functionTypeList);
+            }
+            else
+            {
+                typeListsBySymbol[functionSymbol] = [functionTypeList];
+            }
+        }
+
+        foreach (var function in onDemandGeneratedFunctions)
+        {
+            if (referenceListsBySymbol.TryGetValue(function.Symbol, out var functionReferenceLists))
+            {
+                foreach (var functionReferenceList in functionReferenceLists)
+                {
+                    var functionReference = new LoweredFunctionReferenceNode(
+                        function.Declaration.Identifier,
+                        new LoweredPointerDataType(function.Declaration.DataType)
+                    );
+                    functionReferenceList.Add(functionReference);
+                }
+            }
+
+            if (typeListsBySymbol.TryGetValue(function.Symbol, out var functionTypeLists))
+            {
+                foreach (var functionTypeList in functionTypeLists)
+                {
+                    var functionDataType = new LoweredPointerDataType(
+                        (LoweredFunctionDataType)function.Declaration.DataType
+                    );
+                    functionTypeList.Add(new LoweredStructDataTypeField(function.UnqualifiedName, functionDataType));
+                }
+            }
         }
     }
 }

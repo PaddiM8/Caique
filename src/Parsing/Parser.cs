@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Caique.Analysis;
 using Caique.Lexing;
 using Caique.Scope;
 
@@ -124,20 +125,28 @@ public class Parser
             EatExpected(TokenKind.ClosedBracket);
 
         var typeArguments = new List<SyntaxTypeNode>();
-        if (AdvanceIf(TokenKind.OpenBracket))
-        {
-            do
-            {
-                typeArguments.Add(ParseType());
-            }
-            while (AdvanceIf(TokenKind.Comma));
-
-            EatExpected(TokenKind.ClosedBracket);
-        }
+        if (Match(TokenKind.OpenBracket))
+            typeArguments = ParseTypeArguments();
 
         var span = start!.Combine(_previous!.Span);
 
         return new SyntaxTypeNode(typeNames, isSlice, typeArguments, span);
+    }
+
+    private List<SyntaxTypeNode> ParseTypeArguments()
+    {
+        EatExpected(TokenKind.OpenBracket);
+
+        var typeArguments = new List<SyntaxTypeNode>();
+        do
+        {
+            typeArguments.Add(ParseType());
+        }
+        while (AdvanceIf(TokenKind.Comma));
+
+        EatExpected(TokenKind.ClosedBracket);
+
+        return typeArguments;
     }
 
     private SyntaxVariableDeclarationNode ParseVariableDeclaration()
@@ -512,6 +521,12 @@ public class Parser
     {
         var start = EatExpected(TokenKind.Func).Span;
         var identifier = EatExpected(TokenKind.Identifier);
+
+        var typeScope = new TypeScope(parentTypeScope);
+        var typeParameters = new List<SyntaxTypeParameterNode>();
+        if (Match(TokenKind.OpenBracket))
+            typeParameters = ParseTypeParameters(typeScope);
+
         var parameters = ParseParameters();
         var returnType = Match(TokenKind.OpenBrace, TokenKind.Semicolon)
             ? null
@@ -520,9 +535,9 @@ public class Parser
             ? null
             : ParseBlock();
 
-        var typeScope = new TypeScope(parentTypeScope);
         var node = new SyntaxFunctionDeclarationNode(
             identifier,
+            typeParameters,
             parameters,
             returnType,
             body,
@@ -819,13 +834,26 @@ public class Parser
             }
 
             var identifier = EatExpected(TokenKind.Identifier);
-            left = new SyntaxMemberAccessNode(left, identifier);
+            var typeArguments = new List<SyntaxTypeNode>();
+            if (Match(TokenKind.OpenBracket))
+                typeArguments = ParseTypeArguments();
+
+            var identifierNode = new SyntaxIdentifierNode(
+                [identifier],
+                typeArguments,
+                identifier.Span.Combine(_previous!.Span))
+            ;
+            left = new SyntaxMemberAccessNode(left, identifierNode);
 
             if (Match(TokenKind.OpenParenthesis))
             {
                 var arguments = ParseArguments();
 
-                return new SyntaxCallNode(left, arguments, left.Span.Combine(_previous!.Span));
+                return new SyntaxCallNode(
+                    left,
+                    arguments,
+                    left.Span.Combine(_previous!.Span)
+                );
             }
         }
 
@@ -853,7 +881,11 @@ public class Parser
         {
             var arguments = ParseArguments();
 
-            return new SyntaxCallNode(left, arguments, left.Span.Combine(_previous!.Span));
+            return new SyntaxCallNode(
+                left,
+                arguments,
+                left.Span.Combine(_previous!.Span)
+            );
         }
 
         return left;
@@ -1022,7 +1054,15 @@ public class Parser
         while (AdvanceIf(TokenKind.Colon))
             identifierList.Add(EatExpected(TokenKind.Identifier));
 
-        return new SyntaxIdentifierNode(identifierList);
+        var typeArguments = new List<SyntaxTypeNode>();
+        if (Match(TokenKind.OpenBracket))
+            typeArguments = ParseTypeArguments();
+
+        return new SyntaxIdentifierNode(
+            identifierList,
+            typeArguments,
+            identifierList.First().Span.Combine(identifierList.Last().Span)
+        );
     }
 
     private SyntaxNewNode ParseNew()

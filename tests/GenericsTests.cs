@@ -13,7 +13,7 @@ public class GenericsTests
                 func Run() i32
                 {
                     let a = new A[i32]();
-                    a.x = 3;
+                    a.x = 2;
 
                     a.x
                 }
@@ -28,7 +28,7 @@ public class GenericsTests
             .Create()
             .AddFile("main", mainFile)
             .Run()
-            .AssertSuccessWithExitCode(3);
+            .AssertSuccessWithExitCode(2);
     }
 
     [Test]
@@ -39,7 +39,7 @@ public class GenericsTests
             {
                 func Run() i32
                 {
-                    let b = new B[i32](3);
+                    let b = new B[i32](2);
 
                     b.a.x
                 }
@@ -65,10 +65,244 @@ public class GenericsTests
             .Create()
             .AddFile("main", mainFile)
             .Run()
-            .AssertSuccessWithExitCode(3);
+            .AssertSuccessWithExitCode(2);
     }
 
-    // TODO: someInstance.SomeMethod(x) where someInstance is SomeClass[T] and SomeMethod is SomeMethod(x T)
-    // TODO: Return a generic type to a different class
-    // TODO: A[T, K] where T is from a class and K is from a function
+    [Test]
+    public void TestGenericClass_WithFunction()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    new A[i32]().Func(2)
+                }
+            }
+
+            class A[T]
+            {
+                pub func Func(value T) T
+                {
+                    value
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericFunction_InSameModule()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    Generic[i32](2)
+                }
+
+                func Generic[T](value T) T
+                {
+                    value
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericFunction_InDifferentClass()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let other = new Other();
+
+                    other.Generic[i32](2)
+                }
+            }
+
+            class Other
+            {
+                pub func Generic[T](value T) T
+                {
+                    value
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericFunction_InGenericClass()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let other = new Other[i64]();
+                    let a = other.Generic[i32]() == size_of(i64) + size_of(i32);
+                    let b = other.Generic[i8]() == size_of(i64) + size_of(i8);
+
+                    if a && b
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+
+            class Other[T]
+            {
+                pub func Generic[K]() usize
+                {
+                    size_of(T) + size_of(K)
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericFunction_WithGenericCallInGenericClass()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    if new B[i64]().Generic[i32]() == size_of(i64) + size_of(i32)
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+
+            class A
+            {
+                pub func Generic[T, K]() usize
+                {
+                    size_of(T) + size_of(K)
+                }
+            }
+
+            class B[T]
+            {
+                pub func Generic[K]() usize
+                {
+                    new A().Generic[T, K]()
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericFunctionReference()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let ref = Generic[i64, i32];
+                    if ref() == size_of(i64) + size_of(i32)
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+
+                func Generic[T, K]() usize
+                {
+                    size_of(T) + size_of(K)
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericFunction_InProtocol()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let p P = new A();
+                    if p.Generic[i64, i32]() == size_of(i64) + size_of(i32)
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+
+            }
+
+            protocol P
+            {
+                func Generic[T, K]() usize;
+            }
+
+            class A : P
+            {
+                pub func Generic[T, K]() usize
+                {
+                    size_of(T) + size_of(K)
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    // TestGenericFunction_InInheritedClass
+    // TestGenericFunction_InInheritedClassWithParent
+    // TestNonGenericFunction_InGenericProtocol
+    // TestNonGenericFunction_InGenericInheritedClass
 }

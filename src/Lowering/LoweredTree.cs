@@ -60,12 +60,34 @@ public class LoweredFunctionReferenceNode(string name, ILoweredDataType dataType
     public string Identifier { get; } = name;
 }
 
-public class LoweredFieldReferenceNode(LoweredNode instance, int index, ILoweredDataType dataType)
+public class LoweredFieldReferenceNode(
+    LoweredStructDataType instanceDataType,
+    LoweredNode instance,
+    int index,
+    ILoweredDataType dataType
+)
     : LoweredNode(new LoweredPointerDataType(dataType))
 {
+    public LoweredStructDataType InstanceDataType { get; } = instanceDataType;
+
     public LoweredNode Instance { get; } = instance;
 
     public int Index { get; } = index;
+}
+
+public class LoweredFieldReferenceByNameNode(
+    LoweredStructDataType instanceDataType,
+    LoweredNode instance,
+    string name,
+    ILoweredDataType dataType
+)
+    : LoweredNode(new LoweredPointerDataType(dataType))
+{
+    public LoweredStructDataType InstanceDataType { get; } = instanceDataType;
+
+    public LoweredNode Instance { get; } = instance;
+
+    public string Name { get; } = name;
 }
 
 public class LoweredGlobalReferenceNode(string identifier, ILoweredDataType dataType)
@@ -125,7 +147,6 @@ public enum KeywordValueKind
     Self,
     Base,
     Default,
-    SizeOf,
 }
 
 public class LoweredKeywordValueNode(KeywordValueKind kind, List<LoweredNode> arguments, ILoweredDataType dataType)
@@ -134,6 +155,12 @@ public class LoweredKeywordValueNode(KeywordValueKind kind, List<LoweredNode> ar
     public KeywordValueKind Kind { get; } = kind;
 
     public List<LoweredNode> Arguments { get; } = arguments;
+}
+
+public class LoweredSizeOfNode(ILoweredDataType argument)
+    : LoweredNode(new LoweredPrimitiveDataType(Primitive.USize))
+{
+    public ILoweredDataType Argument { get; } = argument;
 }
 
 public class LoweredIfNode(
@@ -194,7 +221,6 @@ public class LoweredVariableDeclarationNode(string identifier, LoweredNode? valu
 public class LoweredFunctionDeclarationNode(
     string identifier,
     List<LoweredParameterNode> parameters,
-    ILoweredDataType returnType,
     LoweredBlockNode? body,
     ILoweredDataType dataType,
     TextSpan span
@@ -204,8 +230,6 @@ public class LoweredFunctionDeclarationNode(
     public string Identifier { get; } = identifier;
 
     public List<LoweredParameterNode> Parameters { get; } = parameters;
-
-    public ILoweredDataType ReturnType { get; } = returnType;
 
     public LoweredBlockNode? Body { get; set; } = body;
 

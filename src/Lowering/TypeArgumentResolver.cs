@@ -9,13 +9,28 @@ using Caique.Scope;
 namespace Caique.Lowering;
 
 record TypeArgumentQueueEntry(
-    Dictionary<TypeSymbol, IDataType> TypeArgumentLookup,
+    IReadOnlyDictionary<TypeSymbol, IDataType> TypeArgumentLookup,
     SemanticNode Declaration
 );
 
-class TypeArgumentResolver
+public class TypeArgumentResolver : ICloneable
 {
-    private readonly Stack<TypeArgumentQueueEntry> _typeArgumentStack = [];
+    private readonly Stack<TypeArgumentQueueEntry> _typeArgumentStack;
+
+    public TypeArgumentResolver()
+    {
+        _typeArgumentStack = [];
+    }
+
+    private TypeArgumentResolver(IEnumerable<TypeArgumentQueueEntry> entries)
+    {
+        _typeArgumentStack = new Stack<TypeArgumentQueueEntry>(entries);
+    }
+
+    public object Clone()
+    {
+        return new TypeArgumentResolver([.._typeArgumentStack]);
+    }
 
     public IDataType Resolve(TypeSymbol typeSymbol)
     {
@@ -28,15 +43,37 @@ class TypeArgumentResolver
         throw new InvalidOperationException();
     }
 
+    public int PushAllFromOtherResolver(TypeArgumentResolver other)
+    {
+        foreach (var entry in other._typeArgumentStack)
+            _typeArgumentStack.Push(entry);
+
+        return other._typeArgumentStack.Count;
+    }
+
     public void PushTypeArguments(IEnumerable<IDataType> typeArguments, ISemanticStructureDeclaration declaration)
     {
-            var symbolToArgumentMap = declaration
-                .Symbol
-                .SyntaxDeclaration
-                .TypeParameters
-                .Select(x => x.Symbol)
-                .Zip(typeArguments)
-                .ToDictionary(x => x.First, x => x.Second);
+        var symbolToArgumentMap = declaration
+            .Symbol
+            .SyntaxDeclaration
+            .TypeParameters
+            .Select(x => x.Symbol)
+            .Zip(typeArguments)
+            .Where(x => x.First != (x.Second as TypeParameterDataType)?.Symbol)
+            .ToDictionary(x => x.First, x => x.Second);
+        _typeArgumentStack.Push(new TypeArgumentQueueEntry(symbolToArgumentMap, (SemanticNode)declaration));
+    }
+
+    public void PushTypeArguments(IEnumerable<IDataType> typeArguments, SemanticFunctionDeclarationNode declaration)
+    {
+        var symbolToArgumentMap = declaration
+            .Symbol
+            .SyntaxDeclaration
+            .TypeParameters
+            .Select(x => x.Symbol)
+            .Zip(typeArguments)
+            .Where(x => x.First != (x.Second as TypeParameterDataType)?.Symbol)
+            .ToDictionary(x => x.First, x => x.Second);
         _typeArgumentStack.Push(new TypeArgumentQueueEntry(symbolToArgumentMap, (SemanticNode)declaration));
     }
 
@@ -48,9 +85,9 @@ class TypeArgumentResolver
     public List<IDataType> GetCurrentStructureTypeArguments()
     {
         return _typeArgumentStack
-            .First(x => x.Declaration is ISemanticStructureDeclaration)
+            .FirstOrDefault(x => x.Declaration is ISemanticStructureDeclaration)?
             .TypeArgumentLookup
             .Values
-            .ToList();
+            .ToList() ?? [];
     }
 }

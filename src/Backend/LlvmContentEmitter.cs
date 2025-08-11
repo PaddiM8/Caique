@@ -197,6 +197,7 @@ public class LlvmContentEmitter
             LoweredVariableReferenceNode variableReferenceNode => Visit(variableReferenceNode),
             LoweredFunctionReferenceNode functionReferenceNode => Visit(functionReferenceNode),
             LoweredFieldReferenceNode fieldReferenceNode => Visit(fieldReferenceNode),
+            LoweredFieldReferenceByNameNode fieldReferenceByNameNode => Visit(fieldReferenceByNameNode),
             LoweredGlobalReferenceNode globalReferenceNode => Visit(globalReferenceNode),
             LoweredUnaryNode unaryNode => Visit(unaryNode),
             LoweredBinaryNode binaryNode => Visit(binaryNode),
@@ -204,6 +205,7 @@ public class LlvmContentEmitter
             LoweredCallNode callNode => Visit(callNode),
             LoweredReturnNode returnNode => Visit(returnNode),
             LoweredKeywordValueNode keywordValueNode => Visit(keywordValueNode),
+            LoweredSizeOfNode sizeOfNode => Visit(sizeOfNode),
             LoweredIfNode ifNode => Visit(ifNode),
             LoweredCastNode castNode => Visit(castNode),
             LoweredBlockNode blockNode => Visit(blockNode),
@@ -292,14 +294,32 @@ public class LlvmContentEmitter
     private LLVMValueRef Visit(LoweredFieldReferenceNode node)
     {
         var instance = Next(node.Instance)!.Value;
-        var loweredInstanceType = node.Instance.DataType.Dereference();
-        var instanceType = _typeBuilder.BuildType(loweredInstanceType);
+        var instanceType = _typeBuilder.BuildType(node.InstanceDataType);
+        var name = node.InstanceDataType.Fields[node.Index].Name;
 
         return _builder.BuildStructGEP2(
             instanceType,
             instance,
             (uint)node.Index,
-            $"field_{node.Index}_pointer"
+            $"{name}_pointer"
+        );
+    }
+
+    private LLVMValueRef Visit(LoweredFieldReferenceByNameNode node)
+    {
+        var instance = Next(node.Instance)!.Value;
+        var instanceType = _typeBuilder.BuildType(node.InstanceDataType);
+        var index = node.InstanceDataType
+            .Fields
+            .Index()
+            .First(x => x.Item.Name == node.Name)
+            .Index;
+
+        return _builder.BuildStructGEP2(
+            instanceType,
+            instance,
+            (uint)index,
+            $"{node.Name}_pointer"
         );
     }
 
@@ -485,13 +505,6 @@ public class LlvmContentEmitter
 
     private LLVMValueRef Visit(LoweredKeywordValueNode node)
     {
-        if (node.Kind == KeywordValueKind.SizeOf)
-        {
-            var type = _typeBuilder.BuildType(node.Arguments![0].DataType);
-
-            return LlvmUtils.BuildSizeOf(_context, _module, type);
-        }
-
         if (node.Kind is KeywordValueKind.Self or KeywordValueKind.Base)
             return GetSelf();
 
@@ -499,6 +512,13 @@ public class LlvmContentEmitter
             return _specialValueBuilder.BuildDefaultValueForType(node.DataType);
 
         throw new UnreachableException();
+    }
+
+    private LLVMValueRef Visit(LoweredSizeOfNode node)
+    {
+        var type = _typeBuilder.BuildType(node.Argument);
+
+        return LlvmUtils.BuildSizeOf(_context, _module, type);
     }
 
     private LLVMValueRef? Visit(LoweredIfNode node)
@@ -701,7 +721,8 @@ public class LlvmContentEmitter
         if (node.Identifier.EndsWith("Main:Run"))
         {
             var functionType = _typeBuilder.BuildType(node.DataType);
-            BuildMain(functionType, function, node.ReturnType);
+            var loweredFunctionDataType = (LoweredFunctionDataType)node.DataType;
+            BuildMain(functionType, function, loweredFunctionDataType.ReturnType);
         }
 
         return function;

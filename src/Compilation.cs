@@ -147,9 +147,13 @@ public class Compilation
         var objectFilePaths = new List<string>();
         foreach (var loweredTree in loweredTrees)
         {
-            var lazilyGeneratedStructs = globalLoweringContext.GetLazilyGeneratedStructsForFile(loweredTree.FileScope);
-            foreach (var lazilyGeneratedStruct in lazilyGeneratedStructs)
-                loweredTree.Structs[lazilyGeneratedStruct.Identifier] = lazilyGeneratedStruct;
+            var onDemandGeneratedStructs = globalLoweringContext.GetOnDemandGeneratedStructsForFile(loweredTree.FileScope);
+            foreach (var onDemandGeneratedStruct in onDemandGeneratedStructs)
+                loweredTree.Structs[onDemandGeneratedStruct.Identifier] = onDemandGeneratedStruct;
+
+            var onDemandGeneratedFunctions = globalLoweringContext.GetOnDemandGeneratedFunctionsForFile(loweredTree.FileScope);
+            foreach (var onDemandGeneratedFunction in onDemandGeneratedFunctions)
+                loweredTree.Functions[onDemandGeneratedFunction.Identifier] = onDemandGeneratedFunction;
 
             var emitterContext = new LlvmEmitterContext(loweredTree.ModuleName, llvmContext);
             var targetPath = GetTargetDirectory(projectFilePath);

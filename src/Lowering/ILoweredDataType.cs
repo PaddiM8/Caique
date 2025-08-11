@@ -38,14 +38,20 @@ public class LoweredSliceDataType(ILoweredDataType innerType) : ILoweredDataType
         => $"[{InnerType}]";
 }
 
-public class LoweredStructDataType(List<ILoweredDataType> fieldTypes, string? name) : ILoweredDataType
+public record LoweredStructDataTypeField(string Name, ILoweredDataType DataType);
+
+public class LoweredStructDataType(List<LoweredStructDataTypeField> fields, string? name) : ILoweredDataType
 {
     public string? Name { get; } = name;
 
-    public List<ILoweredDataType> FieldTypes { get; } = fieldTypes;
+    public List<LoweredStructDataTypeField> Fields { get; } = fields;
 
     public override string ToString()
-        => Name ?? "{" + string.Join(",", FieldTypes) + "}";
+    {
+        var fieldTypes = Fields.Select(x => x.DataType);
+
+        return Name ?? "{" + string.Join(",", fieldTypes) + "}";
+    }
 
     public bool IsString()
         => Name == "std:prelude:String";

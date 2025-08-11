@@ -42,6 +42,7 @@ public enum DiagnosticCode
     ErrorMisplacedSelf,
     ErrorMisplacedBase,
     ErrorMisplacedBaseCall,
+    ErrorMisplacedTypeArguments,
     ErrorFunctionNameSameAsParentStructure,
     ErrorBaseFunctionNotFound,
     ErrorBaseClassNotInheritable,
@@ -84,6 +85,15 @@ public class DiagnosticReporter
         ReportError(
             DiagnosticCode.ErrorUnexpectedToken,
             $"Unexpected token {unexpected.Kind}.",
+            unexpected.Span
+        );
+    }
+
+    public void ReportUnexpectedToken(Token unexpected, TokenKind expected)
+    {
+        ReportError(
+            DiagnosticCode.ErrorUnexpectedToken,
+            $"Unexpected token {unexpected.Kind}. Expected {expected}.",
             unexpected.Span
         );
     }
@@ -384,6 +394,15 @@ public class DiagnosticReporter
         ReportError(
             DiagnosticCode.ErrorMisplacedBaseCall,
             "A base call must be at the top of a constructor of a class that inherits from another class.",
+            span
+        );
+    }
+
+    public void ReportMisplacedTypeArguments(TextSpan span)
+    {
+        ReportError(
+            DiagnosticCode.ErrorMisplacedTypeArguments,
+            "Type arguments may only appear after types or function names.",
             span
         );
     }

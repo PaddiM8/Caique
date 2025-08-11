@@ -76,15 +76,15 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
     public LLVMTypeRef Build(LoweredStructDataType dataType)
     {
         var fieldTypes = new List<LLVMTypeRef>();
-        foreach (var fieldType in dataType.FieldTypes)
+        foreach (var fieldType in dataType.Fields)
         {
-            if (fieldType is LoweredStructDataType)
+            if (fieldType.DataType is LoweredStructDataType)
             {
                 fieldTypes.Add(LLVMTypeRef.CreatePointer(_context.VoidType, 0));
             }
             else
             {
-                fieldTypes.Add(BuildType(fieldType));
+                fieldTypes.Add(BuildType(fieldType.DataType));
             }
         }
 

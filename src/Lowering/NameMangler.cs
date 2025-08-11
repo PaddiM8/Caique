@@ -3,9 +3,8 @@ using Caique.Analysis;
 
 namespace Caique.Lowering;
 
-class NameMangler(SemanticTree tree, TypeArgumentResolver typeArgumentResolver)
+class NameMangler(TypeArgumentResolver typeArgumentResolver)
 {
-    private readonly SemanticTree _tree = tree;
     private readonly TypeArgumentResolver _typeArgumentResolver = typeArgumentResolver;
 
     public string BuildTypeName(IDataType dataType)
@@ -49,16 +48,44 @@ class NameMangler(SemanticTree tree, TypeArgumentResolver typeArgumentResolver)
             : field.Identifier.Value;
     }
 
-    public string BuildFunctionName(SemanticFunctionDeclarationNode function, List<IDataType> structureTypeArguments)
+    public string BuildFunctionName(
+        SemanticFunctionDeclarationNode function,
+        List<IDataType> typeArguments,
+        List<IDataType> structureTypeArguments
+    )
+    {
+        var parentStructure = SemanticTree.GetEnclosingStructure(function);
+        var structureName = BuildStructName(parentStructure!, structureTypeArguments);
+
+        return BuildFunctionNameWithStructName(function, typeArguments, structureName);
+    }
+
+    public string BuildUnqualifiedFunctionName(SemanticFunctionDeclarationNode function, List<IDataType> typeArguments)
+    {
+        var parentStructure = SemanticTree.GetEnclosingStructure(function);
+        var generics = string.Empty;
+        if (typeArguments.Count > 0)
+        {
+            var builtTypeArguments = typeArguments.Select(BuildTypeName);
+            generics = $"[{string.Join(", ", builtTypeArguments)}]";
+        }
+
+        return function.Identifier.Value + generics;
+    }
+
+    public string BuildFunctionNameWithStructName(
+        SemanticFunctionDeclarationNode function,
+        List<IDataType> typeArguments,
+        string structName
+    )
     {
         var ffiAttribute = function.Attributes.FirstOrDefault(x => x.Identifier.Value == "ffi");
         if (ffiAttribute != null)
             return function.Identifier.Value;
 
-        var parentStructure = SemanticTree.GetEnclosingStructure(function);
-        var structureName = BuildStructName(parentStructure!, structureTypeArguments);
+        var unqualifiedName = BuildUnqualifiedFunctionName(function, typeArguments);
 
-        return $"{structureName}:{function.Identifier.Value}";
+        return $"{structName}:{unqualifiedName}";
     }
 
     public string BuildStructName(ISemanticStructureDeclaration structure, List<IDataType> typeArguments)
