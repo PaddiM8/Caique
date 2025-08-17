@@ -754,6 +754,7 @@ public class LlvmContentEmitter
         var name = ((LoweredStructDataType)node.DataType).Name;
         var values = node
             .Values
+            .Where(x => x is not LoweredOnDemandReferencePlaceholderNode)
             .Select(x => Next(x)!.Value)
             .ToArray();
 

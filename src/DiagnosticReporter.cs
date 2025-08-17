@@ -18,6 +18,7 @@ public enum DiagnosticCode
     ErrorUnrecognisedToken,
     ErrorUnexpectedEnd,
     ErrorWrongNumberOfArguments,
+    ErrorWrongNumberOfTypeArguments,
     ErrorExpectedType,
     ErrorExpectedValueGotType,
     ErrorNotFound,
@@ -141,6 +142,15 @@ public class DiagnosticReporter
         ReportError(
             DiagnosticCode.ErrorWrongNumberOfArguments,
             $"Wrong number of arguments. Expected {expected} but got {got}.",
+            span
+        );
+    }
+
+    public void ReportWrongNumberOfTypeArguments(int expected, int got, TextSpan span)
+    {
+        ReportError(
+            DiagnosticCode.ErrorWrongNumberOfTypeArguments,
+            $"Wrong number of type arguments. Expected {expected} but got {got}.",
             span
         );
     }
@@ -420,7 +430,7 @@ public class DiagnosticReporter
     {
         ReportError(
             DiagnosticCode.ErrorBaseFunctionNotFound,
-            $"Unable to override: a function with the name {identifier.Value} found in the base class.",
+            $"Unable to override: a function with the name {identifier.Value} was not found in the base class.",
             identifier.Span
         );
     }

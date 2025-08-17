@@ -14,4 +14,15 @@ public class StructureSymbol(string name, ISyntaxStructureDeclaration node, Name
     public NamespaceScope Namespace { get; } = namespaceNode;
 
     public List<StructureSymbol> Implementors { get; } = [];
+
+    public IEnumerable<StructureSymbol> GetAllNestedImplementors()
+    {
+        foreach (var implementor in Implementors)
+        {
+            yield return implementor;
+
+            foreach (var nested in implementor.GetAllNestedImplementors())
+                yield return nested;
+        }
+    }
 }

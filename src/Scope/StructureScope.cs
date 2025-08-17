@@ -21,4 +21,9 @@ public class StructureScope(NamespaceScope parentNamespace) : IScope
 
         return symbol;
     }
+
+    public bool ContainsSymbol(string name)
+    {
+        return _symbols.ContainsKey(name);
+    }
 }

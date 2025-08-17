@@ -90,6 +90,11 @@ public class LoweredFieldReferenceByNameNode(
     public string Name { get; } = name;
 }
 
+public class LoweredOnDemandReferencePlaceholderNode()
+    : LoweredNode(new LoweredPrimitiveDataType(Primitive.Void))
+{
+}
+
 public class LoweredGlobalReferenceNode(string identifier, ILoweredDataType dataType)
     : LoweredNode(new LoweredPointerDataType(dataType))
 {

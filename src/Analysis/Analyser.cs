@@ -1216,6 +1216,15 @@ public class Analyser
             throw Recover();
         }
 
+        if (structureSymbol.SyntaxDeclaration.TypeParameters.Count != node.TypeArguments.Count)
+        {
+            _diagnostics.ReportWrongNumberOfTypeArguments(
+                structureSymbol.SyntaxDeclaration.TypeParameters.Count,
+                node.TypeArguments.Count,
+                node.Span
+            );
+        }
+
         var typeArguments = node
             .TypeArguments
             .Select(x => Visit(x).DataType)
@@ -1315,19 +1324,16 @@ public class Analyser
             if (!parentClass.IsInheritable)
                 _diagnostics.ReportBaseClassNotInheritable(node.Span, parentClass.Span);
 
-            // TODO: If it does not exist in the parent, throw an error.
-            // If it does exist, mark the base function as virtual
-            var baseFunction = parentClass
-                .Declarations
-                .FirstOrDefault(x => (x as SyntaxFunctionDeclarationNode)?.Identifier.Value == node.Identifier.Value)
-                    as SyntaxFunctionDeclarationNode;
-            if (baseFunction == null)
+            var baseFunctionSymbol = ((ISyntaxStructureDeclaration)parentClass)
+                .ResolveSymbol(node.Identifier.Value)
+                as FunctionSymbol;
+            if (baseFunctionSymbol == null)
             {
                 _diagnostics.ReportBaseFunctionNotFound(node.Identifier);
             }
-            else if (baseFunction.Symbol != null)
+            else if (baseFunctionSymbol != null)
             {
-                baseFunction.Symbol.IsVirtual = true;
+                baseFunctionSymbol.IsVirtual = true;
             }
         }
 

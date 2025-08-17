@@ -66,7 +66,14 @@ class LoweredTypeBuilder(
         var implemented = implementedDataType.Symbol.SemanticDeclaration!;
         var fields = new List<LoweredStructDataTypeField>();
 
-        foreach (var function in implementor.Functions.Where(x => !x.IsStatic))
+        // TODO: When default implementions in protocols are a thing, include them here
+        var functions = implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration
+            ? classDeclaration.GetVtableMethods()
+            : implementor.Functions.Where(x => !x.IsStatic);
+
+        functions = functions.Where(x => !x.IsStatic);
+
+        foreach (var function in functions)
         {
             if (function.Symbol.SyntaxDeclaration.TypeParameters.Count == 0)
             {
@@ -76,7 +83,11 @@ class LoweredTypeBuilder(
             }
             else
             {
-                _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, fields);
+                var placeholder = LoweredStructDataTypeField.CreatePlaceholder();
+                fields.Add(placeholder);
+
+                var typeListSpot = new TypeListSpot(fields, placeholder);
+                _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, typeListSpot);
             }
         }
 

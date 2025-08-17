@@ -263,11 +263,22 @@ public class StructureDataType(StructureSymbol symbol, List<IDataType> typeArgum
             if (otherStructure.Symbol == Symbol)
                 return TypeEquivalence.Identical;
 
-            if (Symbol.SyntaxDeclaration.SubTypes.Any(x => x.ResolvedSymbol == otherStructure.Symbol))
+            if (Symbol.SyntaxDeclaration.SubTypes.Any(x => SubTypeIsEquivalent(x, otherStructure)))
                 return TypeEquivalence.ImplicitCast;
         }
 
         return TypeEquivalence.Incompatible;
+    }
+
+    private bool SubTypeIsEquivalent(SyntaxTypeNode subType, StructureDataType otherStructure)
+    {
+        if (subType.ResolvedSymbol == otherStructure.Symbol)
+            return true;
+
+        return (subType.ResolvedSymbol as StructureSymbol)?
+            .SyntaxDeclaration
+            .SubTypes
+            .Any(x => SubTypeIsEquivalent(x, otherStructure)) is true;
     }
 
     private bool TypeArgumentsAreIdentical(List<IDataType> otherArguments)

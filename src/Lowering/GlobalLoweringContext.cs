@@ -11,13 +11,17 @@ record OnDemandGeneratedFunctionEntry(
 );
 
 record OnDemandGeneratedVirtualFunctionEntry(
-    FunctionSymbol Symbol,
+    FunctionSymbol ImplementationSymbol,
     FunctionDataType VirtualFunctionDataType,
     List<IDataType> StructureTypeArguments,
     StructureSymbol InstanceSymbol,
     TypeArgumentResolver TypeArgumentResolver,
-    Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode, string)> GenerateDeclaration
+    Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode?, string?)> GenerateDeclaration
 );
+
+public record TypeListSpot(List<LoweredStructDataTypeField> TypeList, LoweredStructDataTypeField Placeholder);
+
+public record ReferenceListSpot(List<LoweredNode> ReferenceList, LoweredOnDemandReferencePlaceholderNode Placeholder);
 
 public class GlobalLoweringContext
 {
@@ -36,8 +40,8 @@ public class GlobalLoweringContext
     private readonly Dictionary<StructureSymbol, List<LoweredStructDeclarationNode>> _generatedStructureDeclarationsBySymbol = [];
 
     // Would've been a ConcurrentSet if that was a thing
-    private readonly ConcurrentDictionary<(FunctionSymbol, List<LoweredNode>), bool> _incompleteFunctionReferenceLists = [];
-    private readonly ConcurrentDictionary<(FunctionSymbol, List<LoweredStructDataTypeField>), bool> _incompleteFunctionTypeLists = [];
+    private readonly ConcurrentDictionary<(FunctionSymbol, ReferenceListSpot), bool> _incompleteFunctionReferenceLists = [];
+    private readonly ConcurrentDictionary<(FunctionSymbol, TypeListSpot), bool> _incompleteFunctionTypeLists = [];
 
     public void RegisterVtable(string name)
     {
@@ -148,20 +152,20 @@ public class GlobalLoweringContext
     }
 
     public void AddOnDemandGenericFunctionForAllSpecialisationsOfStructure(
-        FunctionSymbol symbol,
+        FunctionSymbol implementationSymbol,
         FileScope fileScope,
         FunctionDataType virtualFunctionDataType,
         StructureSymbol structureSymbol,
         List<IDataType> structureTypeArguments,
         TypeArgumentResolver typeArgumentResolver,
-        Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode, string)> generateDeclaration
+        Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode?, string?)> generateDeclaration
     )
     {
         lock (_onDemandVirtualFunctionGenerationLock)
         {
             // Caching is handled in the lowerer
             var entry = new OnDemandGeneratedVirtualFunctionEntry(
-                symbol,
+                implementationSymbol,
                 virtualFunctionDataType,
                 structureTypeArguments,
                 structureSymbol,
@@ -188,9 +192,9 @@ public class GlobalLoweringContext
     /// with the function's symbol, so that we later can gather all the concrete lowered function
     /// declarations and complete the vtable, right before starting the code generation phase.
     /// </summary>
-    public void AddIncompleteFunctionReferenceList(FunctionSymbol functionSymbol, List<LoweredNode> functionReferences)
+    public void AddIncompleteFunctionReferenceList(FunctionSymbol functionSymbol, ReferenceListSpot referenceListSpot)
     {
-        _incompleteFunctionReferenceLists.TryAdd((functionSymbol, functionReferences), true);
+        _incompleteFunctionReferenceLists.TryAdd((functionSymbol, referenceListSpot), true);
     }
 
     /// <summary>
@@ -202,7 +206,7 @@ public class GlobalLoweringContext
     /// together with the function's symbol, so that we later can gather all the concrete lowered function
     /// declarations and complete the vtable, right before starting the code generation phase.
     /// </summary>
-    public void AddIncompleteFunctionTypeList(FunctionSymbol functionSymbol, List<LoweredStructDataTypeField> functionTypes)
+    public void AddIncompleteFunctionTypeList(FunctionSymbol functionSymbol, TypeListSpot functionTypes)
     {
         _incompleteFunctionTypeLists.TryAdd((functionSymbol, functionTypes), true);
     }
@@ -244,15 +248,18 @@ public class GlobalLoweringContext
                     );
                     ungeneratedVirtualFunction.TypeArgumentResolver.PushTypeArguments(
                         ungeneratedVirtualFunction.VirtualFunctionDataType.TypeArguments,
-                        ungeneratedVirtualFunction.Symbol.SemanticDeclaration!
+                        ungeneratedVirtualFunction.ImplementationSymbol.SemanticDeclaration!
                     );
 
                     var (generatedDeclaration, unqualifiedName) = ungeneratedVirtualFunction.GenerateDeclaration(
                         ungeneratedVirtualFunction.TypeArgumentResolver,
                         structDeclaration
                     );
+                    if (generatedDeclaration == null || unqualifiedName == null)
+                        continue;
+
                     var entry = new OnDemandGeneratedFunctionEntry(
-                        ungeneratedVirtualFunction.Symbol,
+                        ungeneratedVirtualFunction.ImplementationSymbol,
                         unqualifiedName,
                         generatedDeclaration
                     );
@@ -263,7 +270,8 @@ public class GlobalLoweringContext
                         unqualifiedName,
                         generatedDeclaration
                     );
-                    virtualFunctionEntries.Add(virtualEntry);
+                    // TODO: Why was this here?
+                    //virtualFunctionEntries.Add(virtualEntry);
 
                     ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
                     ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
@@ -279,7 +287,7 @@ public class GlobalLoweringContext
 
     private void ResolveIncompleteLists(IEnumerable<OnDemandGeneratedFunctionEntry> onDemandGeneratedFunctions)
     {
-        var referenceListsBySymbol = new Dictionary<FunctionSymbol, List<List<LoweredNode>>>();
+        var referenceListsBySymbol = new Dictionary<FunctionSymbol, List<ReferenceListSpot>>();
         foreach (var (functionSymbol, functionReferenceList) in _incompleteFunctionReferenceLists.Keys)
         {
             if (referenceListsBySymbol.TryGetValue(functionSymbol, out var lists))
@@ -292,7 +300,7 @@ public class GlobalLoweringContext
             }
         }
 
-        var typeListsBySymbol = new Dictionary<FunctionSymbol, List<List<LoweredStructDataTypeField>>>();
+        var typeListsBySymbol = new Dictionary<FunctionSymbol, List<TypeListSpot>>();
         foreach (var (functionSymbol, functionTypeList) in _incompleteFunctionTypeLists.Keys)
         {
             if (typeListsBySymbol.TryGetValue(functionSymbol, out var lists))
@@ -315,7 +323,8 @@ public class GlobalLoweringContext
                         function.Declaration.Identifier,
                         new LoweredPointerDataType(function.Declaration.DataType)
                     );
-                    functionReferenceList.Add(functionReference);
+                    var index = functionReferenceList.ReferenceList.IndexOf(functionReferenceList.Placeholder);
+                    functionReferenceList.ReferenceList.Insert(index, functionReference);
                 }
             }
 
@@ -326,7 +335,9 @@ public class GlobalLoweringContext
                     var functionDataType = new LoweredPointerDataType(
                         (LoweredFunctionDataType)function.Declaration.DataType
                     );
-                    functionTypeList.Add(new LoweredStructDataTypeField(function.UnqualifiedName, functionDataType));
+                    var index = functionTypeList.TypeList.IndexOf(functionTypeList.Placeholder);
+                    var field = new LoweredStructDataTypeField(function.UnqualifiedName, functionDataType);
+                    functionTypeList.TypeList.Insert(index, field);
                 }
             }
         }

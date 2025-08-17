@@ -38,7 +38,18 @@ public class LoweredSliceDataType(ILoweredDataType innerType) : ILoweredDataType
         => $"[{InnerType}]";
 }
 
-public record LoweredStructDataTypeField(string Name, ILoweredDataType DataType);
+public record LoweredStructDataTypeField(string Name, ILoweredDataType DataType)
+{
+    public bool IsPlaceholder { get; init; }
+
+    public static LoweredStructDataTypeField CreatePlaceholder()
+    {
+        return new LoweredStructDataTypeField(string.Empty, new LoweredPrimitiveDataType(Primitive.Void))
+        {
+            IsPlaceholder = true,
+        };
+    }
+}
 
 public class LoweredStructDataType(List<LoweredStructDataTypeField> fields, string? name) : ILoweredDataType
 {

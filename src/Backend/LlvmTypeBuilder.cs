@@ -78,6 +78,9 @@ public class LlvmTypeBuilder(LLVMContextRef llvmContext)
         var fieldTypes = new List<LLVMTypeRef>();
         foreach (var fieldType in dataType.Fields)
         {
+            if (fieldType.IsPlaceholder)
+                continue;
+
             if (fieldType.DataType is LoweredStructDataType)
             {
                 fieldTypes.Add(LLVMTypeRef.CreatePointer(_context.VoidType, 0));

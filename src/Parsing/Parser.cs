@@ -197,6 +197,11 @@ public class Parser
         var start = EatExpected(TokenKind.Class).Span;
         var identifier = EatExpected(TokenKind.Identifier);
 
+        var typeScope = new TypeScope(parent: null);
+        var typeParameters = new List<SyntaxTypeParameterNode>();
+        if (Match(TokenKind.OpenBracket))
+            typeParameters = ParseTypeParameters(typeScope);
+
         var subTypes = new List<SyntaxTypeNode>();
         if (AdvanceIf(TokenKind.Colon))
         {
@@ -206,11 +211,6 @@ public class Parser
             }
             while (AdvanceIf(TokenKind.Comma));
         }
-
-        var typeScope = new TypeScope(parent: null);
-        var typeParameters = new List<SyntaxTypeParameterNode>();
-        if (Match(TokenKind.OpenBracket))
-            typeParameters = ParseTypeParameters(typeScope);
 
         EatExpected(TokenKind.OpenBrace);
 

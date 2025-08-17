@@ -552,7 +552,34 @@ public class SemanticClassDeclarationNode(
             : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllMethods();
         var memberFunctions = Functions.Where(x => !x.IsStatic);
 
-        return inheritedFunctions.Concat(memberFunctions);
+        return memberFunctions.Concat(inheritedFunctions);
+    }
+
+    public List<SemanticFunctionDeclarationNode> GetVtableMethods()
+    {
+        var methods = InheritedClass?.SemanticDeclaration is SemanticClassDeclarationNode parentClass
+            ? parentClass.GetVtableMethods()
+            : [];
+        var indexMap = methods
+            .Index()
+            .ToDictionary(x => x.Item.Symbol.Name, x => x.Index);
+        foreach (var function in Functions)
+        {
+            var isVirtual = function.Symbol.IsVirtual || function.Symbol.SyntaxDeclaration.IsOverride;
+            if (function.IsStatic || !isVirtual)
+                continue;
+
+            if (indexMap.TryGetValue(function.Symbol.Name, out var index))
+            {
+                methods[index] = function;
+            }
+            else
+            {
+                methods.Add(function);
+            }
+        }
+
+        return methods;
     }
 }
 

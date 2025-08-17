@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Caique.Analysis;
 using Caique.Backend;
 using Caique.Lexing;
@@ -241,7 +242,7 @@ public class Lowerer
     }
 
     private void GenerateFunctionOnDemandForAllSpecialisationsOfStructure(
-        FunctionSymbol symbol,
+        FunctionSymbol implementationSymbol,
         FunctionDataType virtualFunctionDataType,
         StructureSymbol structureSymbol,
         List<IDataType> structureTypeArguments
@@ -249,9 +250,9 @@ public class Lowerer
     {
         // Pass on the _typeArgumentResolver, which is cloned and saved for the later generation.
         // Also save a closure that will be used to generate the function.
-        var functionFileScope = SyntaxTree.GetFileScope(symbol.SyntaxDeclaration)!;
+        var functionFileScope = SyntaxTree.GetFileScope(implementationSymbol.SyntaxDeclaration)!;
         _globalLoweringContext.AddOnDemandGenericFunctionForAllSpecialisationsOfStructure(
-            symbol,
+            implementationSymbol,
             functionFileScope,
             virtualFunctionDataType,
             structureSymbol,
@@ -261,7 +262,7 @@ public class Lowerer
             {
                 var pushCount = _typeArgumentResolver.PushAllFromOtherResolver(typeArgumentResolver);
 
-                var semanticDeclaration = symbol.SemanticDeclaration!;
+                var semanticDeclaration = implementationSymbol.SemanticDeclaration!;
                 var typeArguments = virtualFunctionDataType.TypeArguments;
                 var declaration = BuildFunctionDeclarationWithPregeneratedInstance(
                     semanticDeclaration,
@@ -496,11 +497,9 @@ public class Lowerer
             // Get the vtable from the type table
             vtableReference = new LoweredFieldReferenceNode(
                 typeTableType,
-                typeTableReference,
+                new LoweredLoadNode(typeTableReference),
                 0,
-                new LoweredPointerDataType(
-                    new LoweredPointerDataType(vtableType)
-                )
+                new LoweredPointerDataType(vtableType)
             );
 
             var declaration = classNode
@@ -550,12 +549,42 @@ public class Lowerer
 
         var vtablePointer = new LoweredLoadNode(vtableReference);
 
+        var name = callNode.DataType.IsVoid()
+            ? string.Empty
+            : "call";
+
+        if (functionDataType.Symbol.SyntaxDeclaration.TypeParameters.Count > 0)
+        {
+            var implementors = objectInstanceDataType
+                .Symbol
+                .GetAllNestedImplementors()
+                .Append(objectInstanceDataType.Symbol);
+            foreach (var implementationSymbol in implementors)
+            {
+                var symbol = implementationSymbol
+                    .SemanticDeclaration!
+                    .Functions
+                    .FirstOrDefault(x => x.Identifier.Value == functionDataType.Symbol.SemanticDeclaration!.Identifier.Value)?
+                    .Symbol;
+                if (symbol == null)
+                    continue;
+
+                GenerateFunctionOnDemandForAllSpecialisationsOfStructure(
+                    symbol,
+                    functionDataType,
+                    implementationSymbol,
+                    objectInstanceDataType.TypeArguments
+                );
+            }
+        }
+
         // Get the function from the vtable
         var functionDeclaration = _typeBuilder.BuildFunctionType(
             functionDataType.Symbol,
             functionDataType.TypeArguments,
             objectInstanceDataType.TypeArguments
         );
+
         // We can't get the field by index since vtable fields are created on-demand
         // for generic functions.
         var unqualifiedName = _mangler.BuildUnqualifiedFunctionName(
@@ -569,29 +598,6 @@ public class Lowerer
             new LoweredPointerDataType(functionDeclaration)
         );
         var actualFunctionPointer = new LoweredLoadNode(actualFunctionReference);
-
-        var name = callNode.DataType.IsVoid()
-            ? string.Empty
-            : "call";
-
-        if (functionDataType.Symbol.SyntaxDeclaration.TypeParameters.Count > 0)
-        {
-            // TODO: Probably need to get nested implementors too?
-            foreach (var implementationSymbol in objectInstanceDataType.Symbol.Implementors.Append(objectInstanceDataType.Symbol))
-            {
-                var symbol = implementationSymbol
-                    .SemanticDeclaration!
-                    .Functions
-                    .First(x => x.Identifier.Value == functionDataType.Symbol.SemanticDeclaration!.Identifier.Value)
-                    .Symbol;
-                GenerateFunctionOnDemandForAllSpecialisationsOfStructure(
-                    symbol,
-                    functionDataType,
-                    implementationSymbol,
-                    objectInstanceDataType.TypeArguments
-                );
-            }
-        }
 
         return new LoweredCallNode(actualFunctionPointer, arguments, functionDeclaration.ReturnType);
     }
@@ -957,7 +963,7 @@ public class Lowerer
         return BuildFunctionDeclarationWithParameters(name, node, parameters, dataType);
     }
 
-    private LoweredFunctionDeclarationNode BuildFunctionDeclarationWithPregeneratedInstance(
+    private LoweredFunctionDeclarationNode? BuildFunctionDeclarationWithPregeneratedInstance(
         SemanticFunctionDeclarationNode node,
         List<IDataType>? functionTypeArguments,
         LoweredStructDeclarationNode loweredInstanceDeclaration
@@ -968,12 +974,14 @@ public class Lowerer
             functionTypeArguments ?? [],
             loweredInstanceDeclaration.Identifier
         );
-        if (_functions.TryGetValue(name, out var existing))
-            return existing;
+        if (_functions.ContainsKey(name))
+            return null;
 
+        var selfType = new LoweredPointerDataType(new LoweredPrimitiveDataType(Primitive.Void));
         var parameters = node
             .Parameters
             .Select(Visit)
+            .Prepend(new LoweredParameterNode("self", selfType))
             .ToList();
         var parameterTypes = parameters
             .Select(x => x.DataType)
@@ -1043,6 +1051,21 @@ public class Lowerer
         List<IDataType> typeArguments
     )
     {
+        if (node.InheritedClass != null && node.InheritedClass.SyntaxDeclaration.TypeParameters.Count > 0)
+        {
+            var baseDataType = new StructureDataType(node.InheritedClass.SyntaxDeclaration.Symbol!, typeArguments);
+            GenerateStructOnDemand(baseDataType);
+        }
+
+        foreach (var protocol in node.ImplementedProtocols)
+        {
+            if (protocol.SyntaxDeclaration.TypeParameters.Count > 0)
+            {
+                var protocolDataType = new StructureDataType(protocol.SyntaxDeclaration.Symbol!, typeArguments);
+                GenerateStructOnDemand(protocolDataType);
+            }
+        }
+
         var name = _mangler.BuildStructName(node, typeArguments);
         var fields = node
             .GetAllMemberFields()
@@ -1381,8 +1404,14 @@ public class Lowerer
         {
             var implementor = implementorDataType.Symbol.SemanticDeclaration!;
             var implemented = implementedDataType.Symbol.SemanticDeclaration!;
+
+            // TODO: When default implementions in protocols are a thing, include them here
+            var functions = implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration
+                ? classDeclaration.GetVtableMethods()
+                : implementor.Functions.Where(x => !x.IsStatic);
+
             var functionReferences = new List<LoweredNode>();
-            foreach (var function in implementor.Functions.Where(x => !x.IsStatic))
+            foreach (var function in functions)
             {
                 if (function.Symbol.SyntaxDeclaration.TypeParameters.Count == 0)
                 {
@@ -1393,7 +1422,11 @@ public class Lowerer
                 }
                 else
                 {
-                    _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, functionReferences);
+                    var placeholder = new LoweredOnDemandReferencePlaceholderNode();
+                    functionReferences.Add(placeholder);
+
+                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder);
+                    _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);
                 }
             }
 
@@ -1437,7 +1470,9 @@ public class Lowerer
         );
         _globals[typeTableType.Name!] = global;
 
-        return structValue;
+        return new LoweredLoadNode(
+            new LoweredGlobalReferenceNode(typeTableType.Name!, typeTableType)
+        );
     }
 
     private LoweredNode? Visit(SemanticProtocolDeclarationNode node)
