@@ -460,7 +460,6 @@ public class GenericsTests
             .AssertSuccessWithExitCode(2);
     }
 
-
     [Test]
     public void TestNonGenericFunction_InInheritedGenericClass()
     {
@@ -504,9 +503,43 @@ public class GenericsTests
             .AssertSuccessWithExitCode(2);
     }
 
-    // A[A[T]]
-    // A[T] that contains a field A[T]? This should be a test in ClassTests.cs at least
-    // TODO: TestGenericFunction_InInheritedParentClass with some other methods in the classes in different order and so on
+    [Test]
+    public void TestGenericClass_WithNestedSelf()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let p A[A[i32]] = new A[A[i32]](new A[i32](3));
+                    if p.x.x == 3
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+
+            }
+
+            class A[T]
+            {
+                pub var x T;
+
+                init(x)
+                {
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
     // TODO: Generics in different files and namespaces
     // TODO: One generics test with EVERYTHING
     // TODO: Document describing how generics work

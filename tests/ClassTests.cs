@@ -273,4 +273,34 @@ public class ClassTests
             .Compile()
             .AssertSingleCompilationError(DiagnosticCode.ErrorSymbolIsPrivate);
     }
+
+    [Test]
+    public void TestClassWithSelfField()
+    {
+        var mainFile = """
+            module Main
+            {
+                func Run() i32
+                {
+                    let c1 = new C();
+                    let c2 = new C();
+                    c1.a = c2;
+                    c2.b = 3;
+
+                    c1.a.b
+                }
+            }
+
+            class C
+            {
+                pub var a C;
+                pub var b i32;
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .Run()
+            .AssertSuccessWithExitCode(3);
+    }
 }
