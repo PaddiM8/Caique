@@ -52,7 +52,7 @@ public class LlvmContentEmitter
         emitter.EmitHeaders(tree);
 
         foreach (var function in tree.Functions.Values)
-            emitter.Next(function);
+            emitter.Visit(function);
 
         if (compilationOptions?.DumpIr is true)
         {

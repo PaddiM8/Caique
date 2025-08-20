@@ -25,6 +25,9 @@ public record ReferenceListSpot(List<LoweredNode> ReferenceList, LoweredOnDemand
 
 public class GlobalLoweringContext
 {
+    // Would've been a ConcurrentSet if that was a thing
+    public ConcurrentDictionary<string, bool> AlreadyGeneratedSpecialisationsOfVirtualMethods { get; } = [];
+
     private readonly ConcurrentDictionary<string, bool> _alreadyGeneratedVtables = [];
 
     // Generics
@@ -232,6 +235,7 @@ public class GlobalLoweringContext
         functionEntries ??= [];
 
         List<OnDemandGeneratedFunctionEntry> virtualFunctionEntries = [];
+        HashSet<OnDemandGeneratedFunctionEntry> protocolFunctionEntries = [];
         lock (_onDemandVirtualFunctionGenerationLock)
         {
             _onDemandGeneratedVirtualFunctionsByFileScope.TryGetValue(fileScope, out var ungeneratedVirtualFunctions);
@@ -265,13 +269,19 @@ public class GlobalLoweringContext
                     );
                     virtualFunctionEntries.Add(entry);
 
-                    var virtualEntry = new OnDemandGeneratedFunctionEntry(
-                        ungeneratedVirtualFunction.VirtualFunctionDataType.Symbol,
-                        unqualifiedName,
-                        generatedDeclaration
-                    );
-                    // TODO: Why was this here?
-                    //virtualFunctionEntries.Add(virtualEntry);
+                    // A type like SomeProtocol.vtable.SomeProtocol might be generated for protocols,
+                    // to provide a generic type that can be used when the concrete type is not known.
+                    // This means that, in the case of protocols, we also need to process the protocol's
+                    // functions here in order to fill out the type list.
+                    if (ungeneratedVirtualFunction.VirtualFunctionDataType.InstanceDataType?.IsProtocol() is true)
+                    {
+                        var virtualEntry = new OnDemandGeneratedFunctionEntry(
+                            ungeneratedVirtualFunction.VirtualFunctionDataType.Symbol,
+                            unqualifiedName,
+                            generatedDeclaration
+                        );
+                        protocolFunctionEntries.Add(virtualEntry);
+                    }
 
                     ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
                     ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
@@ -279,7 +289,9 @@ public class GlobalLoweringContext
             }
         }
 
-        var allEntries = functionEntries.Concat(virtualFunctionEntries);
+        var allEntries = functionEntries
+            .Concat(virtualFunctionEntries)
+            .Concat(protocolFunctionEntries);
         ResolveIncompleteLists(allEntries);
 
         return allEntries.Select(x => x.Declaration);

@@ -974,7 +974,7 @@ public class Lowerer
             functionTypeArguments ?? [],
             loweredInstanceDeclaration.Identifier
         );
-        if (_functions.ContainsKey(name))
+        if (!_globalLoweringContext.AlreadyGeneratedSpecialisationsOfVirtualMethods.TryAdd(name, true))
             return null;
 
         var selfType = new LoweredPointerDataType(new LoweredPrimitiveDataType(Primitive.Void));
@@ -989,14 +989,15 @@ public class Lowerer
         var returnType = _typeBuilder.BuildType(node.ReturnType);
         var dataType = new LoweredFunctionDataType(parameterTypes, returnType);
 
-        return BuildFunctionDeclarationWithParameters(name, node, parameters, dataType);
+        return BuildFunctionDeclarationWithParameters(name, node, parameters, dataType, isAddedLater: true);
     }
 
     private LoweredFunctionDeclarationNode BuildFunctionDeclarationWithParameters(
         string name,
         SemanticFunctionDeclarationNode node,
         List<LoweredParameterNode> parameters,
-        ILoweredDataType loweredDataType
+        ILoweredDataType loweredDataType,
+        bool isAddedLater = false
     )
     {
         var declaration = new LoweredFunctionDeclarationNode(
@@ -1006,7 +1007,8 @@ public class Lowerer
             loweredDataType,
             node.Span
         );
-        _functions[name] = declaration;
+        if (!isAddedLater)
+            _functions[name] = declaration;
 
         var body = node.Body == null
             ? null
@@ -1430,7 +1432,6 @@ public class Lowerer
                 }
             }
 
-            vtableType = _typeBuilder.BuildVtableType(implementedDataType, implementorDataType);
             structValue = new LoweredConstStructNode(
                 functionReferences,
                 vtableType

@@ -154,7 +154,10 @@ public class Compilation
             var onDemandGeneratedFunctions = globalLoweringContext.GetOnDemandGeneratedFunctionsForFile(loweredTree.FileScope);
             foreach (var onDemandGeneratedFunction in onDemandGeneratedFunctions)
                 loweredTree.Functions[onDemandGeneratedFunction.Identifier] = onDemandGeneratedFunction;
+        }
 
+        foreach (var loweredTree in loweredTrees)
+        {
             var emitterContext = new LlvmEmitterContext(loweredTree.ModuleName, llvmContext);
             var targetPath = GetTargetDirectory(projectFilePath);
             var result = LlvmContentEmitter.Emit(

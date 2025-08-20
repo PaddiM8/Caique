@@ -263,7 +263,6 @@ public class GenericsTests
     [Test]
     public void TestGenericFunction_InProtocol()
     {
-        return;
         var mainFile = """
             module Main
             {
@@ -540,7 +539,56 @@ public class GenericsTests
             .AssertSuccessWithExitCode(2);
     }
 
-    // TODO: Generics in different files and namespaces
+    [Test]
+    public void TestGenericVirtualFunction_InDifferentNamespace()
+    {
+        var mainFile = """
+            with other;
+
+            module Main
+            {
+                func Run() i32
+                {
+                    let p P = new A();
+                    let a = p.Generic[i32]() == size_of(i32);
+                    let b = p.Generic[i64]() == size_of(i64);
+                    if a && b
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+
+            }
+            """;
+        var otherFile = """
+            protocol P
+            {
+                func Generic[T]() usize;
+            }
+
+            class A : P
+            {
+                pub func Generic[T]() usize
+                {
+                    size_of(T)
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .AddNamespace("other", other =>
+            {
+                return other.AddFile("otherFile", otherFile);
+            })
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
     // TODO: One generics test with EVERYTHING
     // TODO: Document describing how generics work
 }
