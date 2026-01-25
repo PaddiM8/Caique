@@ -12,6 +12,9 @@ class NameMangler(TypeArgumentResolver typeArgumentResolver)
         if (dataType is StructureDataType structureDataType)
             return structureDataType.QualifiedName + MangleTypeArgumentList(structureDataType.TypeArguments);
 
+        if (dataType is TypeParameterDataType typeParameterDataType)
+            return BuildTypeName(_typeArgumentResolver.Resolve(typeParameterDataType.Symbol));
+
         return dataType.ToString()!;
     }
 

@@ -213,11 +213,15 @@ public class Lowerer
     {
         var functionFileScope = SyntaxTree.GetFileScope(symbol.SyntaxDeclaration)!;
         var unqualifiedName = _mangler.BuildUnqualifiedFunctionName(symbol.SemanticDeclaration!, functionDataType.TypeArguments);
+        var structName = structureDeclaration == null
+            ? null
+            : _mangler.BuildStructName(structureDeclaration, structureTypeArguments);
         _globalLoweringContext.AddOnDemandGenericFunction(
             symbol,
             name,
             unqualifiedName,
             functionFileScope,
+            structName,
             () =>
             {
                 if (structureDeclaration != null)
@@ -229,7 +233,8 @@ public class Lowerer
                 var loweredDeclaration = BuildFunctionDeclaration(
                     declaration,
                     functionDataType.TypeArguments,
-                    structureTypeArguments
+                    structureTypeArguments,
+                    isAddedLater: true
                 );
 
                 _typeArgumentResolver.PopTypeArguments();
@@ -269,6 +274,7 @@ public class Lowerer
                     typeArguments,
                     instanceDeclaration
                 );
+
                 var unqualifiedName = _mangler.BuildUnqualifiedFunctionName(semanticDeclaration, typeArguments);
 
                 for (var i = 0; i < pushCount; i++)
@@ -624,16 +630,15 @@ public class Lowerer
         _globalLoweringContext.AddOnDemandGenericStructure(
             structureDataType.Symbol,
             name,
+            structureDataType.TypeArguments,
             structureFileScope,
             () =>
             {
                 var declaration = structureDataType.Symbol.SemanticDeclaration!;
-                _typeArgumentResolver.PushTypeArguments(structureDataType.TypeArguments, declaration);
-
                 var loweredDeclaration = BuildStructureDeclaration(declaration, structureDataType.TypeArguments);
-                _typeArgumentResolver.PopTypeArguments();
+                var clonedResolver = (TypeArgumentResolver)_typeArgumentResolver.Clone();
 
-                return loweredDeclaration;
+                return (loweredDeclaration, clonedResolver);
             }
         );
     }
@@ -940,7 +945,8 @@ public class Lowerer
     private LoweredFunctionDeclarationNode BuildFunctionDeclaration(
         SemanticFunctionDeclarationNode node,
         List<IDataType>? functionTypeArguments,
-        List<IDataType>? structureTypeArguments
+        List<IDataType>? structureTypeArguments,
+        bool isAddedLater = false
     )
     {
         var name = _mangler.BuildFunctionName(
@@ -948,6 +954,7 @@ public class Lowerer
             functionTypeArguments ?? [],
             structureTypeArguments ?? []
         );
+
         var parameters = node
             .Parameters
             .Select(Visit)
@@ -960,7 +967,7 @@ public class Lowerer
             parameters.Insert(0, new LoweredParameterNode("self", instanceType));
         }
 
-        return BuildFunctionDeclarationWithParameters(name, node, parameters, dataType);
+        return BuildFunctionDeclarationWithParameters(name, node, parameters, dataType, isAddedLater);
     }
 
     private LoweredFunctionDeclarationNode? BuildFunctionDeclarationWithPregeneratedInstance(
@@ -1033,7 +1040,7 @@ public class Lowerer
         {
             var loweredDeclaration = BuildClassDeclaration(node, []);
             _structs[loweredDeclaration.Identifier] = loweredDeclaration;
-            _globalLoweringContext.AddPregeneratedStructure(node.Symbol, loweredDeclaration);
+            _globalLoweringContext.AddPregeneratedStructure(node.Symbol, loweredDeclaration, _typeArgumentResolver);
         }
 
         return null;
@@ -1041,11 +1048,17 @@ public class Lowerer
 
     private LoweredStructDeclarationNode BuildStructureDeclaration(ISemanticStructureDeclaration node, List<IDataType> typeArguments)
     {
-        return node switch
+        _typeArgumentResolver.PushTypeArguments(typeArguments, node);
+
+        var lowered = node switch
         {
             SemanticClassDeclarationNode classNode => BuildClassDeclaration(classNode, typeArguments),
             _ => throw new InvalidOperationException(),
         };
+
+        _typeArgumentResolver.PopTypeArguments();
+
+        return lowered;
     }
 
     private LoweredStructDeclarationNode BuildClassDeclaration(
@@ -1427,7 +1440,8 @@ public class Lowerer
                     var placeholder = new LoweredOnDemandReferencePlaceholderNode();
                     functionReferences.Add(placeholder);
 
-                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder);
+                    var implementorName = _mangler.BuildStructName(implementor, implementorDataType.TypeArguments);
+                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, implementorName);
                     _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);
                 }
             }

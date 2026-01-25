@@ -311,6 +311,7 @@ public class LlvmContentEmitter
         var instanceType = _typeBuilder.BuildType(node.InstanceDataType);
         var index = node.InstanceDataType
             .Fields
+            .Where(x => !x.IsPlaceholder)
             .Index()
             .First(x => x.Item.Name == node.Name)
             .Index;

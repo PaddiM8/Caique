@@ -21,11 +21,15 @@ public class TestProject
         _project = project;
     }
 
-    public static TestProject Create()
+    public static TestProject Create(string? name = "test")
     {
-        var name = TestContext.CurrentContext.Test.Name;
-        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output", name);
+        var path = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "output",
+            TestContext.CurrentContext.Test.Name
+        );
         Directory.CreateDirectory(path);
+        Debug.Assert(name != null);
 
         var project = new Project(name, path);
         var projectNamespace = new NamespaceScope(name, path, parent: null, project);

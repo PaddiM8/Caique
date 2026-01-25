@@ -22,14 +22,19 @@ public class TypeArgumentResolver : ICloneable
         _typeArgumentStack = [];
     }
 
-    private TypeArgumentResolver(IEnumerable<TypeArgumentQueueEntry> entries)
+    private TypeArgumentResolver(Stack<TypeArgumentQueueEntry> entries)
     {
-        _typeArgumentStack = new Stack<TypeArgumentQueueEntry>(entries);
+        _typeArgumentStack = entries;
     }
 
     public object Clone()
     {
-        return new TypeArgumentResolver([.._typeArgumentStack]);
+        // https://stackoverflow.com/questions/7391348/how-to-clone-a-stackt
+        var buffer = new TypeArgumentQueueEntry[_typeArgumentStack.Count];
+        _typeArgumentStack.CopyTo(buffer, 0);
+        Array.Reverse(buffer);
+
+        return new TypeArgumentResolver(new Stack<TypeArgumentQueueEntry>(buffer));
     }
 
     public IDataType Resolve(TypeSymbol typeSymbol)
@@ -45,7 +50,7 @@ public class TypeArgumentResolver : ICloneable
 
     public int PushAllFromOtherResolver(TypeArgumentResolver other)
     {
-        foreach (var entry in other._typeArgumentStack)
+        foreach (var entry in other._typeArgumentStack.Reverse())
             _typeArgumentStack.Push(entry);
 
         return other._typeArgumentStack.Count;

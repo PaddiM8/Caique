@@ -55,7 +55,7 @@ public class LoweredStructDataType(List<LoweredStructDataTypeField> fields, stri
 {
     public string? Name { get; } = name;
 
-    public List<LoweredStructDataTypeField> Fields { get; } = fields;
+    public List<LoweredStructDataTypeField> Fields { get; set; } = fields;
 
     public override string ToString()
     {

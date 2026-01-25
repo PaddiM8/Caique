@@ -7,7 +7,8 @@ namespace Caique.Lowering;
 record OnDemandGeneratedFunctionEntry(
     FunctionSymbol Symbol,
     string UnqualifiedName,
-    LoweredFunctionDeclarationNode Declaration
+    LoweredFunctionDeclarationNode Declaration,
+    string? StructName
 );
 
 record OnDemandGeneratedVirtualFunctionEntry(
@@ -19,14 +20,31 @@ record OnDemandGeneratedVirtualFunctionEntry(
     Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode?, string?)> GenerateDeclaration
 );
 
-public record TypeListSpot(List<LoweredStructDataTypeField> TypeList, LoweredStructDataTypeField Placeholder);
+public record TypeListSpot(
+    List<LoweredStructDataTypeField> TypeList,
+    LoweredStructDataTypeField Placeholder,
+    string StructName
+);
 
-public record ReferenceListSpot(List<LoweredNode> ReferenceList, LoweredOnDemandReferencePlaceholderNode Placeholder);
+public record ReferenceListSpot(
+    List<LoweredNode> ReferenceList,
+    LoweredOnDemandReferencePlaceholderNode Placeholder,
+    string StructName
+);
+
+record GeneratedStructureEntry(
+    LoweredStructDeclarationNode LoweredDeclaration,
+    ISemanticStructureDeclaration SemanticDeclaration,
+    List<IDataType> TypeArguments,
+    TypeArgumentResolver TypeArgumentResolver
+);
 
 public class GlobalLoweringContext
 {
     // Would've been a ConcurrentSet if that was a thing
     public ConcurrentDictionary<string, bool> AlreadyGeneratedSpecialisationsOfVirtualMethods { get; } = [];
+
+    public ConcurrentDictionary<ISymbol, LoweredStructDataType> LoweredImplementationDataTypesForProtocol { get; } = [];
 
     private readonly ConcurrentDictionary<string, bool> _alreadyGeneratedVtables = [];
 
@@ -40,11 +58,12 @@ public class GlobalLoweringContext
     private readonly Lock _onDemandFunctionGenerationLock = new();
     private readonly Lock _onDemandVirtualFunctionGenerationLock = new();
 
-    private readonly Dictionary<StructureSymbol, List<LoweredStructDeclarationNode>> _generatedStructureDeclarationsBySymbol = [];
+    private readonly Dictionary<StructureSymbol, List<GeneratedStructureEntry>> _generatedStructureDeclarationsBySymbol = [];
 
     // Would've been a ConcurrentSet if that was a thing
     private readonly ConcurrentDictionary<(FunctionSymbol, ReferenceListSpot), bool> _incompleteFunctionReferenceLists = [];
     private readonly ConcurrentDictionary<(FunctionSymbol, TypeListSpot), bool> _incompleteFunctionTypeLists = [];
+    private readonly ConcurrentDictionary<(LoweredStructDataType, StructureSymbol), bool> _incompleteLoweredDataTypes = [];
 
     public void RegisterVtable(string name)
     {
@@ -69,8 +88,9 @@ public class GlobalLoweringContext
     public void AddOnDemandGenericStructure(
         StructureSymbol symbol,
         string name,
+        List<IDataType> typeArguments,
         FileScope fileScope,
-        Func<LoweredStructDeclarationNode> generateDeclaration
+        Func<(LoweredStructDeclarationNode, TypeArgumentResolver)> generateDeclaration
     )
     {
         lock (_onDemandStructGenerationLock)
@@ -80,7 +100,7 @@ public class GlobalLoweringContext
 
             _keysForAlreadyGeneratedStructs.Add(name);
 
-            var declaration = generateDeclaration();
+            var (declaration, typeArgumentResolver) = generateDeclaration();
             if (_onDemandGeneratedStructsByFileScope.TryGetValue(fileScope, out var entries))
             {
                 entries.Add(declaration);
@@ -90,28 +110,35 @@ public class GlobalLoweringContext
                 _onDemandGeneratedStructsByFileScope[fileScope] = [declaration];
             }
 
+            var entry = new GeneratedStructureEntry(declaration, symbol.SemanticDeclaration!, typeArguments, typeArgumentResolver);
             if (_generatedStructureDeclarationsBySymbol.TryGetValue(symbol, out var entriesForSymbol))
             {
-                entriesForSymbol.Add(declaration);
+                entriesForSymbol.Add(entry);
             }
             else
             {
-                _generatedStructureDeclarationsBySymbol[symbol] = [declaration];
+                _generatedStructureDeclarationsBySymbol[symbol] = [entry];
             }
         }
     }
 
-    public void AddPregeneratedStructure(StructureSymbol symbol, LoweredStructDeclarationNode declaration)
+    public void AddPregeneratedStructure(StructureSymbol symbol, LoweredStructDeclarationNode declaration, TypeArgumentResolver typeArgumentResolver)
     {
         lock (_onDemandStructGenerationLock)
         {
+            var entry = new GeneratedStructureEntry(
+                declaration,
+                symbol.SemanticDeclaration!,
+                [],
+                (TypeArgumentResolver)typeArgumentResolver.Clone()
+            );
             if (_generatedStructureDeclarationsBySymbol.TryGetValue(symbol, out var entriesForSymbol))
             {
-                entriesForSymbol.Add(declaration);
+                entriesForSymbol.Add(entry);
             }
             else
             {
-                _generatedStructureDeclarationsBySymbol[symbol] = [declaration];
+                _generatedStructureDeclarationsBySymbol[symbol] = [entry];
             }
         }
     }
@@ -131,6 +158,7 @@ public class GlobalLoweringContext
         string qualifiedName,
         string unqualifiedName,
         FileScope fileScope,
+        string? structName,
         Func<LoweredFunctionDeclarationNode> generateDeclaration
     )
     {
@@ -142,7 +170,7 @@ public class GlobalLoweringContext
             _keysForAlreadyGeneratedFunctions.Add(qualifiedName);
 
             var declaration = generateDeclaration.Invoke();
-            var entry = new OnDemandGeneratedFunctionEntry(symbol, unqualifiedName, declaration);
+            var entry = new OnDemandGeneratedFunctionEntry(symbol, unqualifiedName, declaration, structName);
             if (_onDemandGeneratedFunctionsByFileScope.TryGetValue(fileScope, out var entries))
             {
                 entries.Add(entry);
@@ -214,6 +242,11 @@ public class GlobalLoweringContext
         _incompleteFunctionTypeLists.TryAdd((functionSymbol, functionTypes), true);
     }
 
+    public void AddIncompleteStructDataType(LoweredStructDataType dataType, StructureSymbol symbol)
+    {
+        _incompleteLoweredDataTypes.TryAdd((dataType, symbol), true);
+    }
+
     public IEnumerable<LoweredStructDeclarationNode> GetOnDemandGeneratedStructsForFile(FileScope fileScope)
     {
         lock (_onDemandStructGenerationLock)
@@ -246,6 +279,11 @@ public class GlobalLoweringContext
 
                 foreach (var structDeclaration in generatedStructDeclarations)
                 {
+                    int popCount = ungeneratedVirtualFunction.TypeArgumentResolver.PushAllFromOtherResolver(structDeclaration.TypeArgumentResolver);
+                    ungeneratedVirtualFunction.TypeArgumentResolver.PushTypeArguments(
+                        structDeclaration.TypeArguments,
+                        structDeclaration.SemanticDeclaration
+                    );
                     ungeneratedVirtualFunction.TypeArgumentResolver.PushTypeArguments(
                         ungeneratedVirtualFunction.StructureTypeArguments,
                         ungeneratedVirtualFunction.InstanceSymbol.SemanticDeclaration!
@@ -257,7 +295,7 @@ public class GlobalLoweringContext
 
                     var (generatedDeclaration, unqualifiedName) = ungeneratedVirtualFunction.GenerateDeclaration(
                         ungeneratedVirtualFunction.TypeArgumentResolver,
-                        structDeclaration
+                        structDeclaration.LoweredDeclaration
                     );
                     if (generatedDeclaration == null || unqualifiedName == null)
                         continue;
@@ -265,7 +303,8 @@ public class GlobalLoweringContext
                     var entry = new OnDemandGeneratedFunctionEntry(
                         ungeneratedVirtualFunction.ImplementationSymbol,
                         unqualifiedName,
-                        generatedDeclaration
+                        generatedDeclaration,
+                        structDeclaration.LoweredDeclaration.Identifier
                     );
                     virtualFunctionEntries.Add(entry);
 
@@ -278,21 +317,24 @@ public class GlobalLoweringContext
                         var virtualEntry = new OnDemandGeneratedFunctionEntry(
                             ungeneratedVirtualFunction.VirtualFunctionDataType.Symbol,
                             unqualifiedName,
-                            generatedDeclaration
+                            generatedDeclaration,
+                            structDeclaration.LoweredDeclaration.Identifier
                         );
                         protocolFunctionEntries.Add(virtualEntry);
                     }
 
                     ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
                     ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
+                    ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
+
+                    for (var i = 0; i < popCount; i++)
+                        ungeneratedVirtualFunction.TypeArgumentResolver.PopTypeArguments();
                 }
             }
         }
 
-        var allEntries = functionEntries
-            .Concat(virtualFunctionEntries)
-            .Concat(protocolFunctionEntries);
-        ResolveIncompleteLists(allEntries);
+        var allEntries = functionEntries.Concat(virtualFunctionEntries);
+        ResolveIncompleteLists(allEntries.Concat(protocolFunctionEntries));
 
         return allEntries.Select(x => x.Declaration);
     }
@@ -325,12 +367,22 @@ public class GlobalLoweringContext
             }
         }
 
+        var visited = new HashSet<(FunctionSymbol, ReferenceListSpot, string)>();
         foreach (var function in onDemandGeneratedFunctions)
         {
             if (referenceListsBySymbol.TryGetValue(function.Symbol, out var functionReferenceLists))
             {
                 foreach (var functionReferenceList in functionReferenceLists)
                 {
+                    if (functionReferenceList.StructName != function.StructName)
+                        continue;
+
+                    // TODO: Global HashSet?
+                    if (visited.Contains((function.Symbol, functionReferenceList, function.Declaration.Identifier)))
+                        continue;
+
+                    visited.Add((function.Symbol, functionReferenceList, function.Declaration.Identifier));
+
                     var functionReference = new LoweredFunctionReferenceNode(
                         function.Declaration.Identifier,
                         new LoweredPointerDataType(function.Declaration.DataType)
@@ -344,6 +396,9 @@ public class GlobalLoweringContext
             {
                 foreach (var functionTypeList in functionTypeLists)
                 {
+                    if (functionTypeList.StructName != function.StructName)
+                        continue;
+
                     var functionDataType = new LoweredPointerDataType(
                         (LoweredFunctionDataType)function.Declaration.DataType
                     );
@@ -353,5 +408,8 @@ public class GlobalLoweringContext
                 }
             }
         }
+
+        foreach (var (incompleteDataType, symbol) in _incompleteLoweredDataTypes.Keys)
+            incompleteDataType.Fields = LoweredImplementationDataTypesForProtocol[symbol].Fields;
     }
 }

@@ -589,6 +589,87 @@ public class GenericsTests
             .AssertSuccessWithExitCode(2);
     }
 
+    [Test]
+    public void TestGenericVirtualFunctionsInDifferentGenericClasses_InDifferentNamespaces()
+    {
+        var mainFile = """
+            with second_namespace;
+            with third_namespace;
+
+            module Main
+            {
+                func Run() i32
+                {
+                    let p1 P = new A[i32]();
+                    let p2 P = new A[i64]();
+                    let p3 P = new B[i32]();
+                    let a1 = p1.Generic[i32]() == size_of(i32) + size_of(i32);
+                    let a2 = p2.Generic[i32]() == size_of(i32) + size_of(i64);
+
+                    let b1 = p1.Generic[i64]() == size_of(i64) + size_of(i32);
+                    let b2 = p2.Generic[i64]() == size_of(i64) + size_of(i64);
+
+                    let c = p3.Generic[i32]() == size_of(i32) + size_of(i32);
+                    let d = p3.Generic[i64]() == size_of(i64) + size_of(i32);
+
+                    if a1 && a2 && b1 && b2 && c && d
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+            """;
+        var secondFile = """
+            with test:third_namespace;
+
+            protocol P
+            {
+                func Generic[T]() usize;
+            }
+
+            class A[T] : P
+            {
+                pub func Generic[K]() usize
+                {
+                    new B[T]().Generic[K]()
+                }
+            }
+            """;
+        var thirdFile = """
+            with test:second_namespace;
+
+            class B[T] : P
+            {
+                pub func Generic[K]() usize
+                {
+                    size_of(T) + size_of(K)
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .AddNamespace("second_namespace", other =>
+            {
+                return other.AddFile("second_file", secondFile);
+            })
+            .AddNamespace("third_namespace", other =>
+            {
+                return other.AddFile("third_file", thirdFile);
+            })
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    // TODO: A inherits from B which inherits from C. A function F[T] exists in C and A (making it virtual). Call it from B
+    //       Oh same as the todo below I guess
+    // TODO: Multiple virtual generic methods in one class
+    // TODO: Class that inherits from a class and also implements an interface, with one generic virtual method in each
+    // TODO: In the "everything" one, make some non-virtual calls as well (to the same methods that are already used)
     // TODO: One generics test with EVERYTHING
     // TODO: Document describing how generics work
 }
