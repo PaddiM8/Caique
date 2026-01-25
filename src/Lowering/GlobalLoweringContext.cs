@@ -64,6 +64,7 @@ public class GlobalLoweringContext
     private readonly ConcurrentDictionary<(FunctionSymbol, ReferenceListSpot), bool> _incompleteFunctionReferenceLists = [];
     private readonly ConcurrentDictionary<(FunctionSymbol, TypeListSpot), bool> _incompleteFunctionTypeLists = [];
     private readonly ConcurrentDictionary<(LoweredStructDataType, StructureSymbol), bool> _incompleteLoweredDataTypes = [];
+    private readonly ConcurrentDictionary<(string functionIdentifier, ReferenceListSpot), bool> _resolvedFunctionReferenceListPairs = [];
 
     public void RegisterVtable(string name)
     {
@@ -367,7 +368,6 @@ public class GlobalLoweringContext
             }
         }
 
-        var visited = new HashSet<(FunctionSymbol, ReferenceListSpot, string)>();
         foreach (var function in onDemandGeneratedFunctions)
         {
             if (referenceListsBySymbol.TryGetValue(function.Symbol, out var functionReferenceLists))
@@ -377,11 +377,11 @@ public class GlobalLoweringContext
                     if (functionReferenceList.StructName != function.StructName)
                         continue;
 
-                    // TODO: Global HashSet?
-                    if (visited.Contains((function.Symbol, functionReferenceList, function.Declaration.Identifier)))
+                    // Keep track of which functions have been added to this function reference list.
+                    // If TryAdd returns false, that means this function has already been added, and
+                    // we should not continue.
+                    if (!_resolvedFunctionReferenceListPairs.TryAdd((function.Declaration.Identifier, functionReferenceList), true))
                         continue;
-
-                    visited.Add((function.Symbol, functionReferenceList, function.Declaration.Identifier));
 
                     var functionReference = new LoweredFunctionReferenceNode(
                         function.Declaration.Identifier,
