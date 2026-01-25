@@ -77,14 +77,17 @@ public class GlobalLoweringContext
     }
 
     /// <summary>
+    /// <para>
     /// Generic structures are generated on-demand since the concrete types are not yet known
     /// before the lowering stage. When, for example, a generic SemanticNewNode is encountered,
     /// a struct for the declaration is generated with the specific type arguments. Since the
     /// SemanticNewNode could be in a different SemanticTree, the struct is added to the global
     /// lowering context, and then added to the correct tree right before the emitting phase.
-    ///
+    /// </para>
+    /// <para>
     /// If a struct has already been generated with the given type arguments, the
     /// <ref>generateDeclaration</ref> function is not called.
+    /// </para>
     /// </summary>
     public void AddOnDemandGenericStructure(
         StructureSymbol symbol,
@@ -145,14 +148,17 @@ public class GlobalLoweringContext
     }
 
     /// <summary>
+    /// <para>
     /// Generic functions are generated on-demand since the concrete types are not yet known
     /// before the lowering stage. When, for example, a generic call node is encountered, a
     /// function for the declaration is generated with the specific type arguments. Since the
     /// call node could be in a different SemanticTree, the function is added to the global
     /// lowering context, and then added to the correct tree right before the emitting phase.
-    ///
+    /// </para>
+    /// <para>
     /// If a function has already been generated with the given type arguments, the
     /// <ref>generateDeclaration</ref> function is not called.
+    /// </para>
     /// </summary>
     public void AddOnDemandGenericFunction(
         FunctionSymbol symbol,
@@ -268,6 +274,15 @@ public class GlobalLoweringContext
 
         functionEntries ??= [];
 
+        // During the regular lowering phase, virtual generic methods can not be generated, because it is not yet known which
+        // concrete structures could be associated with it. For example, if the classes A and B both implement the protocol P,
+        // which has a generic method, all the specialisations of the generic method have to be added to A and B. Therefore,
+        // we have to wait until after all the lowering is done (for all files) before being able to generate all the generic
+        // virtual methods, in order to know which concrete structures they should be added to.
+        //
+        // Further more, when the functions are added to classes, the vtables also have to be updated to include the new
+        // functions. When the vtables are first generated, placeholders are added in the place of generic virtual methods,
+        // so that they can be resolved later at this stage instead.
         List<OnDemandGeneratedFunctionEntry> virtualFunctionEntries = [];
         HashSet<OnDemandGeneratedFunctionEntry> protocolFunctionEntries = [];
         lock (_onDemandVirtualFunctionGenerationLock)
@@ -340,6 +355,13 @@ public class GlobalLoweringContext
         return allEntries.Select(x => x.Declaration);
     }
 
+    /// <summary>
+    /// Generic virtual methods are generated *after* the regular lowering phase has been completed in all files.
+    /// This means that those functions have not yet been added to the parent structures and vtables during the
+    /// lowering phase. Instead, placeholders are inserted into the vtables during lowering, which are then
+    /// resolved later on, in this method, when all the concrete implementing structures of the protocol/parent class
+    /// have been already found and generated.
+    /// </summary>
     private void ResolveIncompleteLists(IEnumerable<OnDemandGeneratedFunctionEntry> onDemandGeneratedFunctions)
     {
         var referenceListsBySymbol = new Dictionary<FunctionSymbol, List<ReferenceListSpot>>();
