@@ -67,9 +67,9 @@ class LoweredTypeBuilder(
         var fields = new List<LoweredStructDataTypeField>();
 
         // TODO: When default implementions in protocols are a thing, include them here
-        var functions = implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration
+        var functions = implemented is SemanticClassDeclarationNode && implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration
             ? classDeclaration.GetVtableMethods()
-            : implementor.Functions.Where(x => !x.IsStatic);
+            : implementor.Functions.AsEnumerable();
 
         functions = functions.Where(x => !x.IsStatic);
 
@@ -88,9 +88,8 @@ class LoweredTypeBuilder(
 
                 // TODO: Shouldn't this be implementor? Implementor doesn't seem to work but
                 // that probably means that the arguments should probably be swapped in some call somewhere
-                var implementorName = _mangler.BuildStructName(implementor, implementorDataType.TypeArguments);
-                var implementedName = _mangler.BuildStructName(implemented, implementedDataType.TypeArguments);
-                var typeListSpot = new TypeListSpot(fields, placeholder, implementedName);
+                var implementedName = _mangler.BuildStructName(implemented.Symbol.SemanticDeclaration!, implementedDataType.TypeArguments);
+                var typeListSpot = new TypeListSpot(fields, placeholder, implementedName, implemented.Symbol);
                 _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, typeListSpot);
             }
         }

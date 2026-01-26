@@ -8,7 +8,8 @@ record OnDemandGeneratedFunctionEntry(
     FunctionSymbol Symbol,
     string UnqualifiedName,
     LoweredFunctionDeclarationNode Declaration,
-    string? StructName
+    string? StructureName,
+    StructureSymbol? VirtualStructureSymbol
 );
 
 record OnDemandGeneratedVirtualFunctionEntry(
@@ -16,6 +17,7 @@ record OnDemandGeneratedVirtualFunctionEntry(
     FunctionDataType VirtualFunctionDataType,
     List<IDataType> StructureTypeArguments,
     StructureSymbol InstanceSymbol,
+    StructureSymbol VirtualInstanceSymbol,
     TypeArgumentResolver TypeArgumentResolver,
     Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode?, string?)> GenerateDeclaration
 );
@@ -23,13 +25,15 @@ record OnDemandGeneratedVirtualFunctionEntry(
 public record TypeListSpot(
     List<LoweredStructDataTypeField> TypeList,
     LoweredStructDataTypeField Placeholder,
-    string StructName
+    string? StructureName,
+    StructureSymbol VirtualStructureSymbol
 );
 
 public record ReferenceListSpot(
     List<LoweredNode> ReferenceList,
     LoweredOnDemandReferencePlaceholderNode Placeholder,
-    string StructName
+    string? StructureName,
+    StructureSymbol VirtualStructureSymbol
 );
 
 record GeneratedStructureEntry(
@@ -64,7 +68,6 @@ public class GlobalLoweringContext
     private readonly ConcurrentDictionary<(FunctionSymbol, ReferenceListSpot), bool> _incompleteFunctionReferenceLists = [];
     private readonly ConcurrentDictionary<(FunctionSymbol, TypeListSpot), bool> _incompleteFunctionTypeLists = [];
     private readonly ConcurrentDictionary<(LoweredStructDataType, StructureSymbol), bool> _incompleteLoweredDataTypes = [];
-    private readonly ConcurrentDictionary<(string functionIdentifier, ReferenceListSpot), bool> _resolvedFunctionReferenceListPairs = [];
 
     public void RegisterVtable(string name)
     {
@@ -165,7 +168,8 @@ public class GlobalLoweringContext
         string qualifiedName,
         string unqualifiedName,
         FileScope fileScope,
-        string? structName,
+        string? structureName,
+        StructureSymbol? structureSymbol,
         Func<LoweredFunctionDeclarationNode> generateDeclaration
     )
     {
@@ -177,7 +181,13 @@ public class GlobalLoweringContext
             _keysForAlreadyGeneratedFunctions.Add(qualifiedName);
 
             var declaration = generateDeclaration.Invoke();
-            var entry = new OnDemandGeneratedFunctionEntry(symbol, unqualifiedName, declaration, structName);
+            var entry = new OnDemandGeneratedFunctionEntry(
+                symbol,
+                unqualifiedName,
+                declaration,
+                structureName,
+                structureSymbol
+            );
             if (_onDemandGeneratedFunctionsByFileScope.TryGetValue(fileScope, out var entries))
             {
                 entries.Add(entry);
@@ -195,6 +205,7 @@ public class GlobalLoweringContext
         FunctionDataType virtualFunctionDataType,
         StructureSymbol structureSymbol,
         List<IDataType> structureTypeArguments,
+        StructureSymbol virtualInstanceSymbol,
         TypeArgumentResolver typeArgumentResolver,
         Func<TypeArgumentResolver, LoweredStructDeclarationNode, (LoweredFunctionDeclarationNode?, string?)> generateDeclaration
     )
@@ -207,6 +218,7 @@ public class GlobalLoweringContext
                 virtualFunctionDataType,
                 structureTypeArguments,
                 structureSymbol,
+                virtualInstanceSymbol,
                 (TypeArgumentResolver)typeArgumentResolver.Clone(),
                 generateDeclaration
             );
@@ -320,7 +332,8 @@ public class GlobalLoweringContext
                         ungeneratedVirtualFunction.ImplementationSymbol,
                         unqualifiedName,
                         generatedDeclaration,
-                        structDeclaration.LoweredDeclaration.Identifier
+                        structDeclaration.LoweredDeclaration.Identifier,
+                        ungeneratedVirtualFunction.VirtualInstanceSymbol
                     );
                     virtualFunctionEntries.Add(entry);
 
@@ -334,7 +347,8 @@ public class GlobalLoweringContext
                             ungeneratedVirtualFunction.VirtualFunctionDataType.Symbol,
                             unqualifiedName,
                             generatedDeclaration,
-                            structDeclaration.LoweredDeclaration.Identifier
+                            structDeclaration.LoweredDeclaration.Identifier,
+                            ungeneratedVirtualFunction.InstanceSymbol
                         );
                         protocolFunctionEntries.Add(virtualEntry);
                     }
@@ -396,13 +410,19 @@ public class GlobalLoweringContext
             {
                 foreach (var functionReferenceList in functionReferenceLists)
                 {
-                    if (functionReferenceList.StructName != function.StructName)
+                    // For protocols, one vtable is generated per protocol and implementor, eg. SomeClass.vtable.SomeProtocol. This means
+                    // that some generated functions will belong to a specific protocol-implementor vtable. Because of this, we filter by
+                    // the virtual structure type here. If we did not do this, the resulting vtable could include references to functions
+                    // that were used on other protocols implemented by the structure.
+                    //
+                    // Note that this only applies to protocols, since eg. inherited classes only have one vtable.
+                    if (functionReferenceList.VirtualStructureSymbol.SemanticDeclaration is not ISemanticInstantiableStructureDeclaration &&
+                        functionReferenceList.VirtualStructureSymbol != function.VirtualStructureSymbol)
+                    {
                         continue;
+                    }
 
-                    // Keep track of which functions have been added to this function reference list.
-                    // If TryAdd returns false, that means this function has already been added, and
-                    // we should not continue.
-                    if (!_resolvedFunctionReferenceListPairs.TryAdd((function.Declaration.Identifier, functionReferenceList), true))
+                    if (functionReferenceList.StructureName != function.StructureName)
                         continue;
 
                     var functionReference = new LoweredFunctionReferenceNode(
@@ -418,7 +438,19 @@ public class GlobalLoweringContext
             {
                 foreach (var functionTypeList in functionTypeLists)
                 {
-                    if (functionTypeList.StructName != function.StructName)
+                    // For protocols, one vtable is generated per protocol and implementor, eg. SomeClass.vtable.SomeProtocol. This means
+                    // that some generated functions will belong to a specific protocol-implementor vtable. Because of this, we filter by
+                    // the virtual structure type here. If we did not do this, the resulting vtable could include references to functions
+                    // that were used on other protocols implemented by the structure.
+                    //
+                    // Note that this only applies to protocols, since eg. inherited classes only have one vtable.
+                    if (functionTypeList.VirtualStructureSymbol.SemanticDeclaration is not ISemanticInstantiableStructureDeclaration &&
+                        functionTypeList.VirtualStructureSymbol != function.VirtualStructureSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (functionTypeList.StructureName != function.StructureName)
                         continue;
 
                     var functionDataType = new LoweredPointerDataType(

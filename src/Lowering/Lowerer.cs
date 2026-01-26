@@ -222,6 +222,7 @@ public class Lowerer
             unqualifiedName,
             functionFileScope,
             structName,
+            structureDeclaration?.Symbol,
             () =>
             {
                 if (structureDeclaration != null)
@@ -250,7 +251,8 @@ public class Lowerer
         FunctionSymbol implementationSymbol,
         FunctionDataType virtualFunctionDataType,
         StructureSymbol structureSymbol,
-        List<IDataType> structureTypeArguments
+        List<IDataType> structureTypeArguments,
+        StructureSymbol virtualInstanceSymbol
     )
     {
         // Pass on the _typeArgumentResolver, which is cloned and saved for the later generation.
@@ -262,6 +264,7 @@ public class Lowerer
             virtualFunctionDataType,
             structureSymbol,
             structureTypeArguments,
+            virtualInstanceSymbol,
             _typeArgumentResolver,
             (typeArgumentResolver, instanceDeclaration) =>
             {
@@ -579,7 +582,8 @@ public class Lowerer
                     symbol,
                     functionDataType,
                     implementationSymbol,
-                    objectInstanceDataType.TypeArguments
+                    objectInstanceDataType.TypeArguments,
+                    objectInstanceDataType.Symbol
                 );
             }
         }
@@ -1421,9 +1425,21 @@ public class Lowerer
             var implemented = implementedDataType.Symbol.SemanticDeclaration!;
 
             // TODO: When default implementions in protocols are a thing, include them here
-            var functions = implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration
-                ? classDeclaration.GetVtableMethods()
-                : implementor.Functions.Where(x => !x.IsStatic);
+            IEnumerable<SemanticFunctionDeclarationNode> functions;
+            if (implemented is SemanticClassDeclarationNode && implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration)
+            {
+                functions = classDeclaration.GetVtableMethods();
+            }
+            else
+            {
+                // Take the functions in the implementor that exist in the implemented type
+                var implementedIdentifiers = implemented.Functions.Select(x => x.Identifier.Value);
+                functions = implementor
+                    .Functions
+                    .IntersectBy(implementedIdentifiers, x => x.Identifier.Value);
+            }
+
+            functions = functions.Where(x => !x.IsStatic);
 
             var functionReferences = new List<LoweredNode>();
             foreach (var function in functions)
@@ -1440,8 +1456,12 @@ public class Lowerer
                     var placeholder = new LoweredOnDemandReferencePlaceholderNode();
                     functionReferences.Add(placeholder);
 
-                    var implementorName = _mangler.BuildStructName(implementor, implementorDataType.TypeArguments);
-                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, implementorName);
+
+                    // For protocols, one vtable is generated per protocol and implementor. That means that this reference list spot
+                    // should only be for the functions in that protocol. Therefore, we set the VirtualStructureSymbol as the protocol's
+                    // symbol.
+                    var implementorName = _mangler.BuildStructName(implementor.Symbol.SemanticDeclaration!, implementorDataType.TypeArguments);
+                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, implementorName, implemented.Symbol);
                     _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);
                 }
             }

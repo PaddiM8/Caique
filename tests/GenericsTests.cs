@@ -590,7 +590,7 @@ public class GenericsTests
     }
 
     [Test]
-    public void TestGenericVirtualFunctionsInDifferentGenericClasses_InDifferentNamespaces()
+    public void TestGenericVirtualFunctions_InDifferentGenericClasses_InDifferentNamespaces()
     {
         var mainFile = """
             with second_namespace;
@@ -665,11 +665,73 @@ public class GenericsTests
             .AssertSuccessWithExitCode(2);
     }
 
+    [Test]
+    public void TestGenericVirtualFunctions_InClassThatInheritsClassAndImplementsProtocol()
+    {
+        var mainFile = """
+            with second_namespace;
+
+            module Main
+            {
+                func Run() i32
+                {
+                    let p P = new B();
+                    let a A = new A();
+                    let b B = new B();
+
+                    let r1 = p.Generic1[i32]() == size_of(i32);
+                    let r2 = a.Generic2[i64]() == size_of(i64);
+                    let r3 = b.Generic1[i16]() == size_of(i16);
+                    let r4 = b.Generic2[i16]() == size_of(i16);
+
+                    if r1 && r2 && r3 && r4
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+            """;
+        var secondFile = """
+            protocol P
+            {
+                func Generic1[T]() usize;
+            }
+
+            inheritable class A
+            {
+                pub func Generic2[T]() usize
+                {
+                    size_of(T)
+                }
+            }
+
+            class B : A, P
+            {
+                pub func Generic1[T]() usize
+                {
+                    size_of(T)
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .AddNamespace("second_namespace", other =>
+            {
+                return other.AddFile("second_file", secondFile);
+            })
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
     // TODO: A inherits from B which inherits from C. A function F[T] exists in C and A (making it virtual). Call it from B
     //       Oh same as the todo below I guess
     // TODO: Multiple virtual generic methods in one class
     // TODO: Class that inherits from a class and also implements an interface, with one generic virtual method in each
-    // TODO: In the "everything" one, make some non-virtual calls as well (to the same methods that are already used)
     // TODO: One generics test with EVERYTHING
     // TODO: Document describing how generics work
 }
