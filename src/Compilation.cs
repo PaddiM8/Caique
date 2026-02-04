@@ -12,7 +12,7 @@ using LLVMSharp.Interop;
 
 namespace Caique;
 
-public class Compilation
+public static class Compilation
 {
     public static IReadOnlyList<Diagnostic> Compile(string projectFilePath, CompilationOptions? options = null)
     {
@@ -154,6 +154,17 @@ public class Compilation
             var onDemandGeneratedFunctions = globalLoweringContext.GetOnDemandGeneratedFunctionsForFile(loweredTree.FileScope);
             foreach (var onDemandGeneratedFunction in onDemandGeneratedFunctions)
                 loweredTree.Functions[onDemandGeneratedFunction.Identifier] = onDemandGeneratedFunction;
+        }
+
+        if (options?.DumpIr is true)
+        {
+            foreach (var loweredTree in loweredTrees)
+            {
+                var targetPath = GetTargetDirectory(projectFilePath);
+                Directory.CreateDirectory(Path.Combine(targetPath, "cqir"));
+                var dumpFilePath = Path.Combine(targetPath, "cqir", $"{loweredTree.ModuleName}.cqir");
+                LoweredTreePrinter.PrintToFile(loweredTree, dumpFilePath);
+            }
         }
 
         foreach (var loweredTree in loweredTrees)
