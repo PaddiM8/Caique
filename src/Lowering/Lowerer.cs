@@ -1416,7 +1416,7 @@ public class Lowerer
 
     private LoweredNode GetOrBuildVtable(StructureDataType implementorDataType, StructureDataType implementedDataType)
     {
-        var vtableType = _typeBuilder.BuildVtableType(implementedDataType, implementorDataType);
+        var vtableType = _typeBuilder.BuildVtableType(implementorDataType, implementedDataType);
         LoweredConstStructNode? structValue = null;
 
         if (!_globalLoweringContext.VtableHasBeenRegistered(vtableType.Name!))
@@ -1456,12 +1456,16 @@ public class Lowerer
                     var placeholder = new LoweredOnDemandReferencePlaceholderNode();
                     functionReferences.Add(placeholder);
 
+                    // Here, we want to get the name of the structure that contains the function, rather than the structure that
+                    // the vtable is used for. It is possible for a function to be defined in a parent class but used in the child class,
+                    // in which case the vtable should refer to the function in the parent class.
+                    var functionParentStructureSymbol = SemanticTree.GetEnclosingStructure(function)!.Symbol.SemanticDeclaration!;
+                    var functionParentStructureName = _mangler.BuildStructName(functionParentStructureSymbol, implementorDataType.TypeArguments);
 
                     // For protocols, one vtable is generated per protocol and implementor. That means that this reference list spot
                     // should only be for the functions in that protocol. Therefore, we set the VirtualStructureSymbol as the protocol's
                     // symbol.
-                    var implementorName = _mangler.BuildStructName(implementor.Symbol.SemanticDeclaration!, implementorDataType.TypeArguments);
-                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, implementorName, implemented.Symbol);
+                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, functionParentStructureName, implemented.Symbol);
                     _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);
                 }
             }

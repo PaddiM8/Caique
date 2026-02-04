@@ -77,7 +77,7 @@ class LoweredTypeBuilder(
         {
             if (function.Symbol.SyntaxDeclaration.TypeParameters.Count == 0)
             {
-                var functionType = BuildType(new FunctionDataType(function.Symbol, implementorDataType, []));
+                var functionType = BuildType(new FunctionDataType(function.Symbol, implementedDataType, []));
                 var functionName = _mangler.BuildUnqualifiedFunctionName(function.Symbol.SemanticDeclaration!, []);
                 fields.Add(new LoweredStructDataTypeField(functionName, functionType));
             }
@@ -86,10 +86,13 @@ class LoweredTypeBuilder(
                 var placeholder = LoweredStructDataTypeField.CreatePlaceholder();
                 fields.Add(placeholder);
 
-                // TODO: Shouldn't this be implementor? Implementor doesn't seem to work but
-                // that probably means that the arguments should probably be swapped in some call somewhere
-                var implementedName = _mangler.BuildStructName(implemented.Symbol.SemanticDeclaration!, implementedDataType.TypeArguments);
-                var typeListSpot = new TypeListSpot(fields, placeholder, implementedName, implemented.Symbol);
+                //var implementedName = _mangler.BuildStructName(implemented.Symbol.SemanticDeclaration!, implementedDataType.TypeArguments);
+
+                // TODO: Why does this cause 4 more tests to fail? Compared to the above
+                // TODO: `function` here could be from inside a protocol
+                var functionParentStructureDeclaration = SemanticTree.GetEnclosingStructure(function)!.Symbol.SemanticDeclaration!;
+                var functionParentStructureName = _mangler.BuildStructName(functionParentStructureDeclaration, implementorDataType.TypeArguments);
+                var typeListSpot = new TypeListSpot(fields, placeholder, functionParentStructureName, implemented.Symbol);
                 _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, typeListSpot);
             }
         }
@@ -102,17 +105,16 @@ class LoweredTypeBuilder(
         // we won't be able to fill out the incomplete lists in the global lowering context, since that
         // relies on knowing how generic functions are used (with which type arguments). Therefore, we
         // need to wait for a concrete implementation to be generated and then steal the types of that.
-        if (implementorDataType.Symbol == implementedDataType.Symbol && implementorDataType.IsProtocol())
+        if (implementorDataType.Symbol == implementedDataType.Symbol && implementedDataType.IsProtocol())
         {
-            _globalLoweringContext.AddIncompleteStructDataType(dataType, implementedDataType.Symbol);
+            _globalLoweringContext.AddIncompleteStructDataType(dataType, implementorDataType.Symbol);
         }
         else
         {
             // ...and if it is a concrete implementation, we will map it to the implemented types symbol
             // so we can look it up later based on the symbol (for the reason above). This is done in
             // the global lowering context, when resolving incomplete lists.
-            // TODO: Shouldn't it be implementedDataType here though? Some call somewhere seems to flip them
-            _globalLoweringContext.LoweredImplementationDataTypesForProtocol[implementorDataType.Symbol] = dataType;
+            _globalLoweringContext.LoweredImplementationDataTypesForProtocol[implementedDataType.Symbol] = dataType;
             _vtableCache[name] = dataType;
         }
 

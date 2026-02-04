@@ -309,11 +309,19 @@ public class LlvmContentEmitter
     {
         var instance = Next(node.Instance)!.Value;
         var instanceType = _typeBuilder.BuildType(node.InstanceDataType);
+
+#if DEBUG
+        if (!node.InstanceDataType.Fields.Any(x => !x.IsPlaceholder && x.Name == node.Name))
+        {
+            Console.Error.WriteLine($"Field {node.Name} not found in {node.InstanceDataType.Name}.");
+        }
+#endif
+
         var index = node.InstanceDataType
             .Fields
             .Where(x => !x.IsPlaceholder)
             .Index()
-            .First(x => x.Item.Name == node.Name)
+            .FirstOrDefault(x => x.Item.Name == node.Name)
             .Index;
 
         return _builder.BuildStructGEP2(

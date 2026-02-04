@@ -356,7 +356,8 @@ public class GenericsTests
                     let p C = new A();
                     let a = p.Generic[i64, i32]() == size_of(i64) + size_of(i32);
                     let b = p.Generic[i32, i32]() == size_of(i32) + size_of(i32);
-                    if a && b
+                    let c = new B().Generic[i32, i32]() == size_of(i32) + size_of(i32) + 1;
+                    if a && b && c
                     {
                         2
                     }
@@ -365,14 +366,13 @@ public class GenericsTests
                         3
                     }
                 }
-
             }
 
             inheritable class C
             {
                 pub func Generic[T, K]() usize
                 {
-                    0
+                    size_of(T) + size_of(K) + 1
                 }
 
                 pub func NonGeneric3() i32
@@ -653,14 +653,14 @@ public class GenericsTests
         TestProject
             .Create()
             .AddFile("main", mainFile)
-            .AddNamespace("second_namespace", other =>
-            {
-                return other.AddFile("second_file", secondFile);
-            })
-            .AddNamespace("third_namespace", other =>
-            {
-                return other.AddFile("third_file", thirdFile);
-            })
+            .AddNamespace(
+                "second_namespace",
+                other => other.AddFile("second_file", secondFile)
+            )
+            .AddNamespace(
+                "third_namespace",
+                other => other.AddFile("third_file", thirdFile)
+            )
             .Run()
             .AssertSuccessWithExitCode(2);
     }
@@ -728,10 +728,8 @@ public class GenericsTests
             .AssertSuccessWithExitCode(2);
     }
 
-    // TODO: A inherits from B which inherits from C. A function F[T] exists in C and A (making it virtual). Call it from B
-    //       Oh same as the todo below I guess
-    // TODO: Multiple virtual generic methods in one class
-    // TODO: Class that inherits from a class and also implements an interface, with one generic virtual method in each
+    // TODO: A inherits from B which inherits from C. A function F[T] exists in C and A (making it virtual). **Call it from B** <---
+    // TODO: Multiple (at least 3) virtual generic methods in one class
     // TODO: One generics test with EVERYTHING
     // TODO: Document describing how generics work
 }
