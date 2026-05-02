@@ -57,6 +57,25 @@ class LoweredTypeBuilder(
 
     public LoweredStructDataType BuildVtableType(StructureDataType implementorDataType, StructureDataType implementedDataType)
     {
+        /*if (implementedDataType.Symbol is StructureSymbol { SemanticDeclaration: SemanticProtocolDeclarationNode })
+        {
+            while (!implementorDataType.Symbol.SyntaxDeclaration.SubTypes.Any(x => x.ResolvedSymbol == implementedDataType.Symbol))
+            {
+                var implementorClass = implementorDataType
+                    .Symbol
+                    .SemanticDeclaration as SemanticClassDeclarationNode;
+                var parentClassType = implementorClass?.InheritedClassType;
+                if (parentClassType != null)
+                {
+                    implementorDataType = parentClassType;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }*/
+
         _typeArgumentResolver.PushTypeArguments(implementorDataType.TypeArguments, implementorDataType.Symbol.SemanticDeclaration!);
         var name = _mangler.BuildVtableName(implementorDataType, implementedDataType);
         if (_vtableCache.TryGetValue(name, out var existing))
@@ -67,7 +86,7 @@ class LoweredTypeBuilder(
         var fields = new List<LoweredStructDataTypeField>();
 
         // TODO: When default implementions in protocols are a thing, include them here
-        var functions = implemented is SemanticClassDeclarationNode && implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration
+        var functions = implemented is SemanticClassDeclarationNode && implementor is SemanticClassDeclarationNode { InheritedClassType: not null } classDeclaration
             ? classDeclaration.GetVtableMethods()
             : implementor.Functions.AsEnumerable();
 
@@ -86,13 +105,15 @@ class LoweredTypeBuilder(
                 var placeholder = LoweredStructDataTypeField.CreatePlaceholder();
                 fields.Add(placeholder);
 
-                //var implementedName = _mangler.BuildStructName(implemented.Symbol.SemanticDeclaration!, implementedDataType.TypeArguments);
-
-                // TODO: Why does this cause 4 more tests to fail? Compared to the above
-                // TODO: `function` here could be from inside a protocol
                 var functionParentStructureDeclaration = SemanticTree.GetEnclosingStructure(function)!.Symbol.SemanticDeclaration!;
-                var functionParentStructureName = _mangler.BuildStructName(functionParentStructureDeclaration, implementorDataType.TypeArguments);
-                var typeListSpot = new TypeListSpot(fields, placeholder, functionParentStructureName, implemented.Symbol);
+                var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(functionParentStructureDeclaration, implementorDataType);
+
+                var typeListSpot = new TypeListSpot(
+                    fields,
+                    placeholder,
+                    functionParentStructureNames,
+                    implemented.Symbol
+                );
                 _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, typeListSpot);
             }
         }
@@ -111,7 +132,7 @@ class LoweredTypeBuilder(
         }
         else
         {
-            // ...and if it is a concrete implementation, we will map it to the implemented types symbol
+            // ...and if it is a concrete implementation, we will map it to the implemented type's symbol
             // so we can look it up later based on the symbol (for the reason above). This is done in
             // the global lowering context, when resolving incomplete lists.
             _globalLoweringContext.LoweredImplementationDataTypesForProtocol[implementedDataType.Symbol] = dataType;

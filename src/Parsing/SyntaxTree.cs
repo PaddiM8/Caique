@@ -205,7 +205,7 @@ public class SyntaxCallNode(
     SyntaxNode left,
     List<SyntaxNode> arguments,
     TextSpan span
-    )
+)
     : SyntaxNode(span)
 {
     public SyntaxNode Left { get; } = left;

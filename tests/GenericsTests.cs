@@ -581,10 +581,10 @@ public class GenericsTests
         TestProject
             .Create()
             .AddFile("main", mainFile)
-            .AddNamespace("other", other =>
-            {
-                return other.AddFile("otherFile", otherFile);
-            })
+            .AddNamespace(
+                "other",
+                other => other.AddFile("otherFile", otherFile)
+            )
             .Run()
             .AssertSuccessWithExitCode(2);
     }
@@ -720,14 +720,146 @@ public class GenericsTests
         TestProject
             .Create()
             .AddFile("main", mainFile)
-            .AddNamespace("second_namespace", other =>
-            {
-                return other.AddFile("second_file", secondFile);
-            })
+            .AddNamespace(
+                "second_namespace",
+                other => other.AddFile("second_file", secondFile)
+            )
             .Run()
             .AssertSuccessWithExitCode(2);
     }
 
+    [Test]
+    public void TestGenericVirtualFunctions_InClassThatInheritsClassThatImplementsProtocol()
+    {
+        var mainFile = """
+            with second_namespace;
+
+            module Main
+            {
+                func Run() i32
+                {
+                    let p P = new B();
+                    let a A = new A();
+                    let b B = new B();
+
+                    let r1 = p.Generic2[i32]() == size_of(i32) + 1;
+                    let r2 = a.Generic2[i64]() == size_of(i64);
+                    let r3 = b.Generic1[i16]() == size_of(i16);
+                    let r4 = b.Generic2[i16]() == size_of(i16) + 1;
+
+                    if r1 && r2 && r3 && r4
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+            """;
+        var secondFile = """
+            protocol P
+            {
+                func Generic2[T]() usize;
+            }
+
+            inheritable class A : P
+            {
+                pub func Generic2[T]() usize
+                {
+                    size_of(T)
+                }
+            }
+
+            class B : A
+            {
+                pub func Generic1[T]() usize
+                {
+                    size_of(T)
+                }
+
+                pub override func Generic2[T]() usize
+                {
+                    size_of(T) + 1
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .AddNamespace(
+                "second_namespace",
+                other => other.AddFile("second_file", secondFile)
+            )
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    [Test]
+    public void TestGenericVirtualFunctions_InGenericClassThatInheritsGenericClassThatImplementsProtocol()
+    {
+        var mainFile = """
+            with second_namespace;
+
+            module Main
+            {
+                func Run() i32
+                {
+                    let p P = new B[i32, i64]();
+                    let a A[i32] = new A[i32]();
+                    let b B[i32, i64] = new B[i32, i64]();
+
+                    let r1 = p.Generic2[i32]() == size_of(i32) + size_of(i32) + 1;
+                    let r2 = a.Generic2[i64]() == size_of(i64) + size_of(i32);
+                    let r3 = b.Generic2[i16]() == size_of(i16) + size_of(i32) + 1;
+
+                    if r1 && r2 && r3
+                    {
+                        2
+                    }
+                    else
+                    {
+                        3
+                    }
+                }
+            }
+            """;
+        var secondFile = """
+            protocol P
+            {
+                func Generic2[T]() usize;
+            }
+
+            inheritable class A[Y] : P
+            {
+                pub func Generic2[T]() usize
+                {
+                    size_of(T) + size_of(Y)
+                }
+            }
+
+            class B[X, Y] : A[Y]
+            {
+                pub override func Generic2[T]() usize
+                {
+                    size_of(T) + size_of(X) + 1
+                }
+            }
+            """;
+        TestProject
+            .Create()
+            .AddFile("main", mainFile)
+            .AddNamespace(
+                "second_namespace",
+                other => other.AddFile("second_file", secondFile)
+            )
+            .Run()
+            .AssertSuccessWithExitCode(2);
+    }
+
+    // TODO: Recursive ones or whatever
+    // TODO: TestGenericVirtualFunctions_InGenericClassThatInheritsGenericClassThatImplementsGenericProtocol() <-- GENERIC PROTOCOL
     // TODO: A inherits from B which inherits from C. A function F[T] exists in C and A (making it virtual). **Call it from B** <---
     // TODO: Multiple (at least 3) virtual generic methods in one class
     // TODO: One generics test with EVERYTHING

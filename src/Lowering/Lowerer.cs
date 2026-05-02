@@ -38,7 +38,7 @@ public class Lowerer
         var lowerer = new Lowerer(tree, stdScope, globalLoweringContext);
         lowerer.Next(tree.Root);
 
-        var moduleName = tree.File.Namespace.ToString() + "_" + Path.GetFileNameWithoutExtension(tree.File.FilePath);
+        var moduleName = tree.File.Namespace + "_" + Path.GetFileNameWithoutExtension(tree.File.FilePath);
 
         return new LoweredTree(
             moduleName,
@@ -335,7 +335,7 @@ public class Lowerer
     private static int CalculateFieldStartIndex(SemanticClassDeclarationNode classDeclarationNode)
     {
         // The first field is the type table. Therefore, the minimum offset is 1
-        return classDeclarationNode.InheritedClass?.SemanticDeclaration is SemanticClassDeclarationNode inheritedClass
+        return classDeclarationNode.InheritedClassType?.Symbol.SemanticDeclaration is SemanticClassDeclarationNode inheritedClass
             ? CalculateFieldStartIndex(inheritedClass) + inheritedClass.Fields.Count
             : 1;
     }
@@ -1070,9 +1070,9 @@ public class Lowerer
         List<IDataType> typeArguments
     )
     {
-        if (node.InheritedClass != null && node.InheritedClass.SyntaxDeclaration.TypeParameters.Count > 0)
+        if (node.InheritedClassType?.Symbol.SyntaxDeclaration.TypeParameters.Count > 0)
         {
-            var baseDataType = new StructureDataType(node.InheritedClass.SyntaxDeclaration.Symbol!, typeArguments);
+            var baseDataType = new StructureDataType(node.InheritedClassType.Symbol!, typeArguments);
             GenerateStructOnDemand(baseDataType);
         }
 
@@ -1341,7 +1341,7 @@ public class Lowerer
         }
 
         // Call base constructor (if any)
-        if (parentStructure is SemanticClassDeclarationNode { InheritedClass: not null } classNode2)
+        if (parentStructure is SemanticClassDeclarationNode { InheritedClassType: not null } classNode2)
         {
             IEnumerable<LoweredNode> baseCallArguments = [];
             if (node.BaseCall != null)
@@ -1354,7 +1354,7 @@ public class Lowerer
 
             BuildConstructorCall(
                 instance,
-                (SemanticClassDeclarationNode)classNode2.InheritedClass!.SemanticDeclaration!,
+                (SemanticClassDeclarationNode)classNode2.InheritedClassType!.Symbol.SemanticDeclaration!,
                 structureTypeArguments,
                 baseCallArguments
             );
@@ -1419,6 +1419,29 @@ public class Lowerer
         var vtableType = _typeBuilder.BuildVtableType(implementorDataType, implementedDataType);
         LoweredConstStructNode? structValue = null;
 
+        // If the type is implemented in an inherited class, use the vtable for that inherited class, since that
+        // should be sufficient. It is also necessary for generic virtual methods to work with nested classes combined
+        // with protocols.
+        // TODO: Won't work
+        /*if (implementedDataType.Symbol is StructureSymbol { SemanticDeclaration: SemanticProtocolDeclarationNode })
+        {
+            while (!implementorDataType.Symbol.SyntaxDeclaration.SubTypes.Any(x => x.ResolvedSymbol == implementedDataType.Symbol))
+            {
+                var implementorClass = implementorDataType
+                    .Symbol
+                    .SemanticDeclaration as SemanticClassDeclarationNode;
+                var parentClassType = implementorClass?.InheritedClassType;
+                if (parentClassType != null)
+                {
+                    implementorDataType = parentClassType;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }*/
+
         if (!_globalLoweringContext.VtableHasBeenRegistered(vtableType.Name!))
         {
             var implementor = implementorDataType.Symbol.SemanticDeclaration!;
@@ -1426,7 +1449,7 @@ public class Lowerer
 
             // TODO: When default implementions in protocols are a thing, include them here
             IEnumerable<SemanticFunctionDeclarationNode> functions;
-            if (implemented is SemanticClassDeclarationNode && implementor is SemanticClassDeclarationNode { InheritedClass: not null } classDeclaration)
+            if (implemented is SemanticClassDeclarationNode && implementor is SemanticClassDeclarationNode { InheritedClassType: not null } classDeclaration)
             {
                 functions = classDeclaration.GetVtableMethods();
             }
@@ -1460,12 +1483,12 @@ public class Lowerer
                     // the vtable is used for. It is possible for a function to be defined in a parent class but used in the child class,
                     // in which case the vtable should refer to the function in the parent class.
                     var functionParentStructureSymbol = SemanticTree.GetEnclosingStructure(function)!.Symbol.SemanticDeclaration!;
-                    var functionParentStructureName = _mangler.BuildStructName(functionParentStructureSymbol, implementorDataType.TypeArguments);
+                    var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(functionParentStructureSymbol, implementorDataType);
 
                     // For protocols, one vtable is generated per protocol and implementor. That means that this reference list spot
                     // should only be for the functions in that protocol. Therefore, we set the VirtualStructureSymbol as the protocol's
                     // symbol.
-                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, functionParentStructureName, implemented.Symbol);
+                    var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, functionParentStructureNames, implemented.Symbol);
                     _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);
                 }
             }

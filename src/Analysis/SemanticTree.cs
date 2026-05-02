@@ -486,7 +486,7 @@ public interface ISemanticInstantiableStructureDeclaration : ISemanticStructureD
 
 public class SemanticClassDeclarationNode(
     Token identifier,
-    StructureSymbol? inheritedClass,
+    StructureDataType? inheritedClassType,
     List<StructureSymbol> implementedProtocols,
     SemanticInitNode init,
     List<SemanticFunctionDeclarationNode> functions,
@@ -499,7 +499,7 @@ public class SemanticClassDeclarationNode(
 {
     public Token Identifier { get; } = identifier;
 
-    public StructureSymbol? InheritedClass { get; } = inheritedClass;
+    public StructureDataType? InheritedClassType { get; } = inheritedClassType;
 
     public List<StructureSymbol> ImplementedProtocols { get; } = implementedProtocols;
 
@@ -537,9 +537,9 @@ public class SemanticClassDeclarationNode(
 
     public IEnumerable<SemanticFieldDeclarationNode> GetAllMemberFields()
     {
-        var inheritedFields = InheritedClass == null
+        var inheritedFields = InheritedClassType == null
             ? []
-            : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllMemberFields();
+            : ((SemanticClassDeclarationNode)InheritedClassType.Symbol.SemanticDeclaration!).GetAllMemberFields();
         var memberFields = Fields.Where(x => !x.IsStatic);
 
         return inheritedFields.Concat(memberFields);
@@ -547,9 +547,9 @@ public class SemanticClassDeclarationNode(
 
     public IEnumerable<SemanticFunctionDeclarationNode> GetAllMethods()
     {
-        var inheritedFunctions = InheritedClass == null
+        var inheritedFunctions = InheritedClassType == null
             ? []
-            : ((SemanticClassDeclarationNode)InheritedClass.SemanticDeclaration!).GetAllMethods();
+            : ((SemanticClassDeclarationNode)InheritedClassType.Symbol.SemanticDeclaration!).GetAllMethods();
         var memberFunctions = Functions.Where(x => !x.IsStatic);
 
         return memberFunctions.Concat(inheritedFunctions);
@@ -557,7 +557,7 @@ public class SemanticClassDeclarationNode(
 
     public List<SemanticFunctionDeclarationNode> GetVtableMethods()
     {
-        var methods = InheritedClass?.SemanticDeclaration is SemanticClassDeclarationNode parentClass
+        var methods = InheritedClassType?.Symbol.SemanticDeclaration is SemanticClassDeclarationNode parentClass
             ? parentClass.GetVtableMethods()
             : [];
         var indexMap = methods

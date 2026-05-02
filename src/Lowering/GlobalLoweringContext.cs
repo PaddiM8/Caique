@@ -25,14 +25,14 @@ record OnDemandGeneratedVirtualFunctionEntry(
 public record TypeListSpot(
     List<LoweredStructDataTypeField> TypeList,
     LoweredStructDataTypeField Placeholder,
-    string? StructureName,
+    List<string> StructureNames,
     StructureSymbol VirtualStructureSymbol
 );
 
 public record ReferenceListSpot(
     List<LoweredNode> ReferenceList,
     LoweredOnDemandReferencePlaceholderNode Placeholder,
-    string? StructureName,
+    List<string> StructureNames,
     StructureSymbol VirtualStructureSymbol
 );
 
@@ -347,8 +347,8 @@ public class GlobalLoweringContext
                             ungeneratedVirtualFunction.VirtualFunctionDataType.Symbol,
                             unqualifiedName,
                             generatedDeclaration,
-                            structDeclaration.LoweredDeclaration.Identifier,
-                            ungeneratedVirtualFunction.InstanceSymbol
+                            ungeneratedVirtualFunction.VirtualFunctionDataType.InstanceDataType.QualifiedName,
+                            ungeneratedVirtualFunction.VirtualFunctionDataType.InstanceDataType.Symbol
                         );
                         protocolFunctionEntries.Add(virtualEntry);
                     }
@@ -422,7 +422,7 @@ public class GlobalLoweringContext
                         continue;
                     }
 
-                    if (functionReferenceList.StructureName != function.StructureName)
+                    if (function.StructureName == null || !functionReferenceList.StructureNames.Contains(function.StructureName))
                         continue;
 
                     var functionReference = new LoweredFunctionReferenceNode(
@@ -450,7 +450,7 @@ public class GlobalLoweringContext
                         continue;
                     }
 
-                    if (functionTypeList.StructureName != function.StructureName)
+                    if (function.StructureName == null || !functionTypeList.StructureNames.Contains(function.StructureName))
                         continue;
 
                     var functionDataType = new LoweredPointerDataType(
@@ -463,6 +463,13 @@ public class GlobalLoweringContext
             }
         }
 
+        // TODO: Document this
+        // TODO: Doing Fields.AddRange(...) instead of Fields = ... broke another test... hmm
+        // TODO: B.vtable.P should probably have entries?
+        //       ^ for it do have entries, is it not necessary to change the system with functionTypeList.StructureName and all that?
+        //       The structure name in one case will be A, which B inherits from, and in the other case it will be B, so it won't match,
+        //       but it should I think..?
+        //       Or maybe it would be possible to simply use A.vtable.P instead and not have B.vtable.P? <-- probably not
         foreach (var (incompleteDataType, symbol) in _incompleteLoweredDataTypes.Keys)
             incompleteDataType.Fields = LoweredImplementationDataTypesForProtocol[symbol].Fields;
     }

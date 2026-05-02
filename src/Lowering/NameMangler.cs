@@ -102,6 +102,42 @@ class NameMangler(TypeArgumentResolver typeArgumentResolver)
         return BuildTypeName(dataType);
     }
 
+    /// <summary>
+    /// Builds the names of every ancestor structure up until <paramref name="ancestorDeclaration" />.
+    /// Example structure: Animal -> Bird[K] -> Crow[T, K]
+    /// If ancestorDeclaration refers to Bird and childDataType refers to Crow, the method will return
+    /// ["Bird[K]", "Crow[T, K]"]
+    /// </summary>
+    public List<string> BuildStructNameAndAncestorNames(ISemanticStructureDeclaration ancestorDeclaration, StructureDataType childDataType)
+    {
+        var names = new List<string>();
+        names.Add(BuildStructName(ancestorDeclaration, childDataType.TypeArguments));
+
+        ISemanticStructureDeclaration? currentDeclaration = ancestorDeclaration;
+        while (currentDeclaration is SemanticClassDeclarationNode { InheritedClassType: var inheritedType })
+        {
+            if (inheritedType?.Symbol.SemanticDeclaration != null)
+            {
+                var parentTypeArguments = AdjustTypeArgumentListForParentClass(inheritedType.Symbol.SemanticDeclaration);
+                names.Add(BuildStructName(inheritedType.Symbol.SemanticDeclaration, parentTypeArguments ?? []));
+            }
+
+            currentDeclaration = inheritedType?.Symbol.SemanticDeclaration;
+        }
+
+        Console.WriteLine(string.Join(", ", names));
+
+        return names;
+    }
+
+    private List<IDataType>? AdjustTypeArgumentListForParentClass(ISemanticStructureDeclaration childType)
+    {
+        if (childType is SemanticClassDeclarationNode childClass)
+            return childClass.InheritedClassType?.TypeArguments;
+
+        return null;
+    }
+
     public string BuildConstructorName(ISemanticStructureDeclaration structure, List<IDataType> structureTypeArguments)
     {
         var structureName = BuildStructName(structure, structureTypeArguments);

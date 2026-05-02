@@ -1372,7 +1372,7 @@ public class Analyser
         if (inheritedClasses.FirstOrDefault()?.IsInheritable is false)
             _diagnostics.ReportBaseClassNotInheritable(node.Span, inheritedClasses.First()!.Span);
 
-        StructureSymbol? inheritedClass = null;
+        StructureDataType? inheritedClassType = null;
         var implementedProtocols = new List<StructureSymbol>();
         foreach (var subTypeNode in node.SubTypes)
         {
@@ -1383,7 +1383,7 @@ public class Analyser
 
                 if (structureDataType.IsClass())
                 {
-                    inheritedClass = structureDataType.Symbol;
+                    inheritedClassType = structureDataType;
                 }
                 else if (structureDataType.IsProtocol())
                 {
@@ -1439,7 +1439,7 @@ public class Analyser
 
         var semanticNode = new SemanticClassDeclarationNode(
             node.Identifier,
-            inheritedClass,
+            inheritedClassType,
             implementedProtocols,
             init,
             functions,
