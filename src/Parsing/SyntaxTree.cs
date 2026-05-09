@@ -443,6 +443,7 @@ public class SyntaxClassDeclarationNode(
 
 public class SyntaxProtocolDeclarationNode(
     Token identifier,
+    List<SyntaxTypeParameterNode> typeParameters,
     List<SyntaxTypeNode> subTypes,
     List<SyntaxNode> declarations,
     StructureScope scope,
@@ -452,9 +453,9 @@ public class SyntaxProtocolDeclarationNode(
 {
     public Token Identifier { get; } = identifier;
 
-    public List<SyntaxTypeNode> SubTypes { get; } = subTypes;
+    public List<SyntaxTypeParameterNode> TypeParameters { get; } = typeParameters;
 
-    public List<SyntaxTypeParameterNode> TypeParameters { get; } = [];
+    public List<SyntaxTypeNode> SubTypes { get; } = subTypes;
 
     public List<SyntaxNode> Declarations { get; } = declarations;
 

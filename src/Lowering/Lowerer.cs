@@ -570,9 +570,11 @@ public class Lowerer
                 .Append(objectInstanceDataType.Symbol);
             foreach (var implementationSymbol in implementors)
             {
-                var symbol = implementationSymbol
-                    .SemanticDeclaration!
-                    .Functions
+                var functions = implementationSymbol.SemanticDeclaration!.Functions;
+                if (implementationSymbol == objectInstanceDataType.Symbol && implementationSymbol.SemanticDeclaration is SemanticClassDeclarationNode implementationClass)
+                    functions = implementationClass.GetVtableMethods();
+
+                var symbol = functions
                     .FirstOrDefault(x => x.Identifier.Value == functionDataType.Symbol.SemanticDeclaration!.Identifier.Value)?
                     .Symbol;
                 if (symbol == null)
@@ -597,17 +599,48 @@ public class Lowerer
 
         // We can't get the field by index since vtable fields are created on-demand
         // for generic functions.
-        var unqualifiedName = _mangler.BuildUnqualifiedFunctionName(
+        // TODO: Maybe we can now that they're in the GVM table instead
+        var unqualifiedNameWithoutTypeArguments = _mangler.BuildUnqualifiedFunctionName(
             functionDataType.Symbol.SemanticDeclaration!,
-            functionDataType.TypeArguments
+            []
         );
-        var actualFunctionReference = new LoweredFieldReferenceByNameNode(
-            vtableType,
-            vtablePointer,
-            unqualifiedName,
-            new LoweredPointerDataType(functionDeclaration)
-        );
-        var actualFunctionPointer = new LoweredLoadNode(actualFunctionReference);
+
+        LoweredLoadNode actualFunctionPointer;
+        if (functionDataType.Symbol.SyntaxDeclaration.TypeParameters.Count > 0)
+        {
+            // Get the GVM table from the vtable
+            var gvmTableType = _typeBuilder.BuildGvmTableType(functionDataType.Symbol, objectInstanceDataType, objectInstanceDataType);
+            var gvmTableReference = new LoweredFieldReferenceByNameNode(
+                vtableType,
+                vtablePointer,
+                unqualifiedNameWithoutTypeArguments,
+                new LoweredPointerDataType(gvmTableType)
+            );
+            var gvmTablePointer = new LoweredLoadNode(gvmTableReference);
+
+            // Index the GVM table
+            var unqualifiedName = _mangler.BuildUnqualifiedFunctionName(
+                functionDataType.Symbol.SemanticDeclaration!,
+                functionDataType.TypeArguments
+            );
+            var actualFunctionReference = new LoweredFieldReferenceByNameNode(
+                gvmTableType,
+                gvmTablePointer,
+                unqualifiedName,
+                new LoweredPointerDataType(functionDeclaration)
+            );
+            actualFunctionPointer = new LoweredLoadNode(actualFunctionReference);
+        }
+        else
+        {
+            var actualFunctionReference = new LoweredFieldReferenceByNameNode(
+                vtableType,
+                vtablePointer,
+                unqualifiedNameWithoutTypeArguments,
+                new LoweredPointerDataType(functionDeclaration)
+            );
+            actualFunctionPointer = new LoweredLoadNode(actualFunctionReference);
+        }
 
         return new LoweredCallNode(actualFunctionPointer, arguments, functionDeclaration.ReturnType);
     }
@@ -1076,14 +1109,15 @@ public class Lowerer
             GenerateStructOnDemand(baseDataType);
         }
 
-        foreach (var protocol in node.ImplementedProtocols)
+        // TODO: Why was this here? Won't work...
+        /* foreach (var protocol in node.ImplementedProtocols)
         {
             if (protocol.SyntaxDeclaration.TypeParameters.Count > 0)
             {
                 var protocolDataType = new StructureDataType(protocol.SyntaxDeclaration.Symbol!, typeArguments);
                 GenerateStructOnDemand(protocolDataType);
             }
-        }
+        }*/
 
         var name = _mangler.BuildStructName(node, typeArguments);
         var fields = node
@@ -1419,29 +1453,6 @@ public class Lowerer
         var vtableType = _typeBuilder.BuildVtableType(implementorDataType, implementedDataType);
         LoweredConstStructNode? structValue = null;
 
-        // If the type is implemented in an inherited class, use the vtable for that inherited class, since that
-        // should be sufficient. It is also necessary for generic virtual methods to work with nested classes combined
-        // with protocols.
-        // TODO: Won't work
-        /*if (implementedDataType.Symbol is StructureSymbol { SemanticDeclaration: SemanticProtocolDeclarationNode })
-        {
-            while (!implementorDataType.Symbol.SyntaxDeclaration.SubTypes.Any(x => x.ResolvedSymbol == implementedDataType.Symbol))
-            {
-                var implementorClass = implementorDataType
-                    .Symbol
-                    .SemanticDeclaration as SemanticClassDeclarationNode;
-                var parentClassType = implementorClass?.InheritedClassType;
-                if (parentClassType != null)
-                {
-                    implementorDataType = parentClassType;
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }*/
-
         if (!_globalLoweringContext.VtableHasBeenRegistered(vtableType.Name!))
         {
             var implementor = implementorDataType.Symbol.SemanticDeclaration!;
@@ -1476,20 +1487,23 @@ public class Lowerer
                 }
                 else
                 {
-                    var placeholder = new LoweredOnDemandReferencePlaceholderNode();
+                    var gvmTableReference = GetOrBuildGvmTable(function.Symbol, implementorDataType, implementedDataType);
+                    functionReferences.Add(gvmTableReference);
+
+                    /*var placeholder = new LoweredOnDemandReferencePlaceholderNode();
                     functionReferences.Add(placeholder);
 
                     // Here, we want to get the name of the structure that contains the function, rather than the structure that
                     // the vtable is used for. It is possible for a function to be defined in a parent class but used in the child class,
                     // in which case the vtable should refer to the function in the parent class.
                     var functionParentStructureSymbol = SemanticTree.GetEnclosingStructure(function)!.Symbol.SemanticDeclaration!;
-                    var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(functionParentStructureSymbol, implementorDataType);
+                    var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(implementor, implementorDataType);
 
                     // For protocols, one vtable is generated per protocol and implementor. That means that this reference list spot
                     // should only be for the functions in that protocol. Therefore, we set the VirtualStructureSymbol as the protocol's
                     // symbol.
                     var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, functionParentStructureNames, implemented.Symbol);
-                    _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);
+                    _globalLoweringContext.AddIncompleteFunctionReferenceList(function.Symbol, referenceListSpot);*/
                 }
             }
 
@@ -1509,6 +1523,51 @@ public class Lowerer
         _globalLoweringContext.RegisterVtable(vtableType.Name!);
 
         return new LoweredGlobalReferenceNode(vtableType.Name!, vtableType);
+    }
+
+    private LoweredNode GetOrBuildGvmTable(FunctionSymbol functionSymbol, StructureDataType implementorDataType, StructureDataType implementedDataType)
+    {
+        var gvmTableType = _typeBuilder.BuildGvmTableType(functionSymbol, implementorDataType, implementedDataType);
+        LoweredConstStructNode? structValue = null;
+
+        if (!_globalLoweringContext.GvmTableHasBeenRegistered(gvmTableType.Name!))
+        {
+            var placeholder = new LoweredOnDemandReferencePlaceholderNode();
+            var functionReferences = new List<LoweredNode>
+            {
+                placeholder,
+            };
+
+            var implementor = implementorDataType.Symbol.SemanticDeclaration!;
+            var implemented = implementedDataType.Symbol.SemanticDeclaration!;
+
+            // Here, we want to get the name of the structure that contains the function, rather than the structure that
+            // the vtable is used for. It is possible for a function to be defined in a parent class but used in the child class,
+            // in which case the vtable should refer to the function in the parent class.
+            var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(implementor, implementorDataType);
+
+            // For protocols, one vtable is generated per protocol and implementor. That means that this reference list spot
+            // should only be for the functions in that protocol. Therefore, we set the VirtualStructureSymbol as the protocol's
+            // symbol.
+            var referenceListSpot = new ReferenceListSpot(functionReferences, placeholder, functionParentStructureNames, implemented.Symbol);
+            _globalLoweringContext.AddIncompleteFunctionReferenceList(functionSymbol, referenceListSpot);
+
+            structValue = new LoweredConstStructNode(
+                functionReferences,
+                gvmTableType
+            );
+        }
+
+        var global = new LoweredGlobalDeclarationNode(
+            gvmTableType.Name!,
+            structValue,
+            LoweredGlobalScope.Full,
+            gvmTableType
+        );
+        _globals[gvmTableType.Name!] = global;
+        _globalLoweringContext.RegisterGvmTable(gvmTableType.Name!);
+
+        return new LoweredGlobalReferenceNode(gvmTableType.Name!, gvmTableType);
     }
 
     private LoweredNode BuildTypeTable(StructureDataType classDataType)
@@ -1539,8 +1598,9 @@ public class Lowerer
 
     private LoweredNode? Visit(SemanticProtocolDeclarationNode node)
     {
-        foreach (var function in node.Functions)
-            Next(function);
+        // TODO: Is this necessary? Maybe?
+        /*foreach (var function in node.Functions)
+            Next(function);*/
 
         return null;
     }

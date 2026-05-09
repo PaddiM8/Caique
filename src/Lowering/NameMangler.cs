@@ -125,8 +125,6 @@ class NameMangler(TypeArgumentResolver typeArgumentResolver)
             currentDeclaration = inheritedType?.Symbol.SemanticDeclaration;
         }
 
-        Console.WriteLine(string.Join(", ", names));
-
         return names;
     }
 
@@ -173,6 +171,15 @@ class NameMangler(TypeArgumentResolver typeArgumentResolver)
         var implementedName = BuildTypeName(implementedDataType);
 
         return $"{implementorName}.vtable.{implementedName}";
+    }
+
+    public string BuildGvmTableName(SemanticFunctionDeclarationNode functionDeclaration, StructureDataType implementorDataType, StructureDataType implementedDataType)
+    {
+        var functionName = BuildUnqualifiedFunctionName(functionDeclaration, []);
+        var implementorName = BuildTypeName(implementorDataType);
+        var implementedName = BuildTypeName(implementedDataType);
+
+        return $"{functionName}.{implementorName}.gvmtable.{implementedName}";
     }
 
     public string BuildTypeTableName(StructureDataType structureDataType)

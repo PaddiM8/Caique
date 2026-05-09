@@ -12,6 +12,7 @@ class LoweredTypeBuilder(
 {
     private readonly Dictionary<IDataType, ILoweredDataType> _generalCache = [];
     private readonly Dictionary<string, LoweredStructDataType> _vtableCache = [];
+    private readonly Dictionary<string, LoweredStructDataType> _gvmTableCache = [];
     private readonly GlobalLoweringContext _globalLoweringContext = globalLoweringContext;
     private readonly TypeArgumentResolver _typeArgumentResolver = typeArgumentResolver;
     private readonly NameMangler _mangler = mangler;
@@ -57,25 +58,6 @@ class LoweredTypeBuilder(
 
     public LoweredStructDataType BuildVtableType(StructureDataType implementorDataType, StructureDataType implementedDataType)
     {
-        /*if (implementedDataType.Symbol is StructureSymbol { SemanticDeclaration: SemanticProtocolDeclarationNode })
-        {
-            while (!implementorDataType.Symbol.SyntaxDeclaration.SubTypes.Any(x => x.ResolvedSymbol == implementedDataType.Symbol))
-            {
-                var implementorClass = implementorDataType
-                    .Symbol
-                    .SemanticDeclaration as SemanticClassDeclarationNode;
-                var parentClassType = implementorClass?.InheritedClassType;
-                if (parentClassType != null)
-                {
-                    implementorDataType = parentClassType;
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }*/
-
         _typeArgumentResolver.PushTypeArguments(implementorDataType.TypeArguments, implementorDataType.Symbol.SemanticDeclaration!);
         var name = _mangler.BuildVtableName(implementorDataType, implementedDataType);
         if (_vtableCache.TryGetValue(name, out var existing))
@@ -94,19 +76,21 @@ class LoweredTypeBuilder(
 
         foreach (var function in functions)
         {
+            var functionName = _mangler.BuildUnqualifiedFunctionName(function.Symbol.SemanticDeclaration!, []);
             if (function.Symbol.SyntaxDeclaration.TypeParameters.Count == 0)
             {
                 var functionType = BuildType(new FunctionDataType(function.Symbol, implementedDataType, []));
-                var functionName = _mangler.BuildUnqualifiedFunctionName(function.Symbol.SemanticDeclaration!, []);
                 fields.Add(new LoweredStructDataTypeField(functionName, functionType));
             }
             else
             {
-                var placeholder = LoweredStructDataTypeField.CreatePlaceholder();
+                var voidPointerType = new LoweredPointerDataType(new LoweredPrimitiveDataType(Primitive.Void));
+                fields.Add(new LoweredStructDataTypeField(functionName, voidPointerType));
+                /*var placeholder = LoweredStructDataTypeField.CreatePlaceholder();
                 fields.Add(placeholder);
 
                 var functionParentStructureDeclaration = SemanticTree.GetEnclosingStructure(function)!.Symbol.SemanticDeclaration!;
-                var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(functionParentStructureDeclaration, implementorDataType);
+                var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(implementor, implementorDataType);
 
                 var typeListSpot = new TypeListSpot(
                     fields,
@@ -114,9 +98,43 @@ class LoweredTypeBuilder(
                     functionParentStructureNames,
                     implemented.Symbol
                 );
-                _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, typeListSpot);
+                _globalLoweringContext.AddIncompleteFunctionTypeList(function.Symbol, typeListSpot);*/
             }
         }
+
+        _typeArgumentResolver.PopTypeArguments();
+        var dataType = new LoweredStructDataType(fields, name);
+
+        _vtableCache[name] = dataType;
+
+        return dataType;
+    }
+
+    public LoweredStructDataType BuildGvmTableType(FunctionSymbol functionSymbol, StructureDataType implementorDataType, StructureDataType implementedDataType)
+    {
+        _typeArgumentResolver.PushTypeArguments(implementorDataType.TypeArguments, implementorDataType.Symbol.SemanticDeclaration!);
+
+        var name = _mangler.BuildGvmTableName(functionSymbol.SemanticDeclaration!, implementorDataType, implementedDataType);
+        if (_gvmTableCache.TryGetValue(name, out var existing))
+            return existing;
+
+        var implementor = implementorDataType.Symbol.SemanticDeclaration!;
+        var implemented = implementedDataType.Symbol.SemanticDeclaration!;
+
+        var fields = new List<LoweredStructDataTypeField>();
+        var placeholder = LoweredStructDataTypeField.CreatePlaceholder();
+        fields.Add(placeholder);
+
+        // Here, we want to get the name of the structure that contains the function, rather than the structure that
+        // the vtable is used for. It is possible for a function to be defined in a parent class but used in the child class,
+        // in which case the vtable should refer to the function in the parent class.
+        var functionParentStructureNames = _mangler.BuildStructNameAndAncestorNames(implementor, implementorDataType);
+
+        // For protocols, one vtable is generated per protocol and implementor. That means that this reference list spot
+        // should only be for the functions in that protocol. Therefore, we set the VirtualStructureSymbol as the protocol's
+        // symbol.
+        var typeListSpot = new TypeListSpot(fields, placeholder, functionParentStructureNames, implemented.Symbol);
+        _globalLoweringContext.AddIncompleteFunctionTypeList(functionSymbol, typeListSpot);
 
         _typeArgumentResolver.PopTypeArguments();
         var dataType = new LoweredStructDataType(fields, name);
@@ -136,7 +154,7 @@ class LoweredTypeBuilder(
             // so we can look it up later based on the symbol (for the reason above). This is done in
             // the global lowering context, when resolving incomplete lists.
             _globalLoweringContext.LoweredImplementationDataTypesForProtocol[implementedDataType.Symbol] = dataType;
-            _vtableCache[name] = dataType;
+            _gvmTableCache[name] = dataType;
         }
 
         return dataType;
@@ -282,8 +300,6 @@ class LoweredTypeBuilder(
         }
         else if (dataType.Symbol.SemanticDeclaration is SemanticProtocolDeclarationNode)
         {
-            // var instanceType = new LoweredPointerDataType(BuildStructType(dataType.Symbol, dataType.TypeArguments));
-            // var vtableType = new LoweredPointerDataType(BuildVtableType(dataType, dataType));
             var internalFatPointerTypes = new List<LoweredStructDataTypeField>
             {
                 new("instance", new LoweredPointerDataType(new LoweredPrimitiveDataType(Primitive.Void))),

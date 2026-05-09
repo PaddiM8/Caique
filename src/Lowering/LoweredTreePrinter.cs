@@ -105,7 +105,7 @@ public class LoweredTreePrinter
         if (preceding.Length > 0)
             Append(builder, preceding);
 
-        builder.AppendLine($"%{_variableCount++} = load {NextDataType(node.DataType)} {value}");
+        builder.AppendLine($"%{++_variableCount} = load {NextDataType(node.DataType)} {value}");
 
         return (builder, $"%{_variableCount}");
     }
@@ -142,7 +142,7 @@ public class LoweredTreePrinter
         if (preceding.Length > 0)
             builder.AppendLine(preceding.ToString());
 
-        return (new(), $"(field_by_name {NextDataType(node.DataType)} {NextDataType(node.InstanceDataType)} {value}, {node.Name})");
+        return (builder, $"(field_by_name {NextDataType(node.DataType)} {NextDataType(node.InstanceDataType)} {value}, {node.Name})");
     }
 
     private (StringBuilder, string?) Visit(LoweredGlobalReferenceNode node)
@@ -230,7 +230,7 @@ public class LoweredTreePrinter
         if (precedingCallee.Length > 0)
             Append(builder, precedingCallee.ToString());
 
-        builder.AppendLine($"%{_variableCount++} = call {valueCalle}({string.Join(", ", argumentValues)})");
+        builder.AppendLine($"%{++_variableCount} = call {valueCalle}({string.Join(", ", argumentValues)})");
 
         return (builder, $"%{_variableCount}");
     }

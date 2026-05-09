@@ -318,6 +318,10 @@ public class Parser
     {
         var start = EatExpected(TokenKind.Protocol).Span;
         var identifier = EatExpected(TokenKind.Identifier);
+        var typeScope = new TypeScope(parent: null);
+        var typeParameters = new List<SyntaxTypeParameterNode>();
+        if (Match(TokenKind.OpenBracket))
+            typeParameters = ParseTypeParameters(typeScope);
 
         var subTypes = new List<SyntaxTypeNode>();
         if (AdvanceIf(TokenKind.Colon))
@@ -336,6 +340,7 @@ public class Parser
 
         var node = new SyntaxProtocolDeclarationNode(
             identifier,
+            typeParameters,
             subTypes,
             declarations,
             scope,
